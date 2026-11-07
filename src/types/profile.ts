@@ -85,3 +85,4 @@ export function createDefaultProfile(name = 'Personal'): Profile {
     customFields: [],
   };
 }
+

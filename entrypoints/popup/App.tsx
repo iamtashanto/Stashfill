@@ -47,15 +47,17 @@ export function App() {
   useEffect(() => {
     async function load() {
       let allProfiles = await repo.getProfiles();
+      let curSettings = await repo.getSettings();
       if (allProfiles.length === 0) {
         const initialProfile = createPersonalTemplate('Personal');
         await repo.upsertProfile(initialProfile);
+        await repo.setActiveProfileId(initialProfile.id);
         allProfiles = [initialProfile];
+        curSettings = await repo.getSettings();
       }
 
-      const [active, curSettings, isInit] = await Promise.all([
+      const [active, isInit] = await Promise.all([
         repo.getActiveProfile(),
-        repo.getSettings(),
         vaultManager.isInitialized(),
       ]);
 
@@ -69,6 +71,9 @@ export function App() {
     }
     load();
   }, [repo, vaultManager]);
+
+  const isProfileDefault = (p: Profile) =>
+    settings.defaultProfileId ? settings.defaultProfileId === p.id : profiles[0]?.id === p.id;
 
   const applyTheme = (theme: 'system' | 'light' | 'dark') => {
     const root = document.documentElement;
@@ -372,7 +377,7 @@ export function App() {
           >
             {profiles.map((p) => (
               <option key={p.id} value={p.id}>
-                {p.name} {settings.defaultProfileId === p.id ? '★' : ''}
+                {p.name} {isProfileDefault(p) ? '★' : ''}
               </option>
             ))}
           </select>

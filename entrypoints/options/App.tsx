@@ -125,15 +125,17 @@ export function App() {
   useEffect(() => {
     async function init() {
       let allProfiles = await repo.getProfiles();
+      let curSettings = await repo.getSettings();
       if (allProfiles.length === 0) {
         const initial = createPersonalTemplate('Personal');
         await repo.upsertProfile(initial);
+        await repo.setActiveProfileId(initial.id);
         allProfiles = [initial];
+        curSettings = await repo.getSettings();
       }
 
-      const [activeId, curSettings, isInit] = await Promise.all([
+      const [activeId, isInit] = await Promise.all([
         repo.getActiveProfileId(),
-        repo.getSettings(),
         vaultManager.isInitialized(),
       ]);
 
@@ -149,6 +151,11 @@ export function App() {
     }
     init();
   }, [repo, vaultManager]);
+
+  const isProfileDefault = (p: Profile | null) => {
+    if (!p) return false;
+    return settings.defaultProfileId ? settings.defaultProfileId === p.id : profiles[0]?.id === p.id;
+  };
 
   const applyTheme = (theme: 'system' | 'light' | 'dark') => {
     const root = document.documentElement;
@@ -315,10 +322,7 @@ export function App() {
       expMonth,
       expYear,
       cvv: cvv.trim(),
-      brand:
-        brand === 'visa' || brand === 'mastercard' || brand === 'amex' || brand === 'discover'
-          ? brand
-          : 'other',
+      brand: (brand === 'visa' || brand === 'mastercard' || brand === 'amex' || brand === 'discover') ? brand : 'other',
       createdAt: Date.now(),
     };
 
@@ -533,7 +537,7 @@ export function App() {
                           : 'bg-slate-100 text-slate-700 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700'
                       }`}
                     >
-                      {p.name} {settings.defaultProfileId === p.id ? '★' : ''}
+                      {p.name} {isProfileDefault(p) ? '★' : ''}
                     </button>
                   ))}
                   <button
@@ -590,7 +594,7 @@ export function App() {
                       <label class="flex cursor-pointer items-center space-x-2 text-xs font-medium text-slate-700 dark:text-slate-300">
                         <input
                           type="checkbox"
-                          checked={settings.defaultProfileId === profileForm.id}
+                          checked={isProfileDefault(profileForm)}
                           onChange={async (e) => {
                             const isChecked = (e.target as HTMLInputElement).checked;
                             if (isChecked) {

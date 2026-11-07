@@ -67,3 +67,4 @@ export function detectCardBrand(
   if (/^6(011|5)/.test(clean)) return 'discover';
   return 'other';
 }
+
