@@ -3,17 +3,28 @@ import { browser } from 'wxt/browser';
 import { LocalStorageAdapter } from '../../src/storage/LocalStorageAdapter';
 import { StashRepository } from '../../src/storage/StashRepository';
 import { VaultManager } from '../../src/vault/vaultManager';
-import { type Profile, type Settings, DEFAULT_SETTINGS } from '../../src/core/schemas/vault';
+import {
+  type Profile,
+  type Field,
+  type Settings,
+  DEFAULT_SETTINGS,
+} from '../../src/core/schemas/vault';
 import { createPersonalTemplate } from '../../src/core/templates';
 import { type PaymentCard, maskCardNumber } from '../../src/types/vault';
 import { getTranslations, formatString, type Language } from '../../src/i18n';
 import { StashItemRow } from '../../src/components/StashItemRow';
+import { CardBrandIcon } from '../../src/components/CardBrandIcon';
 import { Toast, type ToastMessage } from '../../src/components/Toast';
 import { ConfirmModal } from '../../src/components/ConfirmModal';
 
-export function App() {
-  const [repo] = useState(() => new StashRepository(new LocalStorageAdapter()));
-  const [vaultManager] = useState(() => new VaultManager(repo));
+export interface PopupProps {
+  repository?: StashRepository;
+  vaultMgr?: VaultManager;
+}
+
+export function App({ repository, vaultMgr }: PopupProps = {}) {
+  const [repo] = useState(() => repository ?? new StashRepository(new LocalStorageAdapter()));
+  const [vaultManager] = useState(() => vaultMgr ?? new VaultManager(repo));
 
   const [profiles, setProfiles] = useState<Profile[]>([]);
   const [activeProfile, setActiveProfile] = useState<Profile | null>(null);
@@ -21,6 +32,12 @@ export function App() {
 
   const [searchQuery, setSearchQuery] = useState('');
   const [toast, setToast] = useState<ToastMessage | null>(null);
+
+  // Quick Add Field state
+  const [isQuickAdding, setIsQuickAdding] = useState(false);
+  const [quickLabel, setQuickLabel] = useState('');
+  const [quickValue, setQuickValue] = useState('');
+  const [quickSensitive, setQuickSensitive] = useState(false);
 
   // Vault state
   const [vaultInitialized, setVaultInitialized] = useState(false);
@@ -43,8 +60,10 @@ export function App() {
     }, 2500);
   };
 
-  // Load initial data
+  // Focus search box on open & load initial data
   useEffect(() => {
+    searchInputRef.current?.focus();
+
     async function load() {
       let allProfiles = await repo.getProfiles();
       let curSettings = await repo.getSettings();
@@ -66,8 +85,9 @@ export function App() {
       setSettings(curSettings);
       setVaultInitialized(isInit);
 
-      // Apply theme
       applyTheme(curSettings.theme);
+      document.documentElement.lang = curSettings.language;
+      searchInputRef.current?.focus();
     }
     load();
   }, [repo, vaultManager]);
@@ -82,7 +102,9 @@ export function App() {
     } else if (theme === 'light') {
       root.classList.remove('dark');
     } else {
-      const isSystemDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+      const isSystemDark =
+        typeof window.matchMedia === 'function' &&
+        window.matchMedia('(prefers-color-scheme: dark)').matches;
       root.classList.toggle('dark', isSystemDark);
     }
   };
@@ -104,12 +126,13 @@ export function App() {
     const nextLang = settings.language === 'en' ? 'bn' : 'en';
     const updated = await repo.updateSettings({ language: nextLang });
     setSettings(updated);
+    document.documentElement.lang = nextLang;
   };
 
   const openOptionsPage = () => {
-    if (browser.runtime.openOptionsPage) {
+    if (browser?.runtime?.openOptionsPage) {
       browser.runtime.openOptionsPage();
-    } else {
+    } else if (browser?.runtime?.getURL) {
       window.open(browser.runtime.getURL('/options.html'));
     }
   };
@@ -140,12 +163,25 @@ export function App() {
     }
   };
 
+  const markFieldUsed = async (fieldId: string) => {
+    if (!activeProfile) return;
+    const updatedProfile = await repo.recordFieldUsage(activeProfile.id, fieldId);
+    if (updatedProfile) {
+      setActiveProfile(updatedProfile);
+      setProfiles((prev) => prev.map((p) => (p.id === updatedProfile.id ? updatedProfile : p)));
+    }
+  };
+
   // Fill single field into active focused element
-  const handleFillField = async (key: string, value: string) => {
+  const handleFillField = async (fieldId: string, key: string, value: string) => {
+    await markFieldUsed(fieldId);
     try {
       const tabs = await browser.tabs.query({ active: true, currentWindow: true });
       const activeTab = tabs[0];
-      if (!activeTab?.id) return;
+      if (!activeTab?.id) {
+        await handleCopy(fieldId, value, false);
+        return;
+      }
 
       const res = (await browser.tabs.sendMessage(activeTab.id, {
         type: 'FILL_ACTIVE_FIELD',
@@ -153,24 +189,63 @@ export function App() {
       })) as { success: boolean };
 
       if (res && res.success) {
-        showToast(t.actions.copied, 'success');
+        showToast(formatString(t.actions.filled, { count: 1 }), 'success');
       } else {
-        // Fallback to copy if no active field is focused
-        await handleCopy(value);
+        await handleCopy(fieldId, value, false);
       }
     } catch {
-      await handleCopy(value);
+      await handleCopy(fieldId, value, false);
     }
   };
 
   // Copy to clipboard
-  const handleCopy = async (value: string) => {
+  const handleCopy = async (fieldId: string, value: string, recordUsage = true) => {
+    if (recordUsage) {
+      await markFieldUsed(fieldId);
+    }
     try {
       await navigator.clipboard.writeText(value);
       showToast(t.actions.copied, 'success');
     } catch {
-      showToast('Copy failed', 'error');
+      showToast(t.actions.copyFailed, 'error');
     }
+  };
+
+  // Quick Add Field
+  const handleQuickAddField = async (e: Event) => {
+    e.preventDefault();
+    if (!activeProfile || !quickLabel.trim() || !quickValue.trim()) return;
+
+    const now = Date.now();
+    const newField: Field = {
+      id: `f_${now}_${Math.random().toString(36).substring(2, 7)}`,
+      label: quickLabel.trim(),
+      key: `custom_${now}`,
+      value: quickValue.trim(),
+      type: 'text',
+      category: 'custom',
+      tags: ['custom'],
+      sensitive: quickSensitive,
+      createdAt: now,
+      updatedAt: now,
+      useCount: 0,
+      lastUsedAt: now,
+    };
+
+    const updatedProfile: Profile = {
+      ...activeProfile,
+      fields: [newField, ...activeProfile.fields],
+    };
+
+    const saved = await repo.upsertProfile(updatedProfile);
+    const all = await repo.getProfiles();
+    setProfiles(all);
+    setActiveProfile(saved);
+    setQuickLabel('');
+    setQuickValue('');
+    setQuickSensitive(false);
+    setIsQuickAdding(false);
+    showToast(t.messages.fieldAdded, 'success');
   };
 
   // Vault actions
@@ -193,7 +268,6 @@ export function App() {
     setVaultPassphrase('');
   };
 
-  // Explicit payment card autofill with confirmation (Principle 6)
   const handleRequestFillCard = (card: PaymentCard) => {
     if (settings.confirmBeforePaymentFill) {
       setCardToConfirmFill(card);
@@ -220,39 +294,42 @@ export function App() {
         showToast(t.messages.noFormFound, 'info');
       }
     } catch {
-      showToast('Could not fill card into page', 'error');
+      showToast(t.messages.cardFillError, 'error');
     } finally {
       setCardToConfirmFill(null);
     }
   };
 
-  // Flat list of profile items for search and keyboard navigation
+  // Sorted & filtered field list: sorted by recent (lastUsedAt desc) then most used (useCount desc)
   const visibleItems = useMemo(() => {
     if (!activeProfile || !activeProfile.fields) return [];
 
-    const items: { id: string; label: string; value: string; group: string; key: string }[] = [];
+    const nonEmptyFields = activeProfile.fields.filter((f) => f.value && f.value.trim().length > 0);
 
-    for (const field of activeProfile.fields) {
-      if (field.value && field.value.trim().length > 0) {
-        items.push({
-          id: field.id,
-          label: field.label,
-          value: field.value,
-          group: field.category
-            ? field.category.charAt(0).toUpperCase() + field.category.slice(1)
-            : t.sections.personal,
-          key: field.key,
-        });
-      }
-    }
+    const sorted = [...nonEmptyFields].sort((a, b) => {
+      const lastA = a.lastUsedAt ?? 0;
+      const lastB = b.lastUsedAt ?? 0;
+      if (lastB !== lastA) return lastB - lastA;
+      return (b.useCount ?? 0) - (a.useCount ?? 0);
+    });
 
-    if (!searchQuery.trim()) return items;
+    const mapped = sorted.map((field) => ({
+      id: field.id,
+      label: field.label,
+      value: field.value,
+      group: field.category || t.sections.personal,
+      key: field.key,
+      sensitive: field.sensitive,
+      useCount: field.useCount,
+    }));
+
+    if (!searchQuery.trim()) return mapped;
 
     const q = searchQuery.toLowerCase();
-    return items.filter(
+    return mapped.filter(
       (item) =>
         item.label.toLowerCase().includes(q) ||
-        item.value.toLowerCase().includes(q) ||
+        (!item.sensitive && item.value.toLowerCase().includes(q)) ||
         item.group.toLowerCase().includes(q),
     );
   }, [activeProfile, searchQuery, t]);
@@ -260,50 +337,78 @@ export function App() {
   // Global keyboard shortcuts
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === '/' && document.activeElement !== searchInputRef.current) {
+      if (e.key === 'Escape') {
+        if (cardToConfirmFill) {
+          setCardToConfirmFill(null);
+        } else if (isQuickAdding) {
+          setIsQuickAdding(false);
+        } else if (searchQuery) {
+          setSearchQuery('');
+        }
+        return;
+      }
+
+      const tag = (document.activeElement as HTMLElement | null)?.tagName;
+      const isTyping = tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT';
+
+      if (e.key === '/' && !isTyping) {
         e.preventDefault();
         searchInputRef.current?.focus();
       } else if (e.key === 'ArrowDown') {
-        e.preventDefault();
-        setSelectedItemIndex((prev) => (prev < visibleItems.length - 1 ? prev + 1 : 0));
+        if (visibleItems.length > 0) {
+          e.preventDefault();
+          setSelectedItemIndex((prev) => (prev < visibleItems.length - 1 ? prev + 1 : 0));
+        }
       } else if (e.key === 'ArrowUp') {
-        e.preventDefault();
-        setSelectedItemIndex((prev) => (prev > 0 ? prev - 1 : visibleItems.length - 1));
-      } else if (e.key === 'Enter' && selectedItemIndex >= 0) {
+        if (visibleItems.length > 0) {
+          e.preventDefault();
+          setSelectedItemIndex((prev) => (prev > 0 ? prev - 1 : visibleItems.length - 1));
+        }
+      } else if (
+        e.key === 'Enter' &&
+        selectedItemIndex >= 0 &&
+        document.activeElement === searchInputRef.current
+      ) {
         const item = visibleItems[selectedItemIndex];
         if (item) {
           e.preventDefault();
-          handleFillField(item.id, item.value);
+          handleFillField(item.id, item.key, item.value);
         }
       }
     };
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [visibleItems, selectedItemIndex]);
+  }, [visibleItems, selectedItemIndex, cardToConfirmFill, isQuickAdding, searchQuery]);
 
   return (
-    <div class="flex max-h-[580px] w-[360px] flex-col overflow-hidden bg-white font-sans text-slate-900 dark:bg-slate-900 dark:text-slate-100">
+    <div
+      dir="auto"
+      class="flex max-h-[580px] w-[360px] flex-col overflow-hidden bg-white font-sans text-slate-900 dark:bg-slate-900 dark:text-slate-100"
+    >
       {/* Header */}
-      <header class="backdrop-blur-xs flex shrink-0 items-center justify-between border-b border-slate-200 bg-slate-50/70 px-3.5 py-2.5 dark:border-slate-800 dark:bg-slate-900/70">
-        <div class="flex items-center space-x-2">
-          <div class="flex h-6 w-6 items-center justify-center rounded bg-brand-600 text-xs font-bold tracking-tighter text-white">
+      <header class="flex shrink-0 items-center justify-between border-b border-slate-200 bg-slate-50 px-3.5 py-2.5 dark:border-slate-800 dark:bg-slate-900">
+        <div class="flex items-center gap-2">
+          <div
+            aria-hidden="true"
+            class="flex h-6 w-6 items-center justify-center rounded bg-brand-600 text-xs font-bold tracking-tighter text-white"
+          >
             SF
           </div>
-          <span class="text-sm font-bold text-slate-900 dark:text-white">{t.appName}</span>
-          <span class="rounded-full bg-emerald-100 px-1.5 py-0.5 text-[10px] font-medium text-emerald-800 dark:bg-emerald-950/80 dark:text-emerald-300">
-            Offline
+          <h1 class="text-sm font-bold text-slate-900 dark:text-white">{t.appName}</h1>
+          <span class="rounded-full bg-emerald-100 px-1.5 py-0.5 text-[10px] font-semibold text-emerald-900 dark:bg-emerald-950 dark:text-emerald-200">
+            {t.offlineBadge}
           </span>
         </div>
 
-        <div class="flex items-center space-x-1.5">
+        <div class="flex items-center gap-1">
           {/* Language Toggle */}
           <button
             type="button"
             onClick={handleToggleLanguage}
             title={t.settings.language}
             aria-label={t.settings.language}
-            class="rounded px-1.5 py-1 text-[11px] font-semibold text-slate-600 transition-colors hover:bg-slate-200 dark:text-slate-300 dark:hover:bg-slate-800"
+            class="rounded px-1.5 py-1 text-[11px] font-semibold text-slate-700 transition-colors hover:bg-slate-200 dark:text-slate-200 dark:hover:bg-slate-800"
           >
             {settings.language === 'en' ? 'বাংলা' : 'EN'}
           </button>
@@ -314,10 +419,16 @@ export function App() {
             onClick={handleToggleTheme}
             title={t.settings.theme}
             aria-label={t.settings.theme}
-            class="rounded p-1 text-slate-600 transition-colors hover:bg-slate-200 dark:text-slate-300 dark:hover:bg-slate-800"
+            class="rounded p-1 text-slate-700 transition-colors hover:bg-slate-200 dark:text-slate-200 dark:hover:bg-slate-800"
           >
             {settings.theme === 'dark' ? (
-              <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg
+                class="h-4 w-4"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+                aria-hidden="true"
+              >
                 <path
                   stroke-linecap="round"
                   stroke-linejoin="round"
@@ -326,7 +437,13 @@ export function App() {
                 />
               </svg>
             ) : (
-              <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg
+                class="h-4 w-4"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+                aria-hidden="true"
+              >
                 <path
                   stroke-linecap="round"
                   stroke-linejoin="round"
@@ -343,9 +460,15 @@ export function App() {
             onClick={openOptionsPage}
             title={t.actions.options}
             aria-label={t.actions.options}
-            class="rounded p-1 text-slate-600 transition-colors hover:bg-slate-200 dark:text-slate-300 dark:hover:bg-slate-800"
+            class="rounded p-1 text-slate-700 transition-colors hover:bg-slate-200 dark:text-slate-200 dark:hover:bg-slate-800"
           >
-            <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg
+              class="h-4 w-4"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+              aria-hidden="true"
+            >
               <path
                 stroke-linecap="round"
                 stroke-linejoin="round"
@@ -363,200 +486,328 @@ export function App() {
         </div>
       </header>
 
-      {/* Profile Bar & Primary Action */}
-      <div class="shrink-0 space-y-2 border-b border-slate-200 bg-white p-3 dark:border-slate-800 dark:bg-slate-900">
-        <div class="flex items-center space-x-2">
-          <label for="profile-select" class="shrink-0 text-xs font-medium text-slate-500">
-            {t.settings.activeProfile}:
-          </label>
-          <select
-            id="profile-select"
-            value={activeProfile?.id ?? ''}
-            onChange={(e) => handleProfileChange((e.target as HTMLSelectElement).value)}
-            class="outline-hidden flex-1 rounded border border-slate-300 bg-white px-2 py-1 text-xs font-medium text-slate-800 focus:ring-1 focus:ring-brand-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
-          >
-            {profiles.map((p) => (
-              <option key={p.id} value={p.id}>
-                {p.name} {isProfileDefault(p) ? '★' : ''}
-              </option>
-            ))}
-          </select>
-        </div>
+      <main class="flex flex-1 flex-col overflow-hidden">
+        {/* Profile Bar & Primary Actions */}
+        <div class="shrink-0 space-y-2 border-b border-slate-200 bg-white p-3 dark:border-slate-800 dark:bg-slate-900">
+          <div class="flex items-center gap-2">
+            <label
+              for="profile-select"
+              class="shrink-0 text-xs font-medium text-slate-700 dark:text-slate-300"
+            >
+              {t.settings.activeProfile}:
+            </label>
+            <select
+              id="profile-select"
+              value={activeProfile?.id ?? ''}
+              onChange={(e) => handleProfileChange((e.target as HTMLSelectElement).value)}
+              class="flex-1 rounded border border-slate-300 bg-white px-2 py-1 text-xs font-medium text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+            >
+              {profiles.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.name} {isProfileDefault(p) ? '★' : ''}
+                </option>
+              ))}
+            </select>
+          </div>
 
-        {/* 1-Click Form Fill Button */}
-        <button
-          type="button"
-          onClick={handleFillEntireForm}
-          class="shadow-xs flex w-full cursor-pointer items-center justify-center space-x-1.5 rounded-md bg-brand-600 px-3 py-2 text-xs font-medium text-white transition-colors hover:bg-brand-700"
-        >
-          <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path
-              stroke-linecap="round"
-              stroke-linejoin="round"
-              stroke-width="2"
-              d="M13 10V3L4 14h7v7l9-11h-7z"
-            />
-          </svg>
-          <span>{t.actions.fillForm}</span>
-        </button>
-
-        {/* Search Input */}
-        <div class="relative">
-          <input
-            ref={searchInputRef}
-            type="text"
-            value={searchQuery}
-            onInput={(e) => setSearchQuery((e.target as HTMLInputElement).value)}
-            placeholder={t.actions.search}
-            class="focus:outline-hidden w-full rounded-md border border-slate-200 bg-slate-50 py-1.5 pl-7 pr-7 text-xs text-slate-900 focus:ring-1 focus:ring-brand-500 dark:border-slate-700 dark:bg-slate-800/60 dark:text-slate-100"
-          />
-          <svg
-            class="absolute left-2 top-2 h-3.5 w-3.5 text-slate-400"
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-          >
-            <path
-              stroke-linecap="round"
-              stroke-linejoin="round"
-              stroke-width="2"
-              d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
-            />
-          </svg>
-          {searchQuery && (
+          <div class="flex items-center gap-1.5">
+            {/* 1-Click Form Fill Button */}
             <button
               type="button"
-              onClick={() => setSearchQuery('')}
-              class="absolute right-2 top-1.5 text-xs text-slate-400 hover:text-slate-600"
+              onClick={handleFillEntireForm}
+              class="flex flex-1 cursor-pointer items-center justify-center gap-1.5 rounded-md bg-brand-600 px-3 py-2 text-xs font-semibold text-white transition-colors hover:bg-brand-700"
             >
-              ×
-            </button>
-          )}
-        </div>
-      </div>
-
-      {/* Main List Area */}
-      <div class="flex-1 space-y-1 divide-y divide-slate-100 overflow-y-auto p-2 dark:divide-slate-800/50">
-        {visibleItems.length === 0 ? (
-          <div class="py-6 text-center text-xs text-slate-400">
-            {searchQuery ? 'No matching fields found' : 'No profile data saved yet.'}
-          </div>
-        ) : (
-          <div class="space-y-0.5">
-            {visibleItems.map((item, idx) => (
-              <StashItemRow
-                key={item.id}
-                label={item.label}
-                value={item.value}
-                fillLabel={t.actions.fillField}
-                copyLabel={t.actions.copy}
-                isSelected={idx === selectedItemIndex}
-                onFill={() => handleFillField(item.id, item.value)}
-                onCopy={() => handleCopy(item.value)}
-              />
-            ))}
-          </div>
-        )}
-
-        {/* Secure Vault Section */}
-        <div class="mt-2 pt-2">
-          <div class="flex items-center justify-between px-2 py-1">
-            <span class="flex items-center space-x-1 text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
               <svg
-                class="h-3 w-3 text-brand-600"
+                class="h-4 w-4"
                 fill="none"
                 stroke="currentColor"
                 viewBox="0 0 24 24"
+                aria-hidden="true"
               >
                 <path
                   stroke-linecap="round"
                   stroke-linejoin="round"
                   stroke-width="2"
-                  d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"
+                  d="M13 10V3L4 14h7v7l9-11h-7z"
                 />
               </svg>
-              <span>{t.vault.title}</span>
-            </span>
+              <span>{t.actions.fillForm}</span>
+            </button>
 
-            {vaultUnlocked && (
+            {/* Quick Add Field Button */}
+            <button
+              type="button"
+              onClick={() => setIsQuickAdding((prev) => !prev)}
+              aria-expanded={isQuickAdding}
+              aria-label={t.actions.quickAdd}
+              title={t.actions.quickAdd}
+              class="rounded-md border border-slate-300 bg-white px-2.5 py-2 text-xs font-semibold text-slate-700 transition-colors hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700"
+            >
+              + {t.actions.add}
+            </button>
+          </div>
+
+          {/* Quick Add Field Inline Drawer */}
+          {isQuickAdding && (
+            <form
+              onSubmit={handleQuickAddField}
+              aria-label={t.actions.quickAdd}
+              class="space-y-2 rounded-md border border-brand-200 bg-brand-50/50 p-2.5 dark:border-brand-800 dark:bg-brand-950/30"
+            >
+              <div class="grid grid-cols-2 gap-1.5">
+                <div>
+                  <label
+                    for="quick-field-label"
+                    class="mb-0.5 block text-[10px] font-semibold text-slate-700 dark:text-slate-300"
+                  >
+                    {t.fields.fieldLabel}
+                  </label>
+                  <input
+                    id="quick-field-label"
+                    type="text"
+                    required
+                    value={quickLabel}
+                    onInput={(e) => setQuickLabel((e.target as HTMLInputElement).value)}
+                    placeholder={t.fields.newFieldPlaceholder}
+                    class="w-full rounded border border-slate-300 bg-white px-2 py-1 text-xs text-slate-900 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
+                  />
+                </div>
+                <div>
+                  <label
+                    for="quick-field-value"
+                    class="mb-0.5 block text-[10px] font-semibold text-slate-700 dark:text-slate-300"
+                  >
+                    {t.fields.fieldValue}
+                  </label>
+                  <input
+                    id="quick-field-value"
+                    type="text"
+                    required
+                    value={quickValue}
+                    onInput={(e) => setQuickValue((e.target as HTMLInputElement).value)}
+                    placeholder={t.fields.valuePlaceholder}
+                    class="w-full rounded border border-slate-300 bg-white px-2 py-1 text-xs text-slate-900 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
+                  />
+                </div>
+              </div>
+              <div class="flex items-center justify-between pt-1">
+                <label class="flex cursor-pointer items-center gap-1.5 text-[11px] font-medium text-slate-700 dark:text-slate-300">
+                  <input
+                    type="checkbox"
+                    checked={quickSensitive}
+                    onChange={(e) => setQuickSensitive((e.target as HTMLInputElement).checked)}
+                    class="rounded border-slate-300 text-brand-600"
+                  />
+                  <span>{t.fields.sensitiveField}</span>
+                </label>
+                <div class="flex items-center gap-1">
+                  <button
+                    type="button"
+                    onClick={() => setIsQuickAdding(false)}
+                    class="rounded px-2 py-1 text-[11px] font-medium text-slate-600 hover:bg-slate-200 dark:text-slate-300 dark:hover:bg-slate-700"
+                  >
+                    {t.actions.cancel}
+                  </button>
+                  <button
+                    type="submit"
+                    class="rounded bg-brand-600 px-2.5 py-1 text-[11px] font-semibold text-white hover:bg-brand-700"
+                  >
+                    {t.actions.save}
+                  </button>
+                </div>
+              </div>
+            </form>
+          )}
+
+          {/* Search Input */}
+          <div class="relative">
+            <label for="popup-search-input" class="sr-only">
+              {t.actions.search}
+            </label>
+            <input
+              id="popup-search-input"
+              ref={searchInputRef}
+              type="text"
+              value={searchQuery}
+              onInput={(e) => {
+                setSearchQuery((e.target as HTMLInputElement).value);
+                setSelectedItemIndex(0);
+              }}
+              placeholder={t.actions.search}
+              class="w-full rounded-md border border-slate-300 bg-slate-50 py-1.5 pe-7 ps-7 text-xs text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+            />
+            <svg
+              class="absolute start-2 top-2 h-3.5 w-3.5 text-slate-500 dark:text-slate-400"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+              aria-hidden="true"
+            >
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+                d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+              />
+            </svg>
+            {searchQuery && (
               <button
                 type="button"
-                onClick={handleLockVault}
-                class="text-[10px] text-brand-600 hover:underline"
+                onClick={() => setSearchQuery('')}
+                aria-label={t.actions.clearSearch}
+                class="absolute end-2 top-1.5 text-xs font-bold text-slate-600 hover:text-slate-900 dark:text-slate-300 dark:hover:text-white"
               >
-                {t.actions.lock}
+                ×
               </button>
             )}
           </div>
+        </div>
 
-          {!vaultInitialized ? (
-            <div class="rounded bg-slate-50 p-2.5 text-center text-xs text-slate-500 dark:bg-slate-800/40">
-              <span>{t.vault.setupPassphrase}</span>
-              <button
-                type="button"
-                onClick={openOptionsPage}
-                class="mx-auto mt-1 block font-medium text-brand-600 hover:underline"
-              >
-                {t.actions.options}
-              </button>
-            </div>
-          ) : !vaultUnlocked ? (
-            <div class="space-y-2 rounded bg-slate-50 p-2.5 dark:bg-slate-800/40">
-              <div class="flex items-center space-x-1.5">
-                <input
-                  type="password"
-                  value={vaultPassphrase}
-                  onInput={(e) => setVaultPassphrase((e.target as HTMLInputElement).value)}
-                  onKeyDown={(e) => e.key === 'Enter' && handleUnlockVault()}
-                  placeholder={t.vault.enterPassphrase}
-                  class="focus:outline-hidden flex-1 rounded border border-slate-300 bg-white px-2 py-1 text-xs focus:ring-1 focus:ring-brand-500 dark:border-slate-700 dark:bg-slate-800"
-                />
-                <button
-                  type="button"
-                  onClick={handleUnlockVault}
-                  class="rounded bg-brand-600 px-2.5 py-1 text-xs font-medium text-white hover:bg-brand-700"
-                >
-                  {t.actions.unlock}
-                </button>
-              </div>
-              {vaultError && <p class="text-[11px] text-rose-500">{vaultError}</p>}
+        {/* Main List Area */}
+        <div class="flex-1 space-y-1 divide-y divide-slate-100 overflow-y-auto p-2 dark:divide-slate-800/50">
+          {visibleItems.length === 0 ? (
+            <div class="py-6 text-center text-xs text-slate-600 dark:text-slate-300">
+              {searchQuery ? t.emptyStates.noFieldsMatchSearch : t.emptyStates.noFieldsInProfile}
             </div>
           ) : (
-            <div class="space-y-1.5 p-1">
-              {cards.length === 0 ? (
-                <p class="px-2 py-1 text-xs text-slate-400">{t.vault.noCardsYet}</p>
-              ) : (
-                cards.map((card) => (
-                  <div
-                    key={card.id}
-                    class="flex items-center justify-between rounded border border-slate-200 bg-slate-50/50 p-2 dark:border-slate-800 dark:bg-slate-800/30"
-                  >
-                    <div>
-                      <div class="flex items-center space-x-1.5 text-xs font-semibold text-slate-800 dark:text-slate-100">
-                        <span>{card.nickname}</span>
-                        <span class="rounded bg-slate-200 px-1 text-[9px] uppercase text-slate-700 dark:bg-slate-700 dark:text-slate-300">
-                          {card.brand}
-                        </span>
-                      </div>
-                      <div class="mt-0.5 font-mono text-[11px] text-slate-500">
-                        {maskCardNumber(card.cardNumber)} ({card.expMonth}/{card.expYear})
-                      </div>
-                    </div>
-
-                    <button
-                      type="button"
-                      onClick={() => handleRequestFillCard(card)}
-                      class="rounded border border-amber-500/30 bg-amber-500/10 px-2 py-1 text-xs font-medium text-amber-700 transition-colors hover:bg-amber-500/20 dark:text-amber-400"
-                    >
-                      {t.actions.fillField}
-                    </button>
-                  </div>
-                ))
-              )}
+            <div role="list" class="space-y-0.5">
+              {visibleItems.map((item, idx) => (
+                <StashItemRow
+                  key={item.id}
+                  label={item.label}
+                  value={item.value}
+                  sensitive={item.sensitive}
+                  useCount={item.useCount}
+                  usedBadgeText={
+                    item.useCount > 0
+                      ? formatString(t.fields.mostUsedBadge, { count: item.useCount })
+                      : undefined
+                  }
+                  fillLabel={t.actions.fillField}
+                  copyLabel={t.actions.copy}
+                  revealLabel={t.actions.reveal}
+                  hideLabel={t.actions.hide}
+                  isSelected={idx === selectedItemIndex}
+                  onFill={() => handleFillField(item.id, item.key, item.value)}
+                  onCopy={() => handleCopy(item.id, item.value)}
+                />
+              ))}
             </div>
           )}
+
+          {/* Secure Vault Section */}
+          <section aria-labelledby="popup-vault-heading" class="mt-2 pt-2">
+            <div class="flex items-center justify-between px-2 py-1">
+              <h2
+                id="popup-vault-heading"
+                class="flex items-center gap-1 text-[11px] font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300"
+              >
+                <svg
+                  class="h-3 w-3 text-brand-600 dark:text-brand-400"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                  aria-hidden="true"
+                >
+                  <path
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    stroke-width="2"
+                    d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"
+                  />
+                </svg>
+                <span>{t.vault.title}</span>
+              </h2>
+
+              {vaultUnlocked && (
+                <button
+                  type="button"
+                  onClick={handleLockVault}
+                  class="text-[11px] font-semibold text-brand-700 hover:underline dark:text-brand-300"
+                >
+                  {t.actions.lock}
+                </button>
+              )}
+            </div>
+
+            {!vaultInitialized ? (
+              <div class="rounded bg-slate-50 p-2.5 text-center text-xs text-slate-700 dark:bg-slate-800/40 dark:text-slate-300">
+                <span>{t.vault.setupPassphrase}</span>
+                <button
+                  type="button"
+                  onClick={openOptionsPage}
+                  class="mx-auto mt-1 block font-semibold text-brand-700 hover:underline dark:text-brand-300"
+                >
+                  {t.actions.options}
+                </button>
+              </div>
+            ) : !vaultUnlocked ? (
+              <div class="space-y-2 rounded bg-slate-50 p-2.5 dark:bg-slate-800/40">
+                <div class="flex items-center gap-1.5">
+                  <label for="popup-vault-passphrase" class="sr-only">
+                    {t.vault.enterPassphrase}
+                  </label>
+                  <input
+                    id="popup-vault-passphrase"
+                    type="password"
+                    value={vaultPassphrase}
+                    onInput={(e) => setVaultPassphrase((e.target as HTMLInputElement).value)}
+                    onKeyDown={(e) => e.key === 'Enter' && handleUnlockVault()}
+                    placeholder={t.vault.enterPassphrase}
+                    class="flex-1 rounded border border-slate-300 bg-white px-2 py-1 text-xs text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                  />
+                  <button
+                    type="button"
+                    onClick={handleUnlockVault}
+                    class="rounded bg-brand-600 px-2.5 py-1 text-xs font-semibold text-white hover:bg-brand-700"
+                  >
+                    {t.actions.unlock}
+                  </button>
+                </div>
+                {vaultError && (
+                  <p role="alert" class="text-[11px] font-medium text-rose-700 dark:text-rose-400">
+                    {vaultError}
+                  </p>
+                )}
+              </div>
+            ) : (
+              <div class="space-y-1.5 p-1">
+                {cards.length === 0 ? (
+                  <p class="px-2 py-1 text-xs text-slate-600 dark:text-slate-300">
+                    {t.vault.noCardsYet}
+                  </p>
+                ) : (
+                  cards.map((card) => (
+                    <div
+                      key={card.id}
+                      class="flex items-center justify-between rounded border border-slate-200 bg-slate-50/70 p-2 dark:border-slate-700 dark:bg-slate-800/40"
+                    >
+                      <div>
+                        <div class="flex items-center gap-1.5 text-xs font-semibold text-slate-900 dark:text-slate-100">
+                          <CardBrandIcon brand={card.brand} />
+                          <span>{card.nickname}</span>
+                        </div>
+                        <div class="mt-0.5 font-mono text-[11px] text-slate-700 dark:text-slate-300">
+                          {maskCardNumber(card.cardNumber)} ({card.expMonth}/{card.expYear})
+                        </div>
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={() => handleRequestFillCard(card)}
+                        aria-label={`${t.actions.fillCard} ${card.nickname}`}
+                        class="rounded border border-amber-600/40 bg-amber-500/15 px-2 py-1 text-xs font-semibold text-amber-900 transition-colors hover:bg-amber-500/25 dark:text-amber-200"
+                      >
+                        {t.actions.fillCard}
+                      </button>
+                    </div>
+                  ))
+                )}
+              </div>
+            )}
+          </section>
         </div>
-      </div>
+      </main>
 
       {/* Confirmation Modal for Sensitive Payment Card Fill (Principle 6) */}
       <ConfirmModal
@@ -578,7 +829,7 @@ export function App() {
       />
 
       {/* Toast Notification */}
-      <Toast toast={toast} onClose={() => setToast(null)} />
+      <Toast toast={toast} onClose={() => setToast(null)} closeLabel={t.actions.close} />
     </div>
   );
 }

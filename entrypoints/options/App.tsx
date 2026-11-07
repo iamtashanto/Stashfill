@@ -5,88 +5,69 @@ import { VaultManager } from '../../src/vault/vaultManager';
 import {
   type Profile,
   type Field,
+  type FieldType,
+  type Snippet,
+  type SiteRule,
   type Settings,
   DEFAULT_SETTINGS,
 } from '../../src/core/schemas/vault';
+import { CANONICAL_KEYS } from '../../src/core/canonical';
 import { createPersonalTemplate, TEMPLATE_REGISTRY } from '../../src/core/templates';
-import { validateLuhn, detectCardBrand, maskCardNumber } from '../../src/core/luhn';
+import { maskCardNumber } from '../../src/core/luhn';
 import { type PaymentCard } from '../../src/types/vault';
 import { getTranslations, formatString, type Language } from '../../src/i18n';
+import { CardBrandIcon } from '../../src/components/CardBrandIcon';
+import { CardForm } from '../../src/components/CardForm';
+import { OnboardingWizard } from '../../src/components/OnboardingWizard';
 import { Toast, type ToastMessage } from '../../src/components/Toast';
 import { ConfirmModal } from '../../src/components/ConfirmModal';
 
-type Tab = 'profiles' | 'vault' | 'backup' | 'settings';
+type Tab = 'profiles' | 'snippets' | 'vault' | 'siteRules' | 'backup' | 'settings';
 
-function getFieldValue(profile: Profile | null, key: string): string {
-  if (!profile || !profile.fields) return '';
-  const f = profile.fields.find((field) => field.key === key);
-  return f ? f.value : '';
+export interface OptionsProps {
+  repository?: StashRepository;
+  vaultMgr?: VaultManager;
+  defaultOpenOnboarding?: boolean;
 }
 
-function updateFieldValue(
-  profile: Profile,
-  key: string,
-  value: string,
-  defaultLabel: string,
-  category = 'general',
-): Profile {
-  const fields = [...profile.fields];
-  const idx = fields.findIndex((f) => f.key === key);
-  const now = Date.now();
-  const existing = fields[idx];
-  if (idx >= 0 && existing) {
-    fields[idx] = {
-      ...existing,
-      value,
-      updatedAt: now,
-    };
-  } else {
-    fields.push({
-      id: `f_${now}_${Math.random().toString(36).substring(2, 7)}`,
-      key,
-      label: defaultLabel,
-      value,
-      type: 'text',
-      category,
-      tags: [category],
-      sensitive: false,
-      createdAt: now,
-      updatedAt: now,
-      useCount: 0,
-      lastUsedAt: null,
-    });
-  }
-  return { ...profile, fields };
-}
+const DEFAULT_CATEGORIES = ['personal', 'contact', 'address', 'work', 'social', 'custom'];
+const FIELD_TYPES: FieldType[] = ['text', 'multiline', 'email', 'tel', 'url', 'date', 'select'];
 
-const CANONICAL_KEYS_SET = new Set([
-  'full_name',
-  'first_name',
-  'last_name',
-  'email',
-  'phone',
-  'mobile',
-  'address_line1',
-  'address_line2',
-  'city',
-  'state',
-  'postal_code',
-  'country',
-  'website',
-  'github',
-  'linkedin',
-  'twitter',
-]);
-
-export function App() {
-  const [repo] = useState(() => new StashRepository(new LocalStorageAdapter()));
-  const [vaultManager] = useState(() => new VaultManager(repo));
+export function App({ repository, vaultMgr, defaultOpenOnboarding = false }: OptionsProps = {}) {
+  const [repo] = useState(() => repository ?? new StashRepository(new LocalStorageAdapter()));
+  const [vaultManager] = useState(() => vaultMgr ?? new VaultManager(repo));
 
   const [activeTab, setActiveTab] = useState<Tab>('profiles');
   const [profiles, setProfiles] = useState<Profile[]>([]);
   const [selectedProfileId, setSelectedProfileId] = useState<string>('');
   const [profileForm, setProfileForm] = useState<Profile | null>(null);
   const [settings, setSettings] = useState<Settings>(DEFAULT_SETTINGS);
+
+  // Onboarding wizard state
+  const [isOnboardingOpen, setIsOnboardingOpen] = useState(defaultOpenOnboarding);
+
+  // Category filter & custom category state
+  const [selectedCategory, setSelectedCategory] = useState<string>('all');
+  const [newCategoryName, setNewCategoryName] = useState('');
+
+  // Template selector for creating new profile
+  const [selectedTemplateId, setSelectedTemplateId] = useState<string>('personal');
+
+  // Drag-and-drop field index
+  const [draggedFieldIndex, setDraggedFieldIndex] = useState<number | null>(null);
+
+  // Snippets state
+  const [snippets, setSnippets] = useState<Snippet[]>([]);
+  const [snippetTrigger, setSnippetTrigger] = useState('');
+  const [snippetContent, setSnippetContent] = useState('');
+  const [snippetFolder, setSnippetFolder] = useState('');
+  const [editingSnippetId, setEditingSnippetId] = useState<string | null>(null);
+
+  // Site rules state
+  const [siteRules, setSiteRules] = useState<SiteRule[]>([]);
+  const [ruleHost, setRuleHost] = useState('');
+  const [ruleBehavior, setRuleBehavior] = useState<'ask' | 'always' | 'never'>('ask');
+  const [ruleProfileId, setRuleProfileId] = useState<string>('');
 
   // Vault state
   const [vaultInitialized, setVaultInitialized] = useState(false);
@@ -97,14 +78,9 @@ export function App() {
   const [vaultError, setVaultError] = useState('');
   const [cards, setCards] = useState<PaymentCard[]>([]);
 
-  // Card modal / form
+  // Card form state
   const [isAddingCard, setIsAddingCard] = useState(false);
-  const [cardNickname, setCardNickname] = useState('');
-  const [cardholderName, setCardholderName] = useState('');
-  const [cardNumber, setCardNumber] = useState('');
-  const [expMonth, setExpMonth] = useState('01');
-  const [expYear, setExpYear] = useState('28');
-  const [cvv, setCvv] = useState('');
+  const [editingCard, setEditingCard] = useState<PaymentCard | null>(null);
 
   // Delete modal
   const [profileToDelete, setProfileToDelete] = useState<Profile | null>(null);
@@ -134,9 +110,11 @@ export function App() {
         curSettings = await repo.getSettings();
       }
 
-      const [activeId, isInit] = await Promise.all([
+      const [activeId, isInit, allSnippets, allRules] = await Promise.all([
         repo.getActiveProfileId(),
         vaultManager.isInitialized(),
+        repo.getSnippets(),
+        repo.getSiteRules(),
       ]);
 
       setProfiles(allProfiles);
@@ -146,8 +124,11 @@ export function App() {
       setProfileForm({ ...sel });
       setSettings(curSettings);
       setVaultInitialized(isInit);
+      setSnippets(allSnippets);
+      setSiteRules(allRules);
 
       applyTheme(curSettings.theme);
+      document.documentElement.lang = curSettings.language;
     }
     init();
   }, [repo, vaultManager]);
@@ -166,9 +147,27 @@ export function App() {
     } else if (theme === 'light') {
       root.classList.remove('dark');
     } else {
-      const isSystemDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+      const isSystemDark =
+        typeof window.matchMedia === 'function' &&
+        window.matchMedia('(prefers-color-scheme: dark)').matches;
       root.classList.toggle('dark', isSystemDark);
     }
+  };
+
+  const allCategories = useMemo(() => {
+    const custom = settings.customCategories ?? [];
+    const fieldCats = profileForm?.fields.map((f) => f.category).filter(Boolean) ?? [];
+    return Array.from(new Set([...DEFAULT_CATEGORIES, ...custom, ...fieldCats]));
+  }, [settings.customCategories, profileForm]);
+
+  const getCategoryLabel = (cat: string): string => {
+    const secKey = cat as keyof typeof t.sections;
+    return t.sections[secKey] || cat;
+  };
+
+  const getTemplateLabel = (id: string, fallback: string): string => {
+    const key = id as keyof typeof t.templates;
+    return t.templates[key] || fallback;
   };
 
   const handleSelectProfile = (id: string) => {
@@ -188,14 +187,17 @@ export function App() {
       setProfileForm({ ...saved });
       showToast(t.messages.profileSaved, 'success');
     } catch {
-      showToast('Error saving profile', 'error');
+      showToast(t.messages.profileSaveError, 'error');
     }
   };
 
-  const handleCreateProfile = async (templateKey = 'personal') => {
-    const foundTemplate = TEMPLATE_REGISTRY.find((t) => t.id === templateKey);
+  const handleCreateProfile = async (templateKey = selectedTemplateId) => {
+    const foundTemplate = TEMPLATE_REGISTRY.find((tpl) => tpl.id === templateKey);
     const createFn = foundTemplate?.create || createPersonalTemplate;
-    const newProf = createFn(`Profile ${profiles.length + 1}`);
+    const labelBase = foundTemplate
+      ? getTemplateLabel(foundTemplate.id, foundTemplate.label)
+      : t.templates.personal;
+    const newProf = createFn(`${labelBase} ${profiles.length + 1}`);
     const saved = await repo.upsertProfile(newProf);
     const updated = await repo.getProfiles();
     setProfiles(updated);
@@ -212,23 +214,51 @@ export function App() {
     setProfiles(updated);
     setSelectedProfileId(activeId);
     const sel = updated.find((p) => p.id === activeId) ?? updated[0]!;
-    setProfileForm({ ...sel });
+    setProfileForm(sel ? { ...sel } : null);
     setProfileToDelete(null);
     showToast(t.messages.profileDeleted, 'success');
   };
 
-  // Custom field handlers
-  const handleAddCustomField = () => {
+  // Onboarding completion handler
+  const handleCompleteOnboarding = async (templateIds: string[]) => {
+    for (const tplId of templateIds) {
+      const found = TEMPLATE_REGISTRY.find((item) => item.id === tplId);
+      if (found) {
+        const created = found.create(getTemplateLabel(found.id, found.label));
+        await repo.upsertProfile(created);
+      }
+    }
+    const updatedSettings = await repo.updateSettings({ onboardingCompleted: true });
+    const allProfiles = await repo.getProfiles();
+    setSettings(updatedSettings);
+    setProfiles(allProfiles);
+    if (allProfiles[0]) {
+      setSelectedProfileId(allProfiles[0].id);
+      setProfileForm({ ...allProfiles[0] });
+    }
+    setIsOnboardingOpen(false);
+    showToast(t.messages.profileSaved, 'success');
+  };
+
+  const handleSkipOnboarding = async () => {
+    const updatedSettings = await repo.updateSettings({ onboardingCompleted: true });
+    setSettings(updatedSettings);
+    setIsOnboardingOpen(false);
+  };
+
+  // Field CRUD & Reorder handlers
+  const handleAddField = () => {
     if (!profileForm) return;
     const now = Date.now();
+    const category = selectedCategory === 'all' ? 'custom' : selectedCategory;
     const newField: Field = {
-      id: `cf_${now}_${Math.random().toString(36).substring(2, 7)}`,
-      label: 'Custom Field',
+      id: `f_${now}_${Math.random().toString(36).substring(2, 7)}`,
+      label: t.sections.custom,
       key: `custom_${now}`,
       value: '',
       type: 'text',
-      category: 'custom',
-      tags: ['custom'],
+      category,
+      tags: [category],
       sensitive: false,
       createdAt: now,
       updatedAt: now,
@@ -241,15 +271,15 @@ export function App() {
     });
   };
 
-  const handleRemoveCustomField = (id: string) => {
+  const handleRemoveField = (id: string) => {
     if (!profileForm) return;
     setProfileForm({
       ...profileForm,
-      fields: profileForm.fields.filter((cf) => cf.id !== id),
+      fields: profileForm.fields.filter((f) => f.id !== id),
     });
   };
 
-  const handleUpdateCustomField = (id: string, updates: Partial<Field>) => {
+  const handleUpdateField = (id: string, updates: Partial<Field>) => {
     if (!profileForm) return;
     setProfileForm({
       ...profileForm,
@@ -259,11 +289,119 @@ export function App() {
     });
   };
 
+  const handleMoveField = (index: number, direction: -1 | 1) => {
+    if (!profileForm) return;
+    const targetIndex = index + direction;
+    if (targetIndex < 0 || targetIndex >= profileForm.fields.length) return;
+    const updatedFields = [...profileForm.fields];
+    const [moved] = updatedFields.splice(index, 1);
+    if (!moved) return;
+    updatedFields.splice(targetIndex, 0, moved);
+    setProfileForm({ ...profileForm, fields: updatedFields });
+  };
+
+  const handleDragStart = (index: number) => {
+    setDraggedFieldIndex(index);
+  };
+
+  const handleDragOver = (e: DragEvent) => {
+    e.preventDefault();
+  };
+
+  const handleDrop = (targetIndex: number) => {
+    if (!profileForm || draggedFieldIndex === null || draggedFieldIndex === targetIndex) {
+      setDraggedFieldIndex(null);
+      return;
+    }
+    const updatedFields = [...profileForm.fields];
+    const [moved] = updatedFields.splice(draggedFieldIndex, 1);
+    if (moved) {
+      updatedFields.splice(targetIndex, 0, moved);
+      setProfileForm({ ...profileForm, fields: updatedFields });
+    }
+    setDraggedFieldIndex(null);
+  };
+
+  // Custom Category CRUD
+  const handleAddCategory = async (e: Event) => {
+    e.preventDefault();
+    const cleaned = newCategoryName.trim().toLowerCase();
+    if (!cleaned) return;
+    const current = settings.customCategories ?? [];
+    if (!current.includes(cleaned)) {
+      const updated = await repo.updateSettings({
+        customCategories: [...current, cleaned],
+      });
+      setSettings(updated);
+    }
+    setNewCategoryName('');
+    setSelectedCategory(cleaned);
+  };
+
+  // Snippets CRUD
+  const handleSaveSnippet = async (e: Event) => {
+    e.preventDefault();
+    if (!snippetTrigger.trim() || !snippetContent.trim()) return;
+    const snippet: Snippet = {
+      id: editingSnippetId ?? `snip_${Date.now()}`,
+      trigger: snippetTrigger.trim(),
+      content: snippetContent.trim(),
+      folder: snippetFolder.trim() || 'general',
+    };
+    await repo.upsertSnippet(snippet);
+    const updated = await repo.getSnippets();
+    setSnippets(updated);
+    setSnippetTrigger('');
+    setSnippetContent('');
+    setSnippetFolder('');
+    setEditingSnippetId(null);
+    showToast(t.snippets.saved, 'success');
+  };
+
+  const handleEditSnippet = (snip: Snippet) => {
+    setEditingSnippetId(snip.id);
+    setSnippetTrigger(snip.trigger);
+    setSnippetContent(snip.content);
+    setSnippetFolder(snip.folder);
+  };
+
+  const handleDeleteSnippet = async (id: string) => {
+    await repo.deleteSnippet(id);
+    const updated = await repo.getSnippets();
+    setSnippets(updated);
+    showToast(t.snippets.deleted, 'success');
+  };
+
+  // Site Rules CRUD
+  const handleSaveSiteRule = async (e: Event) => {
+    e.preventDefault();
+    if (!ruleHost.trim()) return;
+    const rule: SiteRule = {
+      id: `rule_${Date.now()}`,
+      host: ruleHost.trim().toLowerCase(),
+      autoFillRule: ruleBehavior,
+      profileId: ruleProfileId || null,
+      disabledFields: [],
+    };
+    await repo.upsertSiteRule(rule);
+    const updated = await repo.getSiteRules();
+    setSiteRules(updated);
+    setRuleHost('');
+    showToast(t.siteRules.saved, 'success');
+  };
+
+  const handleDeleteSiteRule = async (id: string) => {
+    await repo.deleteSiteRule(id);
+    const updated = await repo.getSiteRules();
+    setSiteRules(updated);
+    showToast(t.siteRules.deleted, 'success');
+  };
+
   // Vault actions
   const handleSetupVault = async () => {
     setVaultError('');
     if (newVaultPassphrase.length < 6) {
-      setVaultError('Passphrase must be at least 6 characters');
+      setVaultError(t.vault.passphraseMinLength);
       return;
     }
     if (newVaultPassphrase !== confirmVaultPassphrase) {
@@ -278,9 +416,9 @@ export function App() {
       setCards([]);
       setNewVaultPassphrase('');
       setConfirmVaultPassphrase('');
-      showToast('Vault created and unlocked successfully!', 'success');
+      showToast(t.messages.vaultSetupSuccess, 'success');
     } catch {
-      setVaultError('Failed to initialize vault');
+      setVaultError(t.messages.vaultSetupError);
     }
   };
 
@@ -303,32 +441,20 @@ export function App() {
     setVaultPassphrase('');
   };
 
-  const handleSaveCard = async () => {
-    if (!cardNickname.trim() || !cardNumber.trim() || !cvv.trim()) {
-      showToast('Please fill all required card fields', 'error');
-      return;
-    }
-
-    const cleanedNumber = cardNumber.replace(/\s+/g, '');
-    if (!validateLuhn(cleanedNumber)) {
-      showToast('Card number failed Luhn validation', 'error');
-      return;
-    }
-
-    const brand = detectCardBrand(cleanedNumber);
+  const handleSaveCardData = async (
+    cardData: Omit<PaymentCard, 'id' | 'createdAt'> & { id?: string },
+  ) => {
     const newCard: PaymentCard = {
-      id: `card_${Date.now()}`,
-      nickname: cardNickname.trim(),
-      cardholderName: cardholderName.trim(),
-      cardNumber: cleanedNumber,
-      expMonth,
-      expYear,
-      cvv: cvv.trim(),
-      brand:
-        brand === 'visa' || brand === 'mastercard' || brand === 'amex' || brand === 'discover'
-          ? brand
-          : 'other',
-      createdAt: Date.now(),
+      id: cardData.id ?? `card_${Date.now()}`,
+      nickname: cardData.nickname,
+      cardholderName: cardData.cardholderName,
+      cardNumber: cardData.cardNumber,
+      expMonth: cardData.expMonth,
+      expYear: cardData.expYear,
+      brand: cardData.brand,
+      cvv: cardData.cvv,
+      billingProfileId: cardData.billingProfileId,
+      createdAt: editingCard?.createdAt ?? Date.now(),
     };
 
     try {
@@ -336,13 +462,10 @@ export function App() {
       const updatedCards = await vaultManager.getCards();
       setCards(updatedCards);
       setIsAddingCard(false);
-      setCardNickname('');
-      setCardholderName('');
-      setCardNumber('');
-      setCvv('');
+      setEditingCard(null);
       showToast(t.messages.cardSaved, 'success');
     } catch {
-      showToast('Failed to save card', 'error');
+      showToast(t.messages.cardSaveError, 'error');
     }
   };
 
@@ -355,7 +478,7 @@ export function App() {
       setCardToDelete(null);
       showToast(t.messages.cardDeleted, 'success');
     } catch {
-      showToast('Failed to delete card', 'error');
+      showToast(t.messages.cardDeleteError, 'error');
     }
   };
 
@@ -371,7 +494,7 @@ export function App() {
     a.download = `stashfill-backup-${new Date().toISOString().slice(0, 10)}.json`;
     a.click();
     URL.revokeObjectURL(url);
-    showToast('Export file downloaded', 'success');
+    showToast(t.messages.exportDownloaded, 'success');
   };
 
   const handleImport = async (e: Event) => {
@@ -384,11 +507,13 @@ export function App() {
       const parsed = JSON.parse(text);
       const result = await repo.importData(parsed);
 
-      const [allProfiles, activeId, curSettings, isInit] = await Promise.all([
+      const [allProfiles, activeId, curSettings, isInit, allSnips, allRules] = await Promise.all([
         repo.getProfiles(),
         repo.getActiveProfileId(),
         repo.getSettings(),
         vaultManager.isInitialized(),
+        repo.getSnippets(),
+        repo.getSiteRules(),
       ]);
 
       setProfiles(allProfiles);
@@ -397,35 +522,61 @@ export function App() {
       setProfileForm({ ...sel });
       setSettings(curSettings);
       setVaultInitialized(isInit);
+      setSnippets(allSnips);
+      setSiteRules(allRules);
 
       showToast(formatString(t.settings.importSuccess, { count: result.profileCount }), 'success');
     } catch {
-      showToast('Invalid backup file format', 'error');
+      showToast(t.messages.importInvalid, 'error');
     } finally {
       input.value = '';
     }
   };
 
+  const filteredFields = useMemo(() => {
+    if (!profileForm) return [];
+    if (selectedCategory === 'all') return profileForm.fields;
+    return profileForm.fields.filter((f) => f.category === selectedCategory);
+  }, [profileForm, selectedCategory]);
+
   return (
-    <div class="flex min-h-screen flex-col bg-slate-50 font-sans text-slate-900 dark:bg-slate-950 dark:text-slate-100">
+    <div
+      dir="auto"
+      class="flex min-h-screen flex-col bg-slate-50 font-sans text-slate-900 dark:bg-slate-950 dark:text-slate-100"
+    >
       {/* Top Bar */}
       <header class="sticky top-0 z-30 border-b border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900">
         <div class="mx-auto flex h-16 max-w-6xl items-center justify-between px-4 sm:px-6">
-          <div class="flex items-center space-x-3">
-            <div class="shadow-xs flex h-8 w-8 items-center justify-center rounded-lg bg-brand-600 text-sm font-bold tracking-tight text-white">
+          <div class="flex items-center gap-3">
+            <div
+              aria-hidden="true"
+              class="flex h-8 w-8 items-center justify-center rounded-lg bg-brand-600 text-sm font-bold tracking-tight text-white"
+            >
               SF
             </div>
             <div>
               <h1 class="text-base font-bold leading-none text-slate-900 dark:text-white">
                 {t.appName}
               </h1>
-              <p class="mt-0.5 text-xs text-slate-500 dark:text-slate-400">{t.tagline}</p>
+              <p class="mt-0.5 text-xs text-slate-600 dark:text-slate-300">{t.tagline}</p>
             </div>
           </div>
 
-          <div class="flex items-center space-x-3">
-            <span class="inline-flex items-center rounded-md bg-emerald-100 px-2 py-1 text-xs font-medium text-emerald-800 dark:bg-emerald-950/70 dark:text-emerald-300">
-              <span class="mr-1.5 h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-500"></span>
+          <div class="flex items-center gap-3">
+            {!settings.onboardingCompleted && (
+              <button
+                type="button"
+                onClick={() => setIsOnboardingOpen(true)}
+                class="rounded-md border border-brand-300 bg-brand-50 px-2.5 py-1 text-xs font-semibold text-brand-800 hover:bg-brand-100 dark:border-brand-700 dark:bg-brand-950 dark:text-brand-200"
+              >
+                {t.settings.reopenOnboarding}
+              </button>
+            )}
+            <span class="inline-flex items-center rounded-md bg-emerald-100 px-2.5 py-1 text-xs font-semibold text-emerald-900 dark:bg-emerald-950 dark:text-emerald-200">
+              <span
+                class="me-1.5 h-1.5 w-1.5 rounded-full bg-emerald-600"
+                aria-hidden="true"
+              ></span>
               {t.settings.privacyNote.split('.')[0]}
             </span>
           </div>
@@ -435,102 +586,94 @@ export function App() {
       {/* Main Container */}
       <div class="mx-auto grid w-full max-w-6xl flex-1 grid-cols-1 gap-8 px-4 py-8 sm:px-6 md:grid-cols-4">
         {/* Navigation Sidebar */}
-        <aside class="space-y-1 md:col-span-1">
+        <nav aria-label={t.settings.title} class="space-y-1 md:col-span-1">
           <button
             type="button"
             onClick={() => setActiveTab('profiles')}
-            class={`flex w-full items-center space-x-2.5 rounded-lg px-3.5 py-2.5 text-left text-sm font-medium transition-colors ${
+            aria-current={activeTab === 'profiles' ? 'page' : undefined}
+            class={`flex w-full items-center gap-2.5 rounded-lg px-3.5 py-2.5 text-start text-sm font-medium transition-colors ${
               activeTab === 'profiles'
-                ? 'bg-brand-50 text-brand-700 dark:bg-brand-950/60 dark:text-brand-300'
-                : 'text-slate-600 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-900'
+                ? 'bg-brand-50 text-brand-800 dark:bg-brand-950/70 dark:text-brand-200'
+                : 'text-slate-700 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-900'
             }`}
           >
-            <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                stroke-width="2"
-                d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"
-              />
-            </svg>
             <span>{t.settings.profilesTitle}</span>
           </button>
 
           <button
             type="button"
-            onClick={() => setActiveTab('vault')}
-            class={`flex w-full items-center space-x-2.5 rounded-lg px-3.5 py-2.5 text-left text-sm font-medium transition-colors ${
-              activeTab === 'vault'
-                ? 'bg-brand-50 text-brand-700 dark:bg-brand-950/60 dark:text-brand-300'
-                : 'text-slate-600 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-900'
+            onClick={() => setActiveTab('snippets')}
+            aria-current={activeTab === 'snippets' ? 'page' : undefined}
+            class={`flex w-full items-center gap-2.5 rounded-lg px-3.5 py-2.5 text-start text-sm font-medium transition-colors ${
+              activeTab === 'snippets'
+                ? 'bg-brand-50 text-brand-800 dark:bg-brand-950/70 dark:text-brand-200'
+                : 'text-slate-700 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-900'
             }`}
           >
-            <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                stroke-width="2"
-                d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"
-              />
-            </svg>
+            <span>{t.snippets.title}</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setActiveTab('vault')}
+            aria-current={activeTab === 'vault' ? 'page' : undefined}
+            class={`flex w-full items-center gap-2.5 rounded-lg px-3.5 py-2.5 text-start text-sm font-medium transition-colors ${
+              activeTab === 'vault'
+                ? 'bg-brand-50 text-brand-800 dark:bg-brand-950/70 dark:text-brand-200'
+                : 'text-slate-700 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-900'
+            }`}
+          >
             <span>{t.vault.title}</span>
           </button>
 
           <button
             type="button"
-            onClick={() => setActiveTab('backup')}
-            class={`flex w-full items-center space-x-2.5 rounded-lg px-3.5 py-2.5 text-left text-sm font-medium transition-colors ${
-              activeTab === 'backup'
-                ? 'bg-brand-50 text-brand-700 dark:bg-brand-950/60 dark:text-brand-300'
-                : 'text-slate-600 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-900'
+            onClick={() => setActiveTab('siteRules')}
+            aria-current={activeTab === 'siteRules' ? 'page' : undefined}
+            class={`flex w-full items-center gap-2.5 rounded-lg px-3.5 py-2.5 text-start text-sm font-medium transition-colors ${
+              activeTab === 'siteRules'
+                ? 'bg-brand-50 text-brand-800 dark:bg-brand-950/70 dark:text-brand-200'
+                : 'text-slate-700 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-900'
             }`}
           >
-            <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                stroke-width="2"
-                d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"
-              />
-            </svg>
+            <span>{t.siteRules.title}</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setActiveTab('backup')}
+            aria-current={activeTab === 'backup' ? 'page' : undefined}
+            class={`flex w-full items-center gap-2.5 rounded-lg px-3.5 py-2.5 text-start text-sm font-medium transition-colors ${
+              activeTab === 'backup'
+                ? 'bg-brand-50 text-brand-800 dark:bg-brand-950/70 dark:text-brand-200'
+                : 'text-slate-700 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-900'
+            }`}
+          >
             <span>{t.settings.exportImportTitle}</span>
           </button>
 
           <button
             type="button"
             onClick={() => setActiveTab('settings')}
-            class={`flex w-full items-center space-x-2.5 rounded-lg px-3.5 py-2.5 text-left text-sm font-medium transition-colors ${
+            aria-current={activeTab === 'settings' ? 'page' : undefined}
+            class={`flex w-full items-center gap-2.5 rounded-lg px-3.5 py-2.5 text-start text-sm font-medium transition-colors ${
               activeTab === 'settings'
-                ? 'bg-brand-50 text-brand-700 dark:bg-brand-950/60 dark:text-brand-300'
-                : 'text-slate-600 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-900'
+                ? 'bg-brand-50 text-brand-800 dark:bg-brand-950/70 dark:text-brand-200'
+                : 'text-slate-700 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-900'
             }`}
           >
-            <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                stroke-width="2"
-                d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"
-              />
-              <path
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                stroke-width="2"
-                d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
-              />
-            </svg>
             <span>{t.settings.title}</span>
           </button>
-        </aside>
+        </nav>
 
         {/* Content Pane */}
-        <main class="shadow-xs rounded-xl border border-slate-200 bg-white p-6 dark:border-slate-800 dark:bg-slate-900 md:col-span-3">
-          {/* TAB 1: PROFILES */}
+        <main class="rounded-xl border border-slate-200 bg-white p-6 dark:border-slate-800 dark:bg-slate-900 md:col-span-3">
+          {/* TAB 1: PROFILES & FIELDS */}
           {activeTab === 'profiles' && (
             <div class="space-y-6">
-              {/* Profile Selector & Add Bar */}
-              <div class="flex items-center justify-between border-b border-slate-200 pb-4 dark:border-slate-800">
-                <div class="flex items-center space-x-2">
+              {/* Profile Selector & Template Picker Bar */}
+              <div class="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 pb-4 dark:border-slate-800">
+                <div class="flex flex-wrap items-center gap-2">
                   {profiles.map((p) => (
                     <button
                       key={p.id}
@@ -538,28 +681,46 @@ export function App() {
                       onClick={() => handleSelectProfile(p.id)}
                       class={`rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
                         selectedProfileId === p.id
-                          ? 'shadow-xs bg-brand-600 text-white'
-                          : 'bg-slate-100 text-slate-700 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700'
+                          ? 'bg-brand-600 text-white'
+                          : 'bg-slate-100 text-slate-800 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700'
                       }`}
                     >
                       {p.name} {isProfileDefault(p) ? '★' : ''}
                     </button>
                   ))}
-                  <button
-                    type="button"
-                    onClick={() => handleCreateProfile('personal')}
-                    class="rounded-md border border-dashed border-slate-300 px-2.5 py-1.5 text-xs font-medium text-slate-600 transition-colors hover:border-brand-500 hover:text-brand-600 dark:border-slate-700 dark:text-slate-400"
-                  >
-                    + {t.actions.add}
-                  </button>
+
+                  <div class="flex items-center gap-1">
+                    <label for="new-profile-template" class="sr-only">
+                      {t.templates.createFromTemplate}
+                    </label>
+                    <select
+                      id="new-profile-template"
+                      value={selectedTemplateId}
+                      onChange={(e) => setSelectedTemplateId((e.target as HTMLSelectElement).value)}
+                      class="rounded-md border border-slate-300 bg-white px-2 py-1.5 text-xs text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                    >
+                      {TEMPLATE_REGISTRY.map((tpl) => (
+                        <option key={tpl.id} value={tpl.id}>
+                          {getTemplateLabel(tpl.id, tpl.label)}
+                        </option>
+                      ))}
+                    </select>
+                    <button
+                      type="button"
+                      onClick={() => handleCreateProfile(selectedTemplateId)}
+                      class="rounded-md border border-dashed border-slate-300 px-2.5 py-1.5 text-xs font-medium text-slate-700 transition-colors hover:border-brand-500 hover:text-brand-700 dark:border-slate-600 dark:text-slate-200"
+                    >
+                      + {t.actions.add}
+                    </button>
+                  </div>
                 </div>
 
-                <div class="flex items-center space-x-2">
+                <div class="flex items-center gap-2">
                   {profiles.length > 1 && profileForm && (
                     <button
                       type="button"
                       onClick={() => setProfileToDelete(profileForm)}
-                      class="rounded-md px-2.5 py-1.5 text-xs text-rose-600 transition-colors hover:bg-rose-50 dark:hover:bg-rose-950/40"
+                      class="rounded-md px-2.5 py-1.5 text-xs font-medium text-rose-700 transition-colors hover:bg-rose-50 dark:text-rose-400 dark:hover:bg-rose-950/40"
                     >
                       {t.actions.delete}
                     </button>
@@ -567,7 +728,7 @@ export function App() {
                   <button
                     type="button"
                     onClick={handleSaveProfile}
-                    class="shadow-xs rounded-md bg-brand-600 px-4 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-brand-700"
+                    class="rounded-md bg-brand-600 px-4 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-brand-700"
                   >
                     {t.actions.save}
                   </button>
@@ -579,10 +740,14 @@ export function App() {
                   {/* Profile Header Fields */}
                   <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
                     <div>
-                      <label class="mb-1 block text-xs font-semibold text-slate-700 dark:text-slate-300">
+                      <label
+                        for="profile-name-input"
+                        class="mb-1 block text-xs font-semibold text-slate-700 dark:text-slate-200"
+                      >
                         {t.settings.profileName}
                       </label>
                       <input
+                        id="profile-name-input"
                         type="text"
                         value={profileForm.name}
                         onInput={(e) =>
@@ -591,12 +756,12 @@ export function App() {
                             name: (e.target as HTMLInputElement).value,
                           })
                         }
-                        class="w-full rounded-md border border-slate-300 bg-white p-2 text-xs focus:ring-1 focus:ring-brand-500 dark:border-slate-700 dark:bg-slate-800"
+                        class="w-full rounded-md border border-slate-300 bg-white p-2 text-xs text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
                       />
                     </div>
 
                     <div class="mt-6 flex items-center">
-                      <label class="flex cursor-pointer items-center space-x-2 text-xs font-medium text-slate-700 dark:text-slate-300">
+                      <label class="flex cursor-pointer items-center gap-2 text-xs font-medium text-slate-700 dark:text-slate-200">
                         <input
                           type="checkbox"
                           checked={isProfileDefault(profileForm)}
@@ -608,676 +773,302 @@ export function App() {
                               setSettings(cur);
                             }
                           }}
-                          class="rounded border-slate-300 text-brand-600 focus:ring-brand-500"
+                          class="rounded border-slate-300 text-brand-600"
                         />
                         <span>{t.settings.isDefaultProfile}</span>
                       </label>
                     </div>
                   </div>
 
-                  {/* Section: Personal Info */}
-                  <div>
-                    <h3 class="mb-3 text-xs font-bold uppercase tracking-wider text-slate-400">
-                      {t.sections.personal}
-                    </h3>
-                    <div class="grid grid-cols-1 gap-3 sm:grid-cols-3">
-                      <div>
-                        <label class="mb-1 block text-xs text-slate-600 dark:text-slate-400">
-                          {t.fields.fullName}
-                        </label>
-                        <input
-                          type="text"
-                          value={getFieldValue(profileForm, 'full_name')}
-                          onInput={(e) =>
-                            setProfileForm(
-                              updateFieldValue(
-                                profileForm,
-                                'full_name',
-                                (e.target as HTMLInputElement).value,
-                                t.fields.fullName,
-                                'personal',
-                              ),
-                            )
-                          }
-                          class="w-full rounded-md border border-slate-300 bg-white p-2 text-xs dark:border-slate-700 dark:bg-slate-800"
-                        />
-                      </div>
-                      <div>
-                        <label class="mb-1 block text-xs text-slate-600 dark:text-slate-400">
-                          {t.fields.firstName}
-                        </label>
-                        <input
-                          type="text"
-                          value={getFieldValue(profileForm, 'first_name')}
-                          onInput={(e) =>
-                            setProfileForm(
-                              updateFieldValue(
-                                profileForm,
-                                'first_name',
-                                (e.target as HTMLInputElement).value,
-                                t.fields.firstName,
-                                'personal',
-                              ),
-                            )
-                          }
-                          class="w-full rounded-md border border-slate-300 bg-white p-2 text-xs dark:border-slate-700 dark:bg-slate-800"
-                        />
-                      </div>
-                      <div>
-                        <label class="mb-1 block text-xs text-slate-600 dark:text-slate-400">
-                          {t.fields.lastName}
-                        </label>
-                        <input
-                          type="text"
-                          value={getFieldValue(profileForm, 'last_name')}
-                          onInput={(e) =>
-                            setProfileForm(
-                              updateFieldValue(
-                                profileForm,
-                                'last_name',
-                                (e.target as HTMLInputElement).value,
-                                t.fields.lastName,
-                                'personal',
-                              ),
-                            )
-                          }
-                          class="w-full rounded-md border border-slate-300 bg-white p-2 text-xs dark:border-slate-700 dark:bg-slate-800"
-                        />
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Section: Contact Info */}
-                  <div>
-                    <h3 class="mb-3 text-xs font-bold uppercase tracking-wider text-slate-400">
-                      {t.sections.contact}
-                    </h3>
-                    <div class="grid grid-cols-1 gap-3 sm:grid-cols-3">
-                      <div>
-                        <label class="mb-1 block text-xs text-slate-600 dark:text-slate-400">
-                          {t.fields.email}
-                        </label>
-                        <input
-                          type="email"
-                          value={getFieldValue(profileForm, 'email')}
-                          onInput={(e) =>
-                            setProfileForm(
-                              updateFieldValue(
-                                profileForm,
-                                'email',
-                                (e.target as HTMLInputElement).value,
-                                t.fields.email,
-                                'contact',
-                              ),
-                            )
-                          }
-                          class="w-full rounded-md border border-slate-300 bg-white p-2 text-xs dark:border-slate-700 dark:bg-slate-800"
-                        />
-                      </div>
-                      <div>
-                        <label class="mb-1 block text-xs text-slate-600 dark:text-slate-400">
-                          {t.fields.phone}
-                        </label>
-                        <input
-                          type="tel"
-                          value={getFieldValue(profileForm, 'phone')}
-                          onInput={(e) =>
-                            setProfileForm(
-                              updateFieldValue(
-                                profileForm,
-                                'phone',
-                                (e.target as HTMLInputElement).value,
-                                t.fields.phone,
-                                'contact',
-                              ),
-                            )
-                          }
-                          class="w-full rounded-md border border-slate-300 bg-white p-2 text-xs dark:border-slate-700 dark:bg-slate-800"
-                        />
-                      </div>
-                      <div>
-                        <label class="mb-1 block text-xs text-slate-600 dark:text-slate-400">
-                          {t.fields.altPhone}
-                        </label>
-                        <input
-                          type="tel"
-                          value={getFieldValue(profileForm, 'mobile')}
-                          onInput={(e) =>
-                            setProfileForm(
-                              updateFieldValue(
-                                profileForm,
-                                'mobile',
-                                (e.target as HTMLInputElement).value,
-                                t.fields.altPhone,
-                                'contact',
-                              ),
-                            )
-                          }
-                          class="w-full rounded-md border border-slate-300 bg-white p-2 text-xs dark:border-slate-700 dark:bg-slate-800"
-                        />
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Section: Address */}
-                  <div>
-                    <h3 class="mb-3 text-xs font-bold uppercase tracking-wider text-slate-400">
-                      {t.sections.address}
-                    </h3>
-                    <div class="mb-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
-                      <div>
-                        <label class="mb-1 block text-xs text-slate-600 dark:text-slate-400">
-                          {t.fields.address1}
-                        </label>
-                        <input
-                          type="text"
-                          value={getFieldValue(profileForm, 'address_line1')}
-                          onInput={(e) =>
-                            setProfileForm(
-                              updateFieldValue(
-                                profileForm,
-                                'address_line1',
-                                (e.target as HTMLInputElement).value,
-                                t.fields.address1,
-                                'address',
-                              ),
-                            )
-                          }
-                          class="w-full rounded-md border border-slate-300 bg-white p-2 text-xs dark:border-slate-700 dark:bg-slate-800"
-                        />
-                      </div>
-                      <div>
-                        <label class="mb-1 block text-xs text-slate-600 dark:text-slate-400">
-                          {t.fields.address2}
-                        </label>
-                        <input
-                          type="text"
-                          value={getFieldValue(profileForm, 'address_line2')}
-                          onInput={(e) =>
-                            setProfileForm(
-                              updateFieldValue(
-                                profileForm,
-                                'address_line2',
-                                (e.target as HTMLInputElement).value,
-                                t.fields.address2,
-                                'address',
-                              ),
-                            )
-                          }
-                          class="w-full rounded-md border border-slate-300 bg-white p-2 text-xs dark:border-slate-700 dark:bg-slate-800"
-                        />
-                      </div>
-                    </div>
-
-                    <div class="grid grid-cols-2 gap-3 sm:grid-cols-4">
-                      <div>
-                        <label class="mb-1 block text-xs text-slate-600 dark:text-slate-400">
-                          {t.fields.city}
-                        </label>
-                        <input
-                          type="text"
-                          value={getFieldValue(profileForm, 'city')}
-                          onInput={(e) =>
-                            setProfileForm(
-                              updateFieldValue(
-                                profileForm,
-                                'city',
-                                (e.target as HTMLInputElement).value,
-                                t.fields.city,
-                                'address',
-                              ),
-                            )
-                          }
-                          class="w-full rounded-md border border-slate-300 bg-white p-2 text-xs dark:border-slate-700 dark:bg-slate-800"
-                        />
-                      </div>
-                      <div>
-                        <label class="mb-1 block text-xs text-slate-600 dark:text-slate-400">
-                          {t.fields.state}
-                        </label>
-                        <input
-                          type="text"
-                          value={getFieldValue(profileForm, 'state')}
-                          onInput={(e) =>
-                            setProfileForm(
-                              updateFieldValue(
-                                profileForm,
-                                'state',
-                                (e.target as HTMLInputElement).value,
-                                t.fields.state,
-                                'address',
-                              ),
-                            )
-                          }
-                          class="w-full rounded-md border border-slate-300 bg-white p-2 text-xs dark:border-slate-700 dark:bg-slate-800"
-                        />
-                      </div>
-                      <div>
-                        <label class="mb-1 block text-xs text-slate-600 dark:text-slate-400">
-                          {t.fields.postalCode}
-                        </label>
-                        <input
-                          type="text"
-                          value={getFieldValue(profileForm, 'postal_code')}
-                          onInput={(e) =>
-                            setProfileForm(
-                              updateFieldValue(
-                                profileForm,
-                                'postal_code',
-                                (e.target as HTMLInputElement).value,
-                                t.fields.postalCode,
-                                'address',
-                              ),
-                            )
-                          }
-                          class="w-full rounded-md border border-slate-300 bg-white p-2 text-xs dark:border-slate-700 dark:bg-slate-800"
-                        />
-                      </div>
-                      <div>
-                        <label class="mb-1 block text-xs text-slate-600 dark:text-slate-400">
-                          {t.fields.country}
-                        </label>
-                        <input
-                          type="text"
-                          value={getFieldValue(profileForm, 'country')}
-                          onInput={(e) =>
-                            setProfileForm(
-                              updateFieldValue(
-                                profileForm,
-                                'country',
-                                (e.target as HTMLInputElement).value,
-                                t.fields.country,
-                                'address',
-                              ),
-                            )
-                          }
-                          class="w-full rounded-md border border-slate-300 bg-white p-2 text-xs dark:border-slate-700 dark:bg-slate-800"
-                        />
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Section: Links & Social */}
-                  <div>
-                    <h3 class="mb-3 text-xs font-bold uppercase tracking-wider text-slate-400">
-                      {t.sections.links}
-                    </h3>
-                    <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                      <div>
-                        <label class="mb-1 block text-xs text-slate-600 dark:text-slate-400">
-                          {t.fields.website}
-                        </label>
-                        <input
-                          type="url"
-                          value={getFieldValue(profileForm, 'website')}
-                          onInput={(e) =>
-                            setProfileForm(
-                              updateFieldValue(
-                                profileForm,
-                                'website',
-                                (e.target as HTMLInputElement).value,
-                                t.fields.website,
-                                'links',
-                              ),
-                            )
-                          }
-                          class="w-full rounded-md border border-slate-300 bg-white p-2 text-xs dark:border-slate-700 dark:bg-slate-800"
-                        />
-                      </div>
-                      <div>
-                        <label class="mb-1 block text-xs text-slate-600 dark:text-slate-400">
-                          {t.fields.github}
-                        </label>
-                        <input
-                          type="text"
-                          value={getFieldValue(profileForm, 'github')}
-                          onInput={(e) =>
-                            setProfileForm(
-                              updateFieldValue(
-                                profileForm,
-                                'github',
-                                (e.target as HTMLInputElement).value,
-                                t.fields.github,
-                                'links',
-                              ),
-                            )
-                          }
-                          class="w-full rounded-md border border-slate-300 bg-white p-2 text-xs dark:border-slate-700 dark:bg-slate-800"
-                        />
-                      </div>
-                      <div>
-                        <label class="mb-1 block text-xs text-slate-600 dark:text-slate-400">
-                          {t.fields.linkedin}
-                        </label>
-                        <input
-                          type="text"
-                          value={getFieldValue(profileForm, 'linkedin')}
-                          onInput={(e) =>
-                            setProfileForm(
-                              updateFieldValue(
-                                profileForm,
-                                'linkedin',
-                                (e.target as HTMLInputElement).value,
-                                t.fields.linkedin,
-                                'links',
-                              ),
-                            )
-                          }
-                          class="w-full rounded-md border border-slate-300 bg-white p-2 text-xs dark:border-slate-700 dark:bg-slate-800"
-                        />
-                      </div>
-                      <div>
-                        <label class="mb-1 block text-xs text-slate-600 dark:text-slate-400">
-                          {t.fields.twitter}
-                        </label>
-                        <input
-                          type="text"
-                          value={getFieldValue(profileForm, 'twitter')}
-                          onInput={(e) =>
-                            setProfileForm(
-                              updateFieldValue(
-                                profileForm,
-                                'twitter',
-                                (e.target as HTMLInputElement).value,
-                                t.fields.twitter,
-                                'links',
-                              ),
-                            )
-                          }
-                          class="w-full rounded-md border border-slate-300 bg-white p-2 text-xs dark:border-slate-700 dark:bg-slate-800"
-                        />
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Section: Custom / Additional Fields */}
-                  <div>
-                    <div class="mb-3 flex items-center justify-between">
-                      <h3 class="text-xs font-bold uppercase tracking-wider text-slate-400">
-                        {t.sections.custom}
-                      </h3>
-                      <button
-                        type="button"
-                        onClick={handleAddCustomField}
-                        class="text-xs font-medium text-brand-600 hover:text-brand-700"
+                  {/* Category Filter & Management Bar */}
+                  <div class="space-y-2 rounded-lg border border-slate-200 bg-slate-50/70 p-3 dark:border-slate-800 dark:bg-slate-800/40">
+                    <div class="flex flex-wrap items-center justify-between gap-2">
+                      <div
+                        role="group"
+                        aria-label={t.categories.filterByCategory}
+                        class="flex flex-wrap items-center gap-1"
                       >
-                        + {t.actions.add}
-                      </button>
-                    </div>
-
-                    <div class="space-y-2">
-                      {profileForm.fields
-                        .filter((f) => !CANONICAL_KEYS_SET.has(f.key))
-                        .map((cf) => (
-                          <div key={cf.id} class="flex items-center space-x-2">
-                            <input
-                              type="text"
-                              value={cf.label}
-                              onInput={(e) =>
-                                handleUpdateCustomField(cf.id, {
-                                  label: (e.target as HTMLInputElement).value,
-                                })
-                              }
-                              placeholder="Label"
-                              class="w-1/3 rounded-md border border-slate-300 bg-white p-2 text-xs dark:border-slate-700 dark:bg-slate-800"
-                            />
-                            <input
-                              type="text"
-                              value={cf.value}
-                              onInput={(e) =>
-                                handleUpdateCustomField(cf.id, {
-                                  value: (e.target as HTMLInputElement).value,
-                                })
-                              }
-                              placeholder="Value"
-                              class="flex-1 rounded-md border border-slate-300 bg-white p-2 text-xs dark:border-slate-700 dark:bg-slate-800"
-                            />
-                            <button
-                              type="button"
-                              onClick={() => handleRemoveCustomField(cf.id)}
-                              class="p-2 text-rose-500 hover:text-rose-700"
-                              aria-label="Remove field"
-                            >
-                              ×
-                            </button>
-                          </div>
-                        ))}
-                    </div>
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* TAB 2: ENCRYPTED VAULT (PAYMENT CARDS) */}
-          {activeTab === 'vault' && (
-            <div class="space-y-6">
-              <div>
-                <h2 class="text-base font-bold text-slate-900 dark:text-slate-100">
-                  {t.vault.title}
-                </h2>
-                <p class="mt-1 text-xs leading-relaxed text-slate-500 dark:text-slate-400">
-                  {t.vault.description}
-                </p>
-              </div>
-
-              {!vaultInitialized ? (
-                <div class="max-w-md space-y-4 rounded-lg border border-slate-200 bg-slate-50 p-6 dark:border-slate-800 dark:bg-slate-800/40">
-                  <h3 class="text-sm font-semibold text-slate-800 dark:text-slate-200">
-                    {t.vault.setupPassphrase}
-                  </h3>
-                  <div>
-                    <input
-                      type="password"
-                      value={newVaultPassphrase}
-                      onInput={(e) => setNewVaultPassphrase((e.target as HTMLInputElement).value)}
-                      placeholder={t.vault.passphrasePlaceholder}
-                      class="mb-2 w-full rounded-md border border-slate-300 bg-white p-2 text-xs dark:border-slate-700 dark:bg-slate-800"
-                    />
-                    <input
-                      type="password"
-                      value={confirmVaultPassphrase}
-                      onInput={(e) =>
-                        setConfirmVaultPassphrase((e.target as HTMLInputElement).value)
-                      }
-                      placeholder={t.vault.confirmPassphrasePlaceholder}
-                      class="w-full rounded-md border border-slate-300 bg-white p-2 text-xs dark:border-slate-700 dark:bg-slate-800"
-                    />
-                  </div>
-                  {vaultError && <p class="text-xs text-rose-500">{vaultError}</p>}
-                  <button
-                    type="button"
-                    onClick={handleSetupVault}
-                    class="shadow-xs w-full rounded-md bg-brand-600 py-2 text-xs font-semibold text-white transition-colors hover:bg-brand-700"
-                  >
-                    {t.actions.create}
-                  </button>
-                </div>
-              ) : !vaultUnlocked ? (
-                <div class="max-w-md space-y-4 rounded-lg border border-slate-200 bg-slate-50 p-6 dark:border-slate-800 dark:bg-slate-800/40">
-                  <h3 class="text-sm font-semibold text-slate-800 dark:text-slate-200">
-                    {t.vault.enterPassphrase}
-                  </h3>
-                  <input
-                    type="password"
-                    value={vaultPassphrase}
-                    onInput={(e) => setVaultPassphrase((e.target as HTMLInputElement).value)}
-                    onKeyDown={(e) => e.key === 'Enter' && handleUnlockVault()}
-                    placeholder={t.vault.enterPassphrase}
-                    class="w-full rounded-md border border-slate-300 bg-white p-2 text-xs dark:border-slate-700 dark:bg-slate-800"
-                  />
-                  {vaultError && <p class="text-xs text-rose-500">{vaultError}</p>}
-                  <button
-                    type="button"
-                    onClick={handleUnlockVault}
-                    class="shadow-xs w-full rounded-md bg-brand-600 py-2 text-xs font-semibold text-white transition-colors hover:bg-brand-700"
-                  >
-                    {t.actions.unlock}
-                  </button>
-                </div>
-              ) : (
-                <div class="space-y-6">
-                  <div class="flex items-center justify-between border-b border-slate-200 pb-3 dark:border-slate-800">
-                    <span class="flex items-center space-x-1.5 text-xs font-medium text-emerald-600 dark:text-emerald-400">
-                      <span class="h-2 w-2 rounded-full bg-emerald-500"></span>
-                      <span>{t.vault.unlockedBadge}</span>
-                    </span>
-                    <div class="flex items-center space-x-2">
-                      <button
-                        type="button"
-                        onClick={() => setIsAddingCard(true)}
-                        class="rounded-md bg-brand-600 px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-brand-700"
-                      >
-                        + {t.vault.addCard}
-                      </button>
-                      <button
-                        type="button"
-                        onClick={handleLockVault}
-                        class="rounded-md border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-700 transition-colors hover:bg-slate-100 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
-                      >
-                        {t.actions.lock}
-                      </button>
-                    </div>
-                  </div>
-
-                  {/* Add Card Form */}
-                  {isAddingCard && (
-                    <div class="space-y-4 rounded-lg border border-brand-200 bg-brand-50/50 p-4 dark:border-brand-900 dark:bg-brand-950/20">
-                      <h4 class="text-xs font-bold uppercase tracking-wider text-slate-800 dark:text-slate-200">
-                        {t.vault.addCard}
-                      </h4>
-                      <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                        <div>
-                          <label class="mb-1 block text-xs text-slate-600 dark:text-slate-400">
-                            {t.fields.nickname} *
-                          </label>
-                          <input
-                            type="text"
-                            value={cardNickname}
-                            onInput={(e) => setCardNickname((e.target as HTMLInputElement).value)}
-                            placeholder="e.g. Main Visa Debit"
-                            class="w-full rounded-md border border-slate-300 bg-white p-2 text-xs dark:border-slate-700 dark:bg-slate-800"
-                          />
-                        </div>
-                        <div>
-                          <label class="mb-1 block text-xs text-slate-600 dark:text-slate-400">
-                            {t.fields.cardholderName}
-                          </label>
-                          <input
-                            type="text"
-                            value={cardholderName}
-                            onInput={(e) => setCardholderName((e.target as HTMLInputElement).value)}
-                            placeholder="Name as it appears on card"
-                            class="w-full rounded-md border border-slate-300 bg-white p-2 text-xs dark:border-slate-700 dark:bg-slate-800"
-                          />
-                        </div>
-                        <div class="sm:col-span-2">
-                          <label class="mb-1 block text-xs text-slate-600 dark:text-slate-400">
-                            {t.fields.cardNumber} *
-                          </label>
-                          <input
-                            type="text"
-                            value={cardNumber}
-                            onInput={(e) => setCardNumber((e.target as HTMLInputElement).value)}
-                            placeholder="16 digits"
-                            class="w-full rounded-md border border-slate-300 bg-white p-2 font-mono text-xs dark:border-slate-700 dark:bg-slate-800"
-                          />
-                        </div>
-                        <div>
-                          <label class="mb-1 block text-xs text-slate-600 dark:text-slate-400">
-                            {t.fields.expiry} (MM / YY) *
-                          </label>
-                          <div class="flex items-center space-x-2">
-                            <input
-                              type="text"
-                              value={expMonth}
-                              onInput={(e) => setExpMonth((e.target as HTMLInputElement).value)}
-                              placeholder="01"
-                              maxLength={2}
-                              class="w-16 rounded-md border border-slate-300 bg-white p-2 text-center font-mono text-xs dark:border-slate-700 dark:bg-slate-800"
-                            />
-                            <span>/</span>
-                            <input
-                              type="text"
-                              value={expYear}
-                              onInput={(e) => setExpYear((e.target as HTMLInputElement).value)}
-                              placeholder="28"
-                              maxLength={4}
-                              class="w-20 rounded-md border border-slate-300 bg-white p-2 text-center font-mono text-xs dark:border-slate-700 dark:bg-slate-800"
-                            />
-                          </div>
-                        </div>
-                        <div>
-                          <label class="mb-1 block text-xs text-slate-600 dark:text-slate-400">
-                            {t.fields.cvv} *
-                          </label>
-                          <input
-                            type="password"
-                            value={cvv}
-                            onInput={(e) => setCvv((e.target as HTMLInputElement).value)}
-                            placeholder="3-4 digits"
-                            maxLength={4}
-                            class="w-24 rounded-md border border-slate-300 bg-white p-2 text-center font-mono text-xs dark:border-slate-700 dark:bg-slate-800"
-                          />
-                        </div>
-                      </div>
-
-                      <div class="flex items-center justify-end space-x-2 pt-2">
                         <button
                           type="button"
-                          onClick={() => setIsAddingCard(false)}
-                          class="px-3 py-1.5 text-xs text-slate-600 hover:underline dark:text-slate-400"
+                          onClick={() => setSelectedCategory('all')}
+                          class={`rounded px-2.5 py-1 text-xs font-medium ${
+                            selectedCategory === 'all'
+                              ? 'bg-brand-600 text-white'
+                              : 'bg-white text-slate-700 hover:bg-slate-100 dark:bg-slate-800 dark:text-slate-300'
+                          }`}
                         >
-                          {t.actions.cancel}
+                          {t.sections.allCategories}
                         </button>
-                        <button
-                          type="button"
-                          onClick={handleSaveCard}
-                          class="rounded-md bg-brand-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-brand-700"
-                        >
-                          {t.actions.save}
-                        </button>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Cards List */}
-                  <div class="space-y-3">
-                    {cards.length === 0 ? (
-                      <p class="text-xs text-slate-500">{t.vault.noCardsYet}</p>
-                    ) : (
-                      cards.map((card) => (
-                        <div
-                          key={card.id}
-                          class="flex items-center justify-between rounded-lg border border-slate-200 bg-slate-50/50 p-4 dark:border-slate-800 dark:bg-slate-800/30"
-                        >
-                          <div>
-                            <div class="flex items-center space-x-2">
-                              <span class="text-sm font-semibold text-slate-900 dark:text-white">
-                                {card.nickname}
-                              </span>
-                              <span class="rounded bg-slate-200 px-1.5 py-0.5 text-[10px] font-bold uppercase text-slate-700 dark:bg-slate-700 dark:text-slate-300">
-                                {card.brand}
-                              </span>
-                            </div>
-                            <div class="mt-1 font-mono text-xs text-slate-500">
-                              {maskCardNumber(card.cardNumber)} • Exp: {card.expMonth}/
-                              {card.expYear}
-                            </div>
-                            {card.cardholderName && (
-                              <div class="mt-0.5 text-xs text-slate-400">{card.cardholderName}</div>
-                            )}
-                          </div>
-
+                        {allCategories.map((cat) => (
                           <button
+                            key={cat}
                             type="button"
-                            onClick={() => setCardToDelete(card)}
-                            class="rounded-md px-2.5 py-1.5 text-xs text-rose-600 transition-colors hover:bg-rose-50 dark:hover:bg-rose-950/40"
+                            onClick={() => setSelectedCategory(cat)}
+                            class={`rounded px-2.5 py-1 text-xs font-medium ${
+                              selectedCategory === cat
+                                ? 'bg-brand-600 text-white'
+                                : 'bg-white text-slate-700 hover:bg-slate-100 dark:bg-slate-800 dark:text-slate-300'
+                            }`}
                           >
-                            {t.actions.delete}
+                            {getCategoryLabel(cat)}
                           </button>
-                        </div>
-                      ))
+                        ))}
+                      </div>
+
+                      <form onSubmit={handleAddCategory} class="flex items-center gap-1">
+                        <label for="new-category-input" class="sr-only">
+                          {t.categories.categoryNamePlaceholder}
+                        </label>
+                        <input
+                          id="new-category-input"
+                          type="text"
+                          value={newCategoryName}
+                          onInput={(e) => setNewCategoryName((e.target as HTMLInputElement).value)}
+                          placeholder={t.categories.categoryNamePlaceholder}
+                          class="rounded border border-slate-300 bg-white px-2 py-1 text-xs text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                        />
+                        <button
+                          type="submit"
+                          class="rounded border border-slate-300 bg-white px-2 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200"
+                        >
+                          + {t.categories.addCategory}
+                        </button>
+                      </form>
+                    </div>
+                  </div>
+
+                  {/* Fields List with Full CRUD & Drag-and-Drop / Keyboard Reorder */}
+                  <div class="space-y-3">
+                    <div class="flex items-center justify-between">
+                      <h2 class="text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300">
+                        {selectedCategory === 'all'
+                          ? t.sections.allCategories
+                          : getCategoryLabel(selectedCategory)}
+                      </h2>
+                      <button
+                        type="button"
+                        onClick={handleAddField}
+                        class="rounded-md bg-brand-50 px-3 py-1.5 text-xs font-semibold text-brand-800 hover:bg-brand-100 dark:bg-brand-950 dark:text-brand-200"
+                      >
+                        + {t.actions.quickAdd}
+                      </button>
+                    </div>
+
+                    {filteredFields.length === 0 ? (
+                      <p class="py-4 text-center text-xs text-slate-600 dark:text-slate-300">
+                        {t.emptyStates.noFieldsInProfile}
+                      </p>
+                    ) : (
+                      <div role="list" class="space-y-2">
+                        {filteredFields.map((field) => {
+                          const realIndex = profileForm.fields.findIndex(
+                            (item) => item.id === field.id,
+                          );
+                          return (
+                            <div
+                              key={field.id}
+                              role="listitem"
+                              draggable
+                              onDragStart={() => handleDragStart(realIndex)}
+                              onDragOver={handleDragOver}
+                              onDrop={() => handleDrop(realIndex)}
+                              class="grid grid-cols-1 items-center gap-2 rounded-lg border border-slate-200 bg-slate-50/50 p-3 dark:border-slate-800 dark:bg-slate-800/40 sm:grid-cols-12"
+                            >
+                              {/* Reorder controls */}
+                              <div class="flex items-center gap-1 sm:col-span-1">
+                                <button
+                                  type="button"
+                                  onClick={() => handleMoveField(realIndex, -1)}
+                                  disabled={realIndex <= 0}
+                                  aria-label={`${t.actions.moveUp}: ${field.label}`}
+                                  title={t.actions.moveUp}
+                                  class="rounded p-1 text-xs text-slate-600 hover:bg-slate-200 disabled:opacity-30 dark:text-slate-300 dark:hover:bg-slate-700"
+                                >
+                                  ↑
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => handleMoveField(realIndex, 1)}
+                                  disabled={realIndex >= profileForm.fields.length - 1}
+                                  aria-label={`${t.actions.moveDown}: ${field.label}`}
+                                  title={t.actions.moveDown}
+                                  class="rounded p-1 text-xs text-slate-600 hover:bg-slate-200 disabled:opacity-30 dark:text-slate-300 dark:hover:bg-slate-700"
+                                >
+                                  ↓
+                                </button>
+                              </div>
+
+                              {/* Label */}
+                              <div class="sm:col-span-3">
+                                <label
+                                  for={`field-label-${field.id}`}
+                                  class="mb-0.5 block text-[10px] font-semibold text-slate-600 dark:text-slate-300"
+                                >
+                                  {t.fields.fieldLabel}
+                                </label>
+                                <input
+                                  id={`field-label-${field.id}`}
+                                  type="text"
+                                  value={field.label}
+                                  onInput={(e) =>
+                                    handleUpdateField(field.id, {
+                                      label: (e.target as HTMLInputElement).value,
+                                    })
+                                  }
+                                  class="w-full rounded border border-slate-300 bg-white px-2 py-1 text-xs text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                                />
+                              </div>
+
+                              {/* Value */}
+                              <div class="sm:col-span-4">
+                                <label
+                                  for={`field-value-${field.id}`}
+                                  class="mb-0.5 block text-[10px] font-semibold text-slate-600 dark:text-slate-300"
+                                >
+                                  {t.fields.fieldValue}
+                                </label>
+                                {field.type === 'multiline' ? (
+                                  <textarea
+                                    id={`field-value-${field.id}`}
+                                    rows={2}
+                                    value={field.value}
+                                    onInput={(e) =>
+                                      handleUpdateField(field.id, {
+                                        value: (e.target as HTMLTextAreaElement).value,
+                                      })
+                                    }
+                                    placeholder={t.fields.valuePlaceholder}
+                                    class="w-full rounded border border-slate-300 bg-white px-2 py-1 text-xs text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                                  />
+                                ) : (
+                                  <input
+                                    id={`field-value-${field.id}`}
+                                    type={field.sensitive ? 'password' : 'text'}
+                                    value={field.value}
+                                    onInput={(e) =>
+                                      handleUpdateField(field.id, {
+                                        value: (e.target as HTMLInputElement).value,
+                                      })
+                                    }
+                                    placeholder={t.fields.valuePlaceholder}
+                                    class="w-full rounded border border-slate-300 bg-white px-2 py-1 text-xs text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                                  />
+                                )}
+                              </div>
+
+                              {/* Key & Category & Type */}
+                              <div class="grid grid-cols-2 gap-1 sm:col-span-3">
+                                <div>
+                                  <label
+                                    for={`field-cat-${field.id}`}
+                                    class="mb-0.5 block text-[10px] font-semibold text-slate-600 dark:text-slate-300"
+                                  >
+                                    {t.fields.fieldCategory}
+                                  </label>
+                                  <select
+                                    id={`field-cat-${field.id}`}
+                                    value={field.category}
+                                    onChange={(e) =>
+                                      handleUpdateField(field.id, {
+                                        category: (e.target as HTMLSelectElement).value,
+                                      })
+                                    }
+                                    class="w-full rounded border border-slate-300 bg-white px-1.5 py-1 text-xs text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                                  >
+                                    {allCategories.map((c) => (
+                                      <option key={c} value={c}>
+                                        {getCategoryLabel(c)}
+                                      </option>
+                                    ))}
+                                  </select>
+                                </div>
+
+                                <div>
+                                  <label
+                                    for={`field-type-${field.id}`}
+                                    class="mb-0.5 block text-[10px] font-semibold text-slate-600 dark:text-slate-300"
+                                  >
+                                    {t.fields.fieldType}
+                                  </label>
+                                  <select
+                                    id={`field-type-${field.id}`}
+                                    value={field.type}
+                                    onChange={(e) =>
+                                      handleUpdateField(field.id, {
+                                        type: (e.target as HTMLSelectElement).value as FieldType,
+                                      })
+                                    }
+                                    class="w-full rounded border border-slate-300 bg-white px-1.5 py-1 text-xs text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                                  >
+                                    {FIELD_TYPES.map((ft) => (
+                                      <option key={ft} value={ft}>
+                                        {t.fieldTypes[ft]}
+                                      </option>
+                                    ))}
+                                  </select>
+                                </div>
+
+                                <div class="col-span-2 flex items-center justify-between pt-0.5">
+                                  <label class="flex cursor-pointer items-center gap-1 text-[10px] font-medium text-slate-700 dark:text-slate-300">
+                                    <input
+                                      type="checkbox"
+                                      checked={field.sensitive}
+                                      onChange={(e) =>
+                                        handleUpdateField(field.id, {
+                                          sensitive: (e.target as HTMLInputElement).checked,
+                                        })
+                                      }
+                                      class="rounded border-slate-300 text-brand-600"
+                                    />
+                                    <span>{t.fields.sensitiveField.split(' ')[0]}</span>
+                                  </label>
+
+                                  <label for={`field-key-${field.id}`} class="sr-only">
+                                    {t.fields.fieldKey}
+                                  </label>
+                                  <select
+                                    id={`field-key-${field.id}`}
+                                    value={
+                                      CANONICAL_KEYS.includes(
+                                        field.key as (typeof CANONICAL_KEYS)[number],
+                                      )
+                                        ? field.key
+                                        : 'custom'
+                                    }
+                                    onChange={(e) => {
+                                      const val = (e.target as HTMLSelectElement).value;
+                                      handleUpdateField(field.id, {
+                                        key: val === 'custom' ? `custom_${Date.now()}` : val,
+                                      });
+                                    }}
+                                    class="max-w-[95px] rounded border border-slate-200 bg-white px-1 py-0.5 text-[10px] text-slate-700 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300"
+                                  >
+                                    {CANONICAL_KEYS.map((k) => (
+                                      <option key={k} value={k}>
+                                        {k}
+                                      </option>
+                                    ))}
+                                    <option value="custom">custom</option>
+                                  </select>
+                                </div>
+                              </div>
+
+                              {/* Delete field button */}
+                              <div class="flex justify-end sm:col-span-1">
+                                <button
+                                  type="button"
+                                  onClick={() => handleRemoveField(field.id)}
+                                  aria-label={`${t.fields.removeField}: ${field.label}`}
+                                  title={t.fields.removeField}
+                                  class="rounded p-1.5 text-rose-700 hover:bg-rose-50 dark:text-rose-400 dark:hover:bg-rose-950/40"
+                                >
+                                  ×
+                                </button>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
                     )}
                   </div>
                 </div>
@@ -1285,90 +1076,559 @@ export function App() {
             </div>
           )}
 
-          {/* TAB 3: BACKUP & RESTORE */}
+          {/* TAB 2: SNIPPETS */}
+          {activeTab === 'snippets' && (
+            <div class="space-y-6">
+              <div class="border-b border-slate-200 pb-4 dark:border-slate-800">
+                <h2 class="text-base font-bold text-slate-900 dark:text-white">
+                  {t.snippets.title}
+                </h2>
+                <p class="mt-1 text-xs text-slate-600 dark:text-slate-300">
+                  {t.snippets.description}
+                </p>
+              </div>
+
+              <form
+                onSubmit={handleSaveSnippet}
+                aria-label={t.snippets.addSnippet}
+                class="space-y-3 rounded-lg border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-800/40"
+              >
+                <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                  <div>
+                    <label
+                      for="snippet-trigger-input"
+                      class="mb-1 block text-xs font-medium text-slate-700 dark:text-slate-200"
+                    >
+                      {t.snippets.trigger} *
+                    </label>
+                    <input
+                      id="snippet-trigger-input"
+                      type="text"
+                      required
+                      value={snippetTrigger}
+                      onInput={(e) => setSnippetTrigger((e.target as HTMLInputElement).value)}
+                      placeholder={t.snippets.triggerPlaceholder}
+                      class="w-full rounded-md border border-slate-300 bg-white p-2 font-mono text-xs text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                    />
+                  </div>
+                  <div>
+                    <label
+                      for="snippet-folder-input"
+                      class="mb-1 block text-xs font-medium text-slate-700 dark:text-slate-200"
+                    >
+                      {t.snippets.folder}
+                    </label>
+                    <input
+                      id="snippet-folder-input"
+                      type="text"
+                      value={snippetFolder}
+                      onInput={(e) => setSnippetFolder((e.target as HTMLInputElement).value)}
+                      placeholder={t.snippets.folderPlaceholder}
+                      class="w-full rounded-md border border-slate-300 bg-white p-2 text-xs text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                    />
+                  </div>
+                </div>
+                <div>
+                  <label
+                    for="snippet-content-input"
+                    class="mb-1 block text-xs font-medium text-slate-700 dark:text-slate-200"
+                  >
+                    {t.snippets.content} *
+                  </label>
+                  <textarea
+                    id="snippet-content-input"
+                    rows={3}
+                    required
+                    value={snippetContent}
+                    onInput={(e) => setSnippetContent((e.target as HTMLTextAreaElement).value)}
+                    placeholder={t.snippets.contentPlaceholder}
+                    class="w-full rounded-md border border-slate-300 bg-white p-2 text-xs text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                  />
+                </div>
+                <div class="flex justify-end gap-2">
+                  {editingSnippetId && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setEditingSnippetId(null);
+                        setSnippetTrigger('');
+                        setSnippetContent('');
+                        setSnippetFolder('');
+                      }}
+                      class="rounded-md border border-slate-300 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200"
+                    >
+                      {t.actions.cancel}
+                    </button>
+                  )}
+                  <button
+                    type="submit"
+                    class="rounded-md bg-brand-600 px-4 py-1.5 text-xs font-semibold text-white hover:bg-brand-700"
+                  >
+                    {t.actions.save}
+                  </button>
+                </div>
+              </form>
+
+              {snippets.length === 0 ? (
+                <p class="py-6 text-center text-xs text-slate-600 dark:text-slate-300">
+                  {t.snippets.emptyState}
+                </p>
+              ) : (
+                <div role="list" class="space-y-2">
+                  {snippets.map((snip) => (
+                    <div
+                      key={snip.id}
+                      role="listitem"
+                      class="flex items-center justify-between rounded-lg border border-slate-200 p-3 dark:border-slate-800"
+                    >
+                      <div>
+                        <div class="flex items-center gap-2">
+                          <span class="rounded bg-brand-100 px-2 py-0.5 font-mono text-xs font-bold text-brand-900 dark:bg-brand-950 dark:text-brand-200">
+                            {snip.trigger}
+                          </span>
+                          <span class="text-[11px] text-slate-600 dark:text-slate-400">
+                            {snip.folder}
+                          </span>
+                        </div>
+                        <p class="mt-1 text-xs text-slate-800 dark:text-slate-200">
+                          {snip.content}
+                        </p>
+                      </div>
+                      <div class="flex items-center gap-1">
+                        <button
+                          type="button"
+                          onClick={() => handleEditSnippet(snip)}
+                          class="rounded px-2 py-1 text-xs font-medium text-brand-700 hover:bg-brand-50 dark:text-brand-300"
+                        >
+                          {t.actions.edit}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteSnippet(snip.id)}
+                          class="rounded px-2 py-1 text-xs font-medium text-rose-700 hover:bg-rose-50 dark:text-rose-400"
+                        >
+                          {t.actions.delete}
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* TAB 3: ENCRYPTED VAULT (CARDS) */}
+          {activeTab === 'vault' && (
+            <div class="space-y-6">
+              <div class="flex items-start justify-between border-b border-slate-200 pb-4 dark:border-slate-800">
+                <div>
+                  <h2 class="text-base font-bold text-slate-900 dark:text-white">
+                    {t.vault.title}
+                  </h2>
+                  <p class="mt-1 text-xs text-slate-600 dark:text-slate-300">
+                    {t.vault.description}
+                  </p>
+                </div>
+
+                <span
+                  class={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-semibold ${
+                    !vaultInitialized
+                      ? 'bg-amber-100 text-amber-900 dark:bg-amber-950 dark:text-amber-200'
+                      : vaultUnlocked
+                        ? 'bg-emerald-100 text-emerald-900 dark:bg-emerald-950 dark:text-emerald-200'
+                        : 'bg-slate-200 text-slate-800 dark:bg-slate-800 dark:text-slate-200'
+                  }`}
+                >
+                  {!vaultInitialized
+                    ? t.vault.uninitializedBadge
+                    : vaultUnlocked
+                      ? t.vault.unlockedBadge
+                      : t.vault.lockedBadge}
+                </span>
+              </div>
+
+              {!vaultInitialized ? (
+                <div class="mx-auto max-w-md space-y-4 rounded-xl border border-slate-200 bg-slate-50 p-6 dark:border-slate-800 dark:bg-slate-800/40">
+                  <h3 class="text-sm font-semibold text-slate-900 dark:text-slate-100">
+                    {t.vault.setupPassphrase}
+                  </h3>
+                  <div class="space-y-3">
+                    <div>
+                      <label for="new-vault-passphrase" class="sr-only">
+                        {t.vault.passphrasePlaceholder}
+                      </label>
+                      <input
+                        id="new-vault-passphrase"
+                        type="password"
+                        value={newVaultPassphrase}
+                        onInput={(e) => setNewVaultPassphrase((e.target as HTMLInputElement).value)}
+                        placeholder={t.vault.passphrasePlaceholder}
+                        class="w-full rounded-md border border-slate-300 bg-white p-2 text-xs text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                      />
+                    </div>
+                    <div>
+                      <label for="confirm-vault-passphrase" class="sr-only">
+                        {t.vault.confirmPassphrasePlaceholder}
+                      </label>
+                      <input
+                        id="confirm-vault-passphrase"
+                        type="password"
+                        value={confirmVaultPassphrase}
+                        onInput={(e) =>
+                          setConfirmVaultPassphrase((e.target as HTMLInputElement).value)
+                        }
+                        placeholder={t.vault.confirmPassphrasePlaceholder}
+                        class="w-full rounded-md border border-slate-300 bg-white p-2 text-xs text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                      />
+                    </div>
+                    {vaultError && (
+                      <p role="alert" class="text-xs font-medium text-rose-700 dark:text-rose-400">
+                        {vaultError}
+                      </p>
+                    )}
+                    <button
+                      type="button"
+                      onClick={handleSetupVault}
+                      class="w-full rounded-md bg-brand-600 py-2 text-xs font-semibold text-white transition-colors hover:bg-brand-700"
+                    >
+                      {t.actions.create}
+                    </button>
+                  </div>
+                </div>
+              ) : !vaultUnlocked ? (
+                <div class="mx-auto max-w-md space-y-4 rounded-xl border border-slate-200 bg-slate-50 p-6 dark:border-slate-800 dark:bg-slate-800/40">
+                  <h3 class="text-sm font-semibold text-slate-900 dark:text-slate-100">
+                    {t.vault.enterPassphrase}
+                  </h3>
+                  <div class="space-y-3">
+                    <div>
+                      <label for="unlock-vault-passphrase" class="sr-only">
+                        {t.vault.enterPassphrase}
+                      </label>
+                      <input
+                        id="unlock-vault-passphrase"
+                        type="password"
+                        value={vaultPassphrase}
+                        onInput={(e) => setVaultPassphrase((e.target as HTMLInputElement).value)}
+                        onKeyDown={(e) => e.key === 'Enter' && handleUnlockVault()}
+                        placeholder={t.vault.enterPassphrase}
+                        class="w-full rounded-md border border-slate-300 bg-white p-2 text-xs text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                      />
+                    </div>
+                    {vaultError && (
+                      <p role="alert" class="text-xs font-medium text-rose-700 dark:text-rose-400">
+                        {vaultError}
+                      </p>
+                    )}
+                    <button
+                      type="button"
+                      onClick={handleUnlockVault}
+                      class="w-full rounded-md bg-brand-600 py-2 text-xs font-semibold text-white transition-colors hover:bg-brand-700"
+                    >
+                      {t.actions.unlock}
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div class="space-y-6">
+                  <div class="flex items-center justify-between">
+                    <p class="text-xs text-slate-600 dark:text-slate-300">
+                      {formatString(t.vault.autoLockNote, {
+                        minutes: settings.vaultTimeoutMinutes,
+                      })}
+                    </p>
+                    <div class="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setEditingCard(null);
+                          setIsAddingCard(true);
+                        }}
+                        class="rounded-md bg-brand-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-brand-700"
+                      >
+                        + {t.vault.addCard}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleLockVault}
+                        class="rounded-md border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-100 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
+                      >
+                        {t.actions.lock}
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Card Form with live Luhn validation, brand detection, expiry picker, optional CVV */}
+                  {(isAddingCard || editingCard) && (
+                    <CardForm
+                      t={t}
+                      initialCard={editingCard}
+                      onSave={handleSaveCardData}
+                      onCancel={() => {
+                        setIsAddingCard(false);
+                        setEditingCard(null);
+                      }}
+                    />
+                  )}
+
+                  {/* Cards List */}
+                  {cards.length === 0 ? (
+                    <div class="rounded-lg border border-dashed border-slate-300 py-10 text-center text-xs text-slate-600 dark:border-slate-800 dark:text-slate-300">
+                      {t.vault.noCardsYet}
+                    </div>
+                  ) : (
+                    <div role="list" class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                      {cards.map((c) => (
+                        <div
+                          key={c.id}
+                          role="listitem"
+                          class="flex flex-col justify-between rounded-xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-800/50"
+                        >
+                          <div class="flex items-start justify-between">
+                            <div>
+                              <div class="flex items-center gap-2">
+                                <CardBrandIcon brand={c.brand} />
+                                <span class="text-sm font-bold text-slate-900 dark:text-slate-100">
+                                  {c.nickname}
+                                </span>
+                              </div>
+                              <p class="mt-2 font-mono text-xs text-slate-700 dark:text-slate-300">
+                                {maskCardNumber(c.cardNumber)}
+                              </p>
+                            </div>
+                            <div class="flex items-center gap-1">
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setEditingCard(c);
+                                  setIsAddingCard(false);
+                                }}
+                                class="rounded px-2 py-1 text-xs font-medium text-brand-700 hover:bg-brand-50 dark:text-brand-300"
+                              >
+                                {t.actions.edit}
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => setCardToDelete(c)}
+                                class="rounded px-2 py-1 text-xs font-medium text-rose-700 hover:bg-rose-50 dark:text-rose-400"
+                              >
+                                {t.actions.delete}
+                              </button>
+                            </div>
+                          </div>
+                          <div class="mt-4 flex items-center justify-between border-t border-slate-200/80 pt-2 text-[11px] text-slate-600 dark:border-slate-700/60 dark:text-slate-300">
+                            <span>{c.cardholderName || '—'}</span>
+                            <span>
+                              {c.expMonth}/{c.expYear}
+                            </span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* TAB 4: SITE RULES */}
+          {activeTab === 'siteRules' && (
+            <div class="space-y-6">
+              <div class="border-b border-slate-200 pb-4 dark:border-slate-800">
+                <h2 class="text-base font-bold text-slate-900 dark:text-white">
+                  {t.siteRules.title}
+                </h2>
+                <p class="mt-1 text-xs text-slate-600 dark:text-slate-300">
+                  {t.siteRules.description}
+                </p>
+              </div>
+
+              <div class="rounded-lg border border-brand-200 bg-brand-50/50 p-3 text-xs text-slate-800 dark:border-brand-900 dark:bg-brand-950/30 dark:text-slate-200">
+                {t.siteRules.placeholderNote}
+              </div>
+
+              <form
+                onSubmit={handleSaveSiteRule}
+                aria-label={t.siteRules.addRule}
+                class="grid grid-cols-1 gap-3 rounded-lg border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-800/40 sm:grid-cols-4"
+              >
+                <div class="sm:col-span-2">
+                  <label
+                    for="rule-host-input"
+                    class="mb-1 block text-xs font-medium text-slate-700 dark:text-slate-200"
+                  >
+                    {t.siteRules.host} *
+                  </label>
+                  <input
+                    id="rule-host-input"
+                    type="text"
+                    required
+                    value={ruleHost}
+                    onInput={(e) => setRuleHost((e.target as HTMLInputElement).value)}
+                    placeholder={t.siteRules.hostPlaceholder}
+                    class="w-full rounded-md border border-slate-300 bg-white p-2 text-xs text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                  />
+                </div>
+                <div>
+                  <label
+                    for="rule-behavior-select"
+                    class="mb-1 block text-xs font-medium text-slate-700 dark:text-slate-200"
+                  >
+                    {t.siteRules.behavior}
+                  </label>
+                  <select
+                    id="rule-behavior-select"
+                    value={ruleBehavior}
+                    onChange={(e) =>
+                      setRuleBehavior(
+                        (e.target as HTMLSelectElement).value as 'ask' | 'always' | 'never',
+                      )
+                    }
+                    class="w-full rounded-md border border-slate-300 bg-white p-2 text-xs text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                  >
+                    <option value="ask">{t.siteRules.behaviorAsk}</option>
+                    <option value="always">{t.siteRules.behaviorAlways}</option>
+                    <option value="never">{t.siteRules.behaviorNever}</option>
+                  </select>
+                </div>
+                <div class="flex items-end">
+                  <button
+                    type="submit"
+                    class="w-full rounded-md bg-brand-600 px-3 py-2 text-xs font-semibold text-white hover:bg-brand-700"
+                  >
+                    + {t.siteRules.addRule}
+                  </button>
+                </div>
+              </form>
+
+              {siteRules.length === 0 ? (
+                <p class="py-6 text-center text-xs text-slate-600 dark:text-slate-300">
+                  {t.siteRules.emptyState}
+                </p>
+              ) : (
+                <div role="list" class="space-y-2">
+                  {siteRules.map((rule) => (
+                    <div
+                      key={rule.id}
+                      role="listitem"
+                      class="flex items-center justify-between rounded-lg border border-slate-200 p-3 dark:border-slate-800"
+                    >
+                      <div>
+                        <span class="font-mono text-xs font-bold text-slate-900 dark:text-slate-100">
+                          {rule.host}
+                        </span>
+                        <span class="ms-2 rounded bg-slate-100 px-2 py-0.5 text-[11px] text-slate-700 dark:bg-slate-800 dark:text-slate-300">
+                          {rule.autoFillRule}
+                        </span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => handleDeleteSiteRule(rule.id)}
+                        class="rounded px-2 py-1 text-xs font-medium text-rose-700 hover:bg-rose-50 dark:text-rose-400"
+                      >
+                        {t.actions.delete}
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* TAB 5: BACKUP & RESTORE */}
           {activeTab === 'backup' && (
             <div class="space-y-6">
-              <div>
-                <h2 class="text-base font-bold text-slate-900 dark:text-slate-100">
+              <div class="border-b border-slate-200 pb-4 dark:border-slate-800">
+                <h2 class="text-base font-bold text-slate-900 dark:text-white">
                   {t.settings.exportImportTitle}
                 </h2>
-                <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">
-                  {t.settings.privacyNote}
-                </p>
               </div>
 
-              {/* Export Box */}
-              <div class="space-y-3 rounded-lg border border-slate-200 bg-slate-50/60 p-5 dark:border-slate-800 dark:bg-slate-800/20">
-                <h3 class="text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300">
-                  {t.actions.export}
-                </h3>
-                <p class="text-xs leading-relaxed text-slate-600 dark:text-slate-400">
-                  {t.settings.exportDesc}
-                </p>
+              <div class="grid grid-cols-1 gap-6 sm:grid-cols-2">
+                {/* Export Box */}
+                <div class="flex flex-col justify-between rounded-xl border border-slate-200 p-5 dark:border-slate-800">
+                  <div class="space-y-3">
+                    <h3 class="text-sm font-semibold text-slate-900 dark:text-slate-100">
+                      {t.actions.export}
+                    </h3>
+                    <p class="text-xs leading-relaxed text-slate-600 dark:text-slate-300">
+                      {t.settings.exportDesc}
+                    </p>
+                    <label class="flex cursor-pointer items-start gap-2 pt-2 text-xs text-slate-700 dark:text-slate-200">
+                      <input
+                        type="checkbox"
+                        checked={includeVaultInExport}
+                        onChange={(e) =>
+                          setIncludeVaultInExport((e.target as HTMLInputElement).checked)
+                        }
+                        class="mt-0.5 rounded border-slate-300 text-brand-600"
+                      />
+                      <span>{t.settings.exportWithVault}</span>
+                    </label>
+                  </div>
 
-                {vaultInitialized && (
-                  <label class="flex cursor-pointer items-center space-x-2 pt-1 text-xs text-slate-700 dark:text-slate-300">
+                  <button
+                    type="button"
+                    onClick={handleExport}
+                    class="mt-6 w-full rounded-md bg-brand-600 py-2 text-xs font-semibold text-white transition-colors hover:bg-brand-700"
+                  >
+                    {t.actions.export}
+                  </button>
+                </div>
+
+                {/* Import Box */}
+                <div class="flex flex-col justify-between rounded-xl border border-slate-200 p-5 dark:border-slate-800">
+                  <div class="space-y-3">
+                    <h3 class="text-sm font-semibold text-slate-900 dark:text-slate-100">
+                      {t.actions.import}
+                    </h3>
+                    <p class="text-xs leading-relaxed text-slate-600 dark:text-slate-300">
+                      {t.settings.importDesc}
+                    </p>
+                  </div>
+
+                  <label class="mt-6 block w-full cursor-pointer rounded-md border border-slate-300 bg-slate-100 py-2 text-center text-xs font-semibold text-slate-800 transition-colors hover:bg-slate-200 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:hover:bg-slate-700">
+                    <span>{t.actions.import}</span>
                     <input
-                      type="checkbox"
-                      checked={includeVaultInExport}
-                      onChange={(e) =>
-                        setIncludeVaultInExport((e.target as HTMLInputElement).checked)
-                      }
-                      class="rounded border-slate-300 text-brand-600"
+                      type="file"
+                      accept=".json,application/json"
+                      onChange={handleImport}
+                      class="sr-only"
                     />
-                    <span>{t.settings.exportWithVault}</span>
                   </label>
-                )}
-
-                <button
-                  type="button"
-                  onClick={handleExport}
-                  class="shadow-xs mt-2 rounded-md bg-brand-600 px-4 py-2 text-xs font-semibold text-white transition-colors hover:bg-brand-700"
-                >
-                  {t.actions.export}
-                </button>
-              </div>
-
-              {/* Import Box */}
-              <div class="space-y-3 rounded-lg border border-slate-200 bg-slate-50/60 p-5 dark:border-slate-800 dark:bg-slate-800/20">
-                <h3 class="text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300">
-                  {t.actions.import}
-                </h3>
-                <p class="text-xs leading-relaxed text-slate-600 dark:text-slate-400">
-                  {t.settings.importDesc}
-                </p>
-
-                <label class="mt-2 inline-block cursor-pointer rounded-md border border-slate-300 px-4 py-2 text-xs font-semibold text-slate-700 transition-colors hover:bg-slate-100 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800">
-                  <span>{t.actions.import}</span>
-                  <input type="file" accept=".json" onChange={handleImport} class="hidden" />
-                </label>
+                </div>
               </div>
             </div>
           )}
 
-          {/* TAB 4: SETTINGS */}
+          {/* TAB 6: SETTINGS */}
           {activeTab === 'settings' && (
             <div class="space-y-6">
-              <div>
-                <h2 class="text-base font-bold text-slate-900 dark:text-slate-100">
+              <div class="border-b border-slate-200 pb-4 dark:border-slate-800">
+                <h2 class="text-base font-bold text-slate-900 dark:text-white">
                   {t.settings.title}
                 </h2>
               </div>
 
-              <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <div class="max-w-lg space-y-5">
                 {/* Language */}
                 <div>
-                  <label class="mb-1 block text-xs font-semibold text-slate-700 dark:text-slate-300">
+                  <label
+                    for="settings-language-select"
+                    class="mb-1.5 block text-xs font-semibold text-slate-700 dark:text-slate-200"
+                  >
                     {t.settings.language}
                   </label>
                   <select
+                    id="settings-language-select"
                     value={settings.language}
                     onChange={async (e) => {
-                      const lang = (e.target as HTMLSelectElement).value as Language;
+                      const lang = (e.target as HTMLSelectElement).value as 'en' | 'bn';
                       const updated = await repo.updateSettings({ language: lang });
                       setSettings(updated);
+                      document.documentElement.lang = lang;
                     }}
-                    class="w-full rounded-md border border-slate-300 bg-white p-2 text-xs dark:border-slate-700 dark:bg-slate-800"
+                    class="w-full rounded-md border border-slate-300 bg-white p-2 text-xs text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
                   >
                     <option value="en">{t.settings.languages.en}</option>
                     <option value="bn">{t.settings.languages.bn}</option>
@@ -1377,10 +1637,14 @@ export function App() {
 
                 {/* Theme */}
                 <div>
-                  <label class="mb-1 block text-xs font-semibold text-slate-700 dark:text-slate-300">
+                  <label
+                    for="settings-theme-select"
+                    class="mb-1.5 block text-xs font-semibold text-slate-700 dark:text-slate-200"
+                  >
                     {t.settings.theme}
                   </label>
                   <select
+                    id="settings-theme-select"
                     value={settings.theme}
                     onChange={async (e) => {
                       const theme = (e.target as HTMLSelectElement).value as
@@ -1389,7 +1653,7 @@ export function App() {
                       setSettings(updated);
                       applyTheme(theme);
                     }}
-                    class="w-full rounded-md border border-slate-300 bg-white p-2 text-xs dark:border-slate-700 dark:bg-slate-800"
+                    class="w-full rounded-md border border-slate-300 bg-white p-2 text-xs text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
                   >
                     <option value="system">{t.settings.themes.system}</option>
                     <option value="light">{t.settings.themes.light}</option>
@@ -1397,32 +1661,35 @@ export function App() {
                   </select>
                 </div>
 
-                {/* Vault auto-lock timeout */}
+                {/* Vault Auto-Lock Timeout */}
                 <div>
-                  <label class="mb-1 block text-xs font-semibold text-slate-700 dark:text-slate-300">
+                  <label
+                    for="settings-timeout-select"
+                    class="mb-1.5 block text-xs font-semibold text-slate-700 dark:text-slate-200"
+                  >
                     {t.settings.vaultTimeout}
                   </label>
                   <select
+                    id="settings-timeout-select"
                     value={settings.vaultTimeoutMinutes}
                     onChange={async (e) => {
                       const mins = Number((e.target as HTMLSelectElement).value);
-                      const updated = await repo.updateSettings({
-                        vaultTimeoutMinutes: mins,
-                      });
+                      const updated = await repo.updateSettings({ vaultTimeoutMinutes: mins });
                       setSettings(updated);
                     }}
-                    class="w-full rounded-md border border-slate-300 bg-white p-2 text-xs dark:border-slate-700 dark:bg-slate-800"
+                    class="w-full rounded-md border border-slate-300 bg-white p-2 text-xs text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
                   >
-                    <option value={5}>5 minutes</option>
-                    <option value={15}>15 minutes (recommended)</option>
-                    <option value={30}>30 minutes</option>
-                    <option value={60}>60 minutes</option>
+                    {[5, 15, 30, 60].map((m) => (
+                      <option key={m} value={m}>
+                        {formatString(t.settings.vaultTimeoutMinutes, { minutes: m })}
+                      </option>
+                    ))}
                   </select>
                 </div>
 
-                {/* Require Confirmation Before Payment Fill */}
-                <div class="pt-2 sm:col-span-2">
-                  <label class="flex cursor-pointer items-center space-x-2 text-xs font-medium text-slate-700 dark:text-slate-300">
+                {/* Payment Confirmation Toggle */}
+                <div class="pt-2">
+                  <label class="flex cursor-pointer items-center gap-2.5 text-xs font-medium text-slate-700 dark:text-slate-200">
                     <input
                       type="checkbox"
                       checked={settings.confirmBeforePaymentFill}
@@ -1433,10 +1700,25 @@ export function App() {
                         });
                         setSettings(updated);
                       }}
-                      class="rounded border-slate-300 text-brand-600 focus:ring-brand-500"
+                      class="rounded border-slate-300 text-brand-600"
                     />
                     <span>{t.settings.confirmPaymentFill}</span>
                   </label>
+                </div>
+
+                {/* Re-open 3-Step Onboarding Wizard */}
+                <div class="pt-2">
+                  <button
+                    type="button"
+                    onClick={() => setIsOnboardingOpen(true)}
+                    class="rounded-md border border-slate-300 bg-white px-3.5 py-2 text-xs font-semibold text-slate-800 hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:hover:bg-slate-700"
+                  >
+                    {t.settings.reopenOnboarding}
+                  </button>
+                </div>
+
+                <div class="rounded-lg border border-emerald-200 bg-emerald-50/60 p-4 text-xs leading-relaxed text-emerald-900 dark:border-emerald-900/50 dark:bg-emerald-950/30 dark:text-emerald-200">
+                  {t.settings.privacyNote}
                 </div>
               </div>
             </div>
@@ -1444,32 +1726,47 @@ export function App() {
         </main>
       </div>
 
-      {/* Profile Delete Confirmation */}
+      {/* Onboarding Wizard */}
+      <OnboardingWizard
+        isOpen={isOnboardingOpen}
+        t={t}
+        onComplete={handleCompleteOnboarding}
+        onSkip={handleSkipOnboarding}
+      />
+
+      {/* Delete Profile Confirmation */}
       <ConfirmModal
         isOpen={profileToDelete !== null}
-        title="Delete Profile"
-        message={`Are you sure you want to delete profile "${profileToDelete?.name}"?`}
+        title={t.messages.confirmDeleteProfileTitle}
+        message={
+          profileToDelete
+            ? formatString(t.messages.confirmDeleteProfileMsg, { name: profileToDelete.name })
+            : ''
+        }
         confirmLabel={t.actions.delete}
         cancelLabel={t.actions.cancel}
-        isDestructive={true}
+        isDestructive
         onConfirm={handleDeleteProfile}
         onCancel={() => setProfileToDelete(null)}
       />
 
-      {/* Card Delete Confirmation */}
+      {/* Delete Card Confirmation */}
       <ConfirmModal
         isOpen={cardToDelete !== null}
-        title="Delete Card"
-        message={`Are you sure you want to remove card "${cardToDelete?.nickname}" from your secure vault?`}
+        title={t.messages.confirmDeleteCardTitle}
+        message={
+          cardToDelete
+            ? formatString(t.messages.confirmDeleteCardMsg, { name: cardToDelete.nickname })
+            : ''
+        }
         confirmLabel={t.actions.delete}
         cancelLabel={t.actions.cancel}
-        isDestructive={true}
+        isDestructive
         onConfirm={handleDeleteCard}
         onCancel={() => setCardToDelete(null)}
       />
 
-      {/* Toast Notification */}
-      <Toast toast={toast} onClose={() => setToast(null)} />
+      <Toast toast={toast} onClose={() => setToast(null)} closeLabel={t.actions.close} />
     </div>
   );
 }

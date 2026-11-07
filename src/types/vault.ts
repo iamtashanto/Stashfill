@@ -7,8 +7,11 @@ export const PaymentCardSchema = z.object({
   cardNumber: z.string().min(12).max(19),
   expMonth: z.string().regex(/^(0[1-9]|1[0-2])$/),
   expYear: z.string().regex(/^\d{2}(\d{2})?$/),
-  cvv: z.string().min(3).max(4),
-  brand: z.enum(['visa', 'mastercard', 'amex', 'discover', 'other']).default('other'),
+  cvv: z.string().min(3).max(4).optional(),
+  billingProfileId: z.string().nullable().optional(),
+  brand: z
+    .enum(['visa', 'mastercard', 'amex', 'discover', 'jcb', 'diners', 'unionpay', 'other'])
+    .default('other'),
   createdAt: z.number(),
 });
 

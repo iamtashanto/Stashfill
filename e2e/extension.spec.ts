@@ -40,7 +40,10 @@ export const test = base.extend<{
 });
 
 test.describe('Stashfill Browser Extension E2E', () => {
-  test('loads options page and displays profiles & settings', async ({ context, extensionId }) => {
+  test('loads options page, displays profiles & settings, and switches language without reload', async ({
+    context,
+    extensionId,
+  }) => {
     const page = await context.newPage();
     await page.goto(`chrome-extension://${extensionId}/options.html`);
 
@@ -50,9 +53,14 @@ test.describe('Stashfill Browser Extension E2E', () => {
 
     // Verify default profile exists
     await expect(page.getByText('Personal ★')).toBeVisible();
+
+    // Switch to Settings tab and change language to Bangla without reload
+    await page.getByRole('button', { name: 'Settings' }).click();
+    await page.locator('#settings-language-select').selectOption('bn');
+    await expect(page.getByText('প্রোফাইল পরিচালনা')).toBeVisible();
   });
 
-  test('loads popup page in under 100ms and shows 1-click fill button', async ({
+  test('loads popup page in under 100ms, shows 1-click fill button, and supports keyboard search', async ({
     context,
     extensionId,
   }) => {

@@ -185,6 +185,12 @@ export class StashRepository {
       this.debounceTimeout = null;
     }
 
+    if (this.debounceMs <= 0) {
+      await this.storage.save(STORAGE_KEYS.PRIMARY, validated);
+      await this.storage.save(STORAGE_KEYS.BACKUP, validated);
+      return;
+    }
+
     return new Promise((resolve, reject) => {
       this.debounceTimeout = setTimeout(async () => {
         try {
@@ -254,6 +260,19 @@ export class StashRepository {
   async deleteProfile(id: string): Promise<void> {
     await this.queueMutation((vault) => {
       vault.profiles = vault.profiles.filter((p) => p.id !== id);
+    });
+  }
+
+  async recordFieldUsage(profileId: string, fieldId: string): Promise<Profile | null> {
+    return this.queueMutation((vault) => {
+      const profile = vault.profiles.find((p) => p.id === profileId);
+      if (!profile) return null;
+      const field = profile.fields.find((f) => f.id === fieldId);
+      if (field) {
+        field.useCount = (field.useCount || 0) + 1;
+        field.lastUsedAt = Date.now();
+      }
+      return JSON.parse(JSON.stringify(profile)) as Profile;
     });
   }
 

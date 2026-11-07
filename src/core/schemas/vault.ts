@@ -100,6 +100,8 @@ export const SettingsSchema = z.object({
   requiresEncryptionForCards: z.boolean().default(true),
   showNotifications: z.boolean().default(true),
   defaultProfileId: z.string().optional(),
+  onboardingCompleted: z.boolean().optional(),
+  customCategories: z.array(z.string()).optional(),
 });
 
 export type Settings = z.infer<typeof SettingsSchema>;
