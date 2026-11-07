@@ -29,10 +29,20 @@ export interface RecoveryReport {
   timestamp: number;
 }
 
+export interface LocalBackupSnapshot {
+  id: string;
+  timestamp: number;
+  profileCount: number;
+  fieldCount: number;
+  vault: Omit<Vault, 'cards'> & { cards: [] };
+  encryptedPayload: EncryptedPayload | null;
+}
+
 const STORAGE_KEYS = {
   PRIMARY: 'stashfill_vault_primary',
   BACKUP: 'stashfill_vault_backup',
   ENCRYPTED_VAULT: 'stashfill_encrypted_vault',
+  BACKUP_HISTORY: 'stashfill_backup_history',
 } as const;
 
 export class StashRepository {
@@ -405,15 +415,24 @@ export class StashRepository {
   async exportData(includeVault = false): Promise<{
     version: number;
     exportedAt: number;
+    cardExportNotice: string;
     vault: Vault;
     encryptedPayload?: EncryptedPayload | null;
   }> {
     const vault = await this.loadVault();
+    const sanitizedVault: Vault = {
+      ...JSON.parse(JSON.stringify(vault)),
+      // Plain vault object in export never carries unencrypted cards
+      cards: [],
+    };
     const encryptedPayload = includeVault ? await this.getEncryptedVault() : null;
+    await this.updateSettings({ lastBackupExportedAt: Date.now() });
     return {
-      version: vault.version,
+      version: sanitizedVault.version,
       exportedAt: Date.now(),
-      vault,
+      cardExportNotice:
+        'Plain JSON and CSV exports always exclude payment cards. Cards travel only inside the encrypted payload.',
+      vault: sanitizedVault,
       encryptedPayload,
     };
   }
@@ -422,6 +441,9 @@ export class StashRepository {
     if (!data || typeof data !== 'object') {
       throw new Error('Invalid backup file');
     }
+
+    // Create a local backup snapshot before overwriting
+    await this.createLocalBackupSnapshot();
 
     const payload = data as Record<string, unknown>;
     let vaultToImport: Vault;
@@ -432,6 +454,9 @@ export class StashRepository {
       const { vault } = MigrationRunner.run(payload);
       vaultToImport = vault;
     }
+
+    // Strip any unencrypted cards from plain vault payload
+    vaultToImport.cards = [];
 
     await this.saveVault(vaultToImport);
     await this.flush();
@@ -446,6 +471,57 @@ export class StashRepository {
       profileCount: vaultToImport.profiles.length,
       hasVault,
     };
+  }
+
+  // --- Rolling Automatic Local Backups (last N versions, cards only inside encrypted copy) ---
+
+  async getLocalBackupHistory(): Promise<LocalBackupSnapshot[]> {
+    const raw = await this.storage.load<LocalBackupSnapshot[]>(STORAGE_KEYS.BACKUP_HISTORY);
+    if (!Array.isArray(raw)) return [];
+    return raw;
+  }
+
+  async createLocalBackupSnapshot(): Promise<LocalBackupSnapshot> {
+    const vault = await this.loadVault();
+    const encryptedPayload = await this.getEncryptedVault();
+    const history = await this.getLocalBackupHistory();
+    const maxBackups = vault.settings.maxLocalBackups ?? 5;
+
+    const sanitizedVault: Omit<Vault, 'cards'> & { cards: [] } = {
+      ...JSON.parse(JSON.stringify(vault)),
+      cards: [],
+    };
+
+    const fieldCount = sanitizedVault.profiles.reduce((sum, p) => sum + p.fields.length, 0);
+
+    const snapshot: LocalBackupSnapshot = {
+      id: `snap_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+      timestamp: Date.now(),
+      profileCount: sanitizedVault.profiles.length,
+      fieldCount,
+      vault: sanitizedVault,
+      encryptedPayload: encryptedPayload ? { ...encryptedPayload } : null,
+    };
+
+    const updatedHistory = [snapshot, ...history].slice(0, maxBackups);
+    await this.storage.save(STORAGE_KEYS.BACKUP_HISTORY, updatedHistory);
+    return snapshot;
+  }
+
+  async restoreLocalBackupSnapshot(snapshotId: string): Promise<boolean> {
+    const history = await this.getLocalBackupHistory();
+    const target = history.find((s) => s.id === snapshotId);
+    if (!target) return false;
+
+    const { vault } = MigrationRunner.run(target.vault);
+    vault.cards = [];
+    await this.saveVault(vault);
+    await this.flush();
+
+    if (target.encryptedPayload) {
+      await this.saveEncryptedVault(target.encryptedPayload);
+    }
+    return true;
   }
 
   // --- Encrypted Vault Payload (Passphrase protected) ---

@@ -17,7 +17,9 @@
 3. **Private by Design**: Minimal permissions, optional Web Crypto encrypted vault, fills only on explicit user action.
 4. **Works Everywhere**: Traverses Shadow DOM, nested iframes, contenteditable, selects, radios, checkboxes, and handles React/Vue controlled input value tracker interception.
 5. **Accessible & Keyboard-First**: Complete keyboard navigation (arrow keys, Enter to fill/copy, `/` to search), high contrast ARIA roles, dark/light theme, and multilingual support (English and বাংলা).
-6. **Highest-Risk Data Protection**: Payment cards are stored **only** inside an AES-GCM 256-bit encrypted vault derived via PBKDF2 (250,000 iterations). Payment card fields are never auto-suggested or passively filled—only explicitly filled after an active confirmation dialog.
+6. **Highest-Risk Data Protection**: Payment cards are stored **only** inside an AES-GCM 256-bit encrypted vault derived via PBKDF2-SHA256 (600,000 iterations). Payment card fields are never auto-suggested or passively filled—only explicitly filled after an active confirmation dialog.
+
+> **Important Note**: Stashfill is an offline local quick-fill utility and **is not a replacement for your browser or OS wallet** (such as Apple Pay, Google Wallet, or built-in browser payment managers). See [THREAT_MODEL.md](THREAT_MODEL.md) for full details.
 
 ---
 
@@ -54,7 +56,7 @@
 │                    │ • Selects, radios, contenteditable│
 ├────────────────────┼───────────────────────────────────┤
 │    Encrypted       │ • AES-GCM 256-bit                 │
-│    Vault           │ • PBKDF2 (SHA-256, 250k rounds)   │
+│    Vault           │ • PBKDF2 (SHA-256, 600k rounds)   │
 │                    │ • In-memory session with auto-lock│
 ├────────────────────┼───────────────────────────────────┤
 │    Storage Adapter │ • Abstract StorageAdapter API     │

@@ -197,6 +197,23 @@ export const en = {
     nicknamePlaceholder: 'e.g. Personal Visa',
     cvvPlaceholder: '3-4 digits',
     last4Label: 'ending in {last4}',
+    passphraseIrrecoverableWarning:
+      'Important: Your master passphrase is never transmitted or stored. If you forget your passphrase, your encrypted cards cannot be recovered.',
+    walletDisclaimer:
+      'Note: Stashfill is a local quick-fill utility and is not a replacement for your browser or OS wallet.',
+    changePassphraseTitle: 'Change Master Passphrase',
+    currentPassphrasePlaceholder: 'Current master passphrase',
+    newPassphrasePlaceholder: 'New master passphrase (min 6 characters)',
+    passphraseChangedSuccess: 'Master passphrase updated and vault re-encrypted.',
+    reauthRequiredTitle: 'Re-enter Passphrase for Card Access',
+    reauthRequiredDesc:
+      'For your security, please re-enter your master passphrase because the vault was unlocked more than {minutes} minutes ago.',
+    ephemeralCvvLabel: 'One-Time CVV for This Fill (Never Saved)',
+    ephemeralCvvHint: 'Kept in memory only for this single action and cleared immediately.',
+    copyCardNumber15s: 'Copy Card Number (Auto-clears in 15s)',
+    cardCopiedAutoClear: 'Card number copied! Clipboard will auto-clear in 15 seconds.',
+    revealCardNumber: 'Reveal Card Number',
+    hideCardNumber: 'Hide Card Number',
   },
 
   onboarding: {
@@ -265,11 +282,39 @@ export const en = {
       'Enable inline autofill chip next to recognized inputs (requests host permission)',
     inlineChipsExplanation:
       'Enabling inline chips requests optional host access so Stashfill can display a quick-fill icon next to focused inputs.',
+    allowSensitiveInChips: 'Include sensitive fields in inline autofill chips (off by default)',
     snippetPrefix: 'Snippet Trigger Prefix',
     exportImportTitle: 'Backup & Restore',
-    exportDesc: 'Download your saved profiles and snippets as an offline JSON backup file.',
+    exportDesc: 'Download your saved profiles and snippets as an offline backup file.',
+    exportPlainExclusionNotice:
+      'Plain JSON and CSV exports always exclude payment cards. Payment cards travel only inside an Encrypted Export.',
+    exportFormatLabel: 'Export Format',
+    exportFormatPlainJson: 'Plain JSON (Excludes payment cards)',
+    exportFormatCsv: 'CSV Spreadsheet (label,value — Excludes payment cards)',
+    exportFormatEncrypted: 'Encrypted Vault Envelope (Includes payment cards)',
+    exportPassphrasePlaceholder: 'Enter passphrase to encrypt export (min 6 chars)',
     exportWithVault: 'Include encrypted vault in export (requires master passphrase to restore)',
-    importDesc: 'Restore profiles and settings from a previously exported JSON backup.',
+    importDesc:
+      'Import profiles and fields from JSON, CSV (label,value), or key-value TXT with dry-run validation.',
+    importFormatLabel: 'Import Format',
+    importMergeStrategyLabel: 'Duplicate Merge Strategy',
+    mergeSkip: 'Skip duplicates (keep existing)',
+    mergeReplace: 'Replace duplicates (overwrite existing)',
+    mergeKeepBoth: 'Keep both (import as separate field)',
+    dryRunTitle: 'Dry-Run Import Preview',
+    dryRunSummary: '{newCount} new, {duplicateCount} duplicate, {invalidCount} invalid',
+    applyImportBtn: 'Confirm & Apply Import',
+    localBackupsTitle: 'Automatic Local Backups',
+    localBackupsDesc:
+      'Stashfill automatically retains the last {max} local snapshots on your device (cards are stored only inside the encrypted payload).',
+    createSnapshotBtn: 'Create Snapshot Now',
+    restoreSnapshotBtn: 'Restore',
+    noLocalBackups: 'No local snapshots recorded yet.',
+    snapshotRestored: 'Local backup snapshot restored successfully.',
+    backupReminderBanner:
+      'Protect your data: Download an offline backup copy of your Stashfill vault.',
+    backupReminderDownload: 'Export Backup',
+    backupReminderDismiss: 'Dismiss',
     importSuccess: 'Successfully imported {count} profile(s)!',
     privacyNote:
       'Stashfill operates 100% offline. No analytics, no accounts, no tracking. Your data never leaves your device.',

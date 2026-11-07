@@ -196,8 +196,90 @@ export default defineContentScript({
 
     function clearOverlay() {
       if (uiContainer) {
-        uiContainer.innerHTML = '';
+        uiContainer.replaceChildren();
       }
+    }
+
+    function isCrossOriginSubframe(): boolean {
+      if (typeof window === 'undefined' || window.self === window.top) return false;
+      try {
+        return (
+          !window.top?.location?.origin || window.top.location.origin !== window.location.origin
+        );
+      } catch {
+        return true;
+      }
+    }
+
+    async function requiresSensitiveSiteConfirm(): Promise<boolean> {
+      const origin = window.location.origin;
+      const confirmedList = cachedSettings?.confirmedSensitiveOrigins || [];
+      return !confirmedList.includes(origin);
+    }
+
+    async function markSensitiveSiteConfirmed(): Promise<void> {
+      const origin = window.location.origin;
+      const confirmedList = cachedSettings?.confirmedSensitiveOrigins || [];
+      if (!confirmedList.includes(origin)) {
+        const updated = await repo.updateSettings({
+          confirmedSensitiveOrigins: [...confirmedList, origin],
+        });
+        cachedSettings = updated;
+      }
+    }
+
+    function openSensitiveConfirmationModal(label: string, onConfirm: () => void) {
+      const origin = window.location.origin;
+      const crossOrigin = isCrossOriginSubframe();
+      const container = ensureClosedShadowContainer();
+      container.replaceChildren();
+
+      const backdrop = document.createElement('div');
+      backdrop.className = 'sf-backdrop';
+
+      const modal = document.createElement('div');
+      modal.className = 'sf-modal';
+      modal.setAttribute('role', 'dialog');
+      modal.setAttribute('aria-label', 'Confirm Sensitive Field Fill');
+
+      const title = document.createElement('h2');
+      title.className = 'sf-title';
+      title.textContent = crossOrigin
+        ? 'Warning: Sensitive Fill Inside Cross-Origin Frame'
+        : 'Confirm Sensitive Field Autofill';
+
+      const desc = document.createElement('p');
+      desc.textContent = crossOrigin
+        ? `You are filling sensitive field "${label}" inside an embedded cross-origin iframe (${origin}). Only proceed if you trust this frame.`
+        : `First time filling a sensitive field ("${label}") on ${origin}. Allow sensitive field autofill on this site?`;
+
+      const actions = document.createElement('div');
+      actions.className = 'sf-actions';
+
+      const cancelBtn = document.createElement('button');
+      cancelBtn.type = 'button';
+      cancelBtn.className = 'sf-btn';
+      cancelBtn.textContent = 'Cancel';
+      cancelBtn.addEventListener('click', clearOverlay);
+
+      const confirmBtn = document.createElement('button');
+      confirmBtn.type = 'button';
+      confirmBtn.className = 'sf-btn sf-btn-primary';
+      confirmBtn.textContent = 'Allow & Fill';
+      confirmBtn.addEventListener('click', async () => {
+        await markSensitiveSiteConfirmed();
+        onConfirm();
+        clearOverlay();
+      });
+
+      actions.appendChild(cancelBtn);
+      actions.appendChild(confirmBtn);
+      modal.appendChild(title);
+      modal.appendChild(desc);
+      modal.appendChild(actions);
+      backdrop.appendChild(modal);
+      container.appendChild(backdrop);
+      confirmBtn.focus();
     }
 
     function resolveTargetElement(targetElementId?: number): FillableElement | null {
@@ -322,12 +404,18 @@ export default defineContentScript({
       if (!profile) return;
 
       const topCandidate = ranked.candidates[0]!;
+      const matchedFieldObj = profile.fields.find((f) => f.key === topCandidate.key);
+      // Exclude sensitive fields from inline chips unless explicitly opted in
+      if (matchedFieldObj?.sensitive && !cachedSettings?.allowSensitiveInInlineChips) {
+        return;
+      }
+
       const value = resolveProfileValue(profile, topCandidate.key);
       if (!value) return;
 
       const container = ensureClosedShadowContainer();
       const rect = el.getBoundingClientRect();
-      container.innerHTML = '';
+      container.replaceChildren();
 
       const chip = document.createElement('button');
       chip.type = 'button';
@@ -335,9 +423,15 @@ export default defineContentScript({
       chip.textContent = `SF: ${topCandidate.key}`;
       chip.style.top = `${Math.max(4, rect.top + 4)}px`;
       chip.style.left = `${Math.max(4, rect.right - 72)}px`;
-      chip.addEventListener('mousedown', (e) => {
+      chip.addEventListener('mousedown', async (e) => {
         e.preventDefault();
         e.stopPropagation();
+        if (matchedFieldObj?.sensitive && (await requiresSensitiveSiteConfirm())) {
+          openSensitiveConfirmationModal(matchedFieldObj.label, () => {
+            fillElement(el, value, true);
+          });
+          return;
+        }
         fillElement(el, value, true);
         clearOverlay();
       });
@@ -356,7 +450,7 @@ export default defineContentScript({
     ) {
       const targetEl = resolveTargetElement();
       const container = ensureClosedShadowContainer();
-      container.innerHTML = '';
+      container.replaceChildren();
 
       const backdrop = document.createElement('div');
       backdrop.className = 'sf-backdrop';
@@ -381,7 +475,7 @@ export default defineContentScript({
       const activeProf = profiles.find((p) => p.id === activeProfileId) || profiles[0] || null;
 
       // Combine profile fields and snippets (NEVER cards!)
-      const allEntries: { label: string; value: string; badge: string }[] = [];
+      const allEntries: { label: string; value: string; badge: string; sensitive?: boolean }[] = [];
       if (activeProf) {
         for (const f of activeProf.fields) {
           if (f.value && f.value.trim()) {
@@ -389,6 +483,7 @@ export default defineContentScript({
               label: f.label,
               value: f.value,
               badge: f.category || 'field',
+              sensitive: f.sensitive,
             });
           }
         }
@@ -404,7 +499,7 @@ export default defineContentScript({
       let selectedIdx = 0;
 
       function renderItems(query: string) {
-        listEl.innerHTML = '';
+        listEl.replaceChildren();
         const q = query.toLowerCase().trim();
         const filtered = q
           ? allEntries.filter(
@@ -429,8 +524,14 @@ export default defineContentScript({
           btn.appendChild(spanLabel);
           btn.appendChild(spanBadge);
 
-          btn.addEventListener('click', () => {
+          btn.addEventListener('click', async () => {
             if (targetEl) {
+              if (item.sensitive && (await requiresSensitiveSiteConfirm())) {
+                openSensitiveConfirmationModal(item.label, () => {
+                  fillElement(targetEl, item.value, true);
+                });
+                return;
+              }
               fillElement(targetEl, item.value, true);
             } else {
               void navigator.clipboard?.writeText(item.value);
@@ -451,7 +552,7 @@ export default defineContentScript({
         currentFiltered = renderItems(searchInput.value);
       });
 
-      searchInput.addEventListener('keydown', (e) => {
+      searchInput.addEventListener('keydown', async (e) => {
         if (e.key === 'Escape') {
           e.preventDefault();
           clearOverlay();
@@ -472,6 +573,12 @@ export default defineContentScript({
           const chosen = currentFiltered[selectedIdx];
           if (chosen) {
             if (targetEl) {
+              if (chosen.sensitive && (await requiresSensitiveSiteConfirm())) {
+                openSensitiveConfirmationModal(chosen.label, () => {
+                  fillElement(targetEl, chosen.value, true);
+                });
+                return;
+              }
               fillElement(targetEl, chosen.value, true);
             } else {
               void navigator.clipboard?.writeText(chosen.value);
@@ -509,7 +616,7 @@ export default defineContentScript({
       activeProfileId: string,
     ) {
       const container = ensureClosedShadowContainer();
-      container.innerHTML = '';
+      container.replaceChildren();
 
       const backdrop = document.createElement('div');
       backdrop.className = 'sf-backdrop';
@@ -602,7 +709,7 @@ export default defineContentScript({
       const host = window.location.hostname.toLowerCase();
 
       const container = ensureClosedShadowContainer();
-      container.innerHTML = '';
+      container.replaceChildren();
 
       const backdrop = document.createElement('div');
       backdrop.className = 'sf-backdrop';
@@ -668,7 +775,7 @@ export default defineContentScript({
 
     /**
      * Explicit Card Fill Confirmation Modal (blocks HTTP, shows origin + last 4 digits,
-     * offers Copy with auto-clear if cross-origin payment iframe is detected).
+     * prompts for ephemeral CVV if not stored, offers Copy with 15s auto-clear).
      */
     function openCardConfirmationModal(card: FillableCard, originText?: string) {
       const protocol = window.location.protocol;
@@ -682,7 +789,7 @@ export default defineContentScript({
       const last4 = rawNumber.replace(/\D/g, '').slice(-4) || '0000';
 
       const container = ensureClosedShadowContainer();
-      container.innerHTML = '';
+      container.replaceChildren();
 
       const backdrop = document.createElement('div');
       backdrop.className = 'sf-backdrop';
@@ -705,6 +812,16 @@ export default defineContentScript({
         desc.textContent = `Fill card ending in •••• ${last4} on ${origin}?`;
       }
 
+      let cvvInput: HTMLInputElement | null = null;
+      if (protocol !== 'http:' && !card.cvv) {
+        cvvInput = document.createElement('input');
+        cvvInput.type = 'password';
+        cvvInput.inputMode = 'numeric';
+        cvvInput.maxLength = 4;
+        cvvInput.className = 'sf-input';
+        cvvInput.placeholder = 'Optional CVV for this fill only (never saved)';
+      }
+
       const actions = document.createElement('div');
       actions.className = 'sf-actions';
 
@@ -719,9 +836,9 @@ export default defineContentScript({
         const copyBtn = document.createElement('button');
         copyBtn.type = 'button';
         copyBtn.className = 'sf-btn';
-        copyBtn.textContent = 'Copy Number (Auto-clears in 30s)';
+        copyBtn.textContent = 'Copy Number (Auto-clears in 15s)';
         copyBtn.addEventListener('click', async () => {
-          await copyCardNumberWithAutoClear(rawNumber, 30000);
+          await copyCardNumberWithAutoClear(rawNumber, 15000);
           clearOverlay();
         });
         actions.appendChild(copyBtn);
@@ -731,7 +848,10 @@ export default defineContentScript({
         confirmBtn.className = 'sf-btn sf-btn-primary';
         confirmBtn.textContent = `Confirm Fill (•••• ${last4})`;
         confirmBtn.addEventListener('click', () => {
-          fillPaymentCard(document, card, { confirmed: true });
+          fillPaymentCard(document, card, {
+            confirmed: true,
+            ephemeralCvv: cvvInput?.value.trim() || undefined,
+          });
           clearOverlay();
         });
         actions.appendChild(confirmBtn);
@@ -739,6 +859,7 @@ export default defineContentScript({
 
       modal.appendChild(title);
       modal.appendChild(desc);
+      if (cvvInput) modal.appendChild(cvvInput);
       modal.appendChild(actions);
       backdrop.appendChild(modal);
       container.appendChild(backdrop);
@@ -758,7 +879,11 @@ export default defineContentScript({
             mode: msg.mode ?? 'all',
             siteRule,
           });
-          sendResponse({ success: true, count: result.filledCount });
+          sendResponse({
+            success: true,
+            count: result.filledCount,
+            crossOriginSubframe: isCrossOriginSubframe(),
+          });
           return true;
         }
 
@@ -768,7 +893,10 @@ export default defineContentScript({
             sendResponse({ success: false, error: 'Confirmation required for payment card fill' });
             return true;
           }
-          const result = fillPaymentCard(document, msg.card, { confirmed: true });
+          const result = fillPaymentCard(document, msg.card, {
+            confirmed: true,
+            ephemeralCvv: msg.ephemeralCvv,
+          });
           if (result.blockedReason === 'insecure_http') {
             sendResponse({
               success: false,
@@ -823,8 +951,19 @@ export default defineContentScript({
           }
 
           if (msg.target.kind === 'profileField') {
-            const ok = fillElement(active, msg.target.value, true);
-            sendResponse({ success: ok });
+            const target = msg.target;
+            void requiresSensitiveSiteConfirm().then((needsConfirm) => {
+              if (target.sensitive && needsConfirm) {
+                openSensitiveConfirmationModal(target.label || target.fieldPath, () => {
+                  fillElement(active, target.value, true);
+                });
+                sendResponse({ success: true, pendingConfirmation: true });
+                return;
+              }
+              const ok = fillElement(active, target.value, true);
+              sendResponse({ success: ok, crossOriginSubframe: isCrossOriginSubframe() });
+            });
+            return true;
           } else {
             sendResponse({ success: false, error: 'Unsupported target for single field' });
           }

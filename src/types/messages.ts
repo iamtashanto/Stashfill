@@ -9,7 +9,13 @@ import type {
 import type { PaymentCard } from './vault';
 
 export type FillTarget =
-  | { kind: 'profileField'; fieldPath: string; value: string }
+  | {
+      kind: 'profileField';
+      fieldPath: string;
+      value: string;
+      label?: string;
+      sensitive?: boolean;
+    }
   | { kind: 'entireProfile'; profile: VaultProfile | LegacyProfile }
   | { kind: 'paymentCard'; card: PaymentCard | Card };
 
@@ -21,7 +27,12 @@ export type ExtensionMessage =
       mode?: 'all' | 'emptyOnly' | 'focusedOnly';
       siteRule?: SiteRule | null;
     }
-  | { type: 'FILL_PAYMENT_CARD'; card: PaymentCard | Card; confirmed: boolean }
+  | {
+      type: 'FILL_PAYMENT_CARD';
+      card: PaymentCard | Card;
+      confirmed: boolean;
+      ephemeralCvv?: string;
+    }
   | {
       type: 'REQUEST_CARD_FILL_CONFIRMATION';
       card: PaymentCard | Card;

@@ -18,6 +18,9 @@ export default defineConfig({
     default_locale: 'en',
     permissions: ['storage', 'activeTab', 'scripting', 'contextMenus'],
     optional_host_permissions: ['https://*/*', 'http://*/*'],
+    content_security_policy: {
+      extension_pages: "script-src 'self'; object-src 'self'; base-uri 'self';",
+    },
     action: {
       default_title: 'Stashfill',
       default_popup: 'popup.html',

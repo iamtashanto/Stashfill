@@ -1,7 +1,18 @@
 import { useState, useEffect, useMemo } from 'preact/hooks';
 import { browser } from 'wxt/browser';
 import { LocalStorageAdapter } from '../../src/storage/LocalStorageAdapter';
-import { StashRepository } from '../../src/storage/StashRepository';
+import { StashRepository, type LocalBackupSnapshot } from '../../src/storage/StashRepository';
+import {
+  exportPlainJson,
+  exportCsv,
+  exportEncryptedBackup,
+  decryptEncryptedBackup,
+  previewImport,
+  applyImportWithStrategy,
+  type ImportFormat,
+  type MergeStrategy,
+  type ImportDryRunPreview,
+} from '../../src/storage/importExport';
 import { VaultManager } from '../../src/vault/vaultManager';
 import {
   type Profile,
@@ -79,6 +90,14 @@ export function App({ repository, vaultMgr, defaultOpenOnboarding = false }: Opt
   const [confirmVaultPassphrase, setConfirmVaultPassphrase] = useState('');
   const [vaultError, setVaultError] = useState('');
   const [cards, setCards] = useState<PaymentCard[]>([]);
+  const [revealedCardIds, setRevealedCardIds] = useState<Record<string, boolean>>({});
+
+  // Change Passphrase state
+  const [isChangingPassphrase, setIsChangingPassphrase] = useState(false);
+  const [oldPassphraseInput, setOldPassphraseInput] = useState('');
+  const [nextPassphraseInput, setNextPassphraseInput] = useState('');
+  const [confirmNextPassphraseInput, setConfirmNextPassphraseInput] = useState('');
+  const [changePassphraseError, setChangePassphraseError] = useState('');
 
   // Card form state
   const [isAddingCard, setIsAddingCard] = useState(false);
@@ -112,11 +131,12 @@ export function App({ repository, vaultMgr, defaultOpenOnboarding = false }: Opt
         curSettings = await repo.getSettings();
       }
 
-      const [activeId, isInit, allSnippets, allRules] = await Promise.all([
+      const [activeId, isInit, allSnippets, allRules, history] = await Promise.all([
         repo.getActiveProfileId(),
         vaultManager.isInitialized(),
         repo.getSnippets(),
         repo.getSiteRules(),
+        repo.getLocalBackupHistory(),
       ]);
 
       setProfiles(allProfiles);
@@ -128,6 +148,7 @@ export function App({ repository, vaultMgr, defaultOpenOnboarding = false }: Opt
       setVaultInitialized(isInit);
       setSnippets(allSnippets);
       setSiteRules(allRules);
+      setLocalBackups(history);
 
       applyTheme(curSettings.theme);
       document.documentElement.lang = curSettings.language;
@@ -458,6 +479,31 @@ export function App({ repository, vaultMgr, defaultOpenOnboarding = false }: Opt
     setVaultUnlocked(false);
     setCards([]);
     setVaultPassphrase('');
+    setRevealedCardIds({});
+    setIsChangingPassphrase(false);
+  };
+
+  const handleChangeMasterPassphrase = async (e: Event) => {
+    e.preventDefault();
+    setChangePassphraseError('');
+    if (nextPassphraseInput.length < 6) {
+      setChangePassphraseError(t.vault.passphraseMinLength);
+      return;
+    }
+    if (nextPassphraseInput !== confirmNextPassphraseInput) {
+      setChangePassphraseError(t.vault.passphraseMismatch);
+      return;
+    }
+    try {
+      await vaultManager.changePassphrase(oldPassphraseInput, nextPassphraseInput);
+      setOldPassphraseInput('');
+      setNextPassphraseInput('');
+      setConfirmNextPassphraseInput('');
+      setIsChangingPassphrase(false);
+      showToast(t.vault.passphraseChangedSuccess, 'success');
+    } catch {
+      setChangePassphraseError(t.vault.invalidPassphrase);
+    }
   };
 
   const handleSaveCardData = async (
@@ -501,39 +547,128 @@ export function App({ repository, vaultMgr, defaultOpenOnboarding = false }: Opt
     }
   };
 
-  // Export & Import
-  const [includeVaultInExport, setIncludeVaultInExport] = useState(false);
+  // Export, Import (with Dry-Run Preview & Merge Strategy), and Automatic Local Backups
+  const [exportFormat, setExportFormat] = useState<'plainJson' | 'csv' | 'encrypted'>('plainJson');
+  const [exportPassphrase, setExportPassphrase] = useState('');
+  const [importFormat, setImportFormat] = useState<ImportFormat>('json');
+  const [importStrategy, setImportStrategy] = useState<MergeStrategy>('skip');
+  const [importPreview, setImportPreview] = useState<ImportDryRunPreview | null>(null);
+  const [importRawText, setImportRawText] = useState('');
+  const [importPassphrase, setImportPassphrase] = useState('');
+  const [localBackups, setLocalBackups] = useState<LocalBackupSnapshot[]>([]);
 
   const handleExport = async () => {
-    const data = await repo.exportData(includeVaultInExport);
-    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `stashfill-backup-${new Date().toISOString().slice(0, 10)}.json`;
-    a.click();
-    URL.revokeObjectURL(url);
-    showToast(t.messages.exportDownloaded, 'success');
+    try {
+      const vault = await repo.loadVault();
+      const dateStr = new Date().toISOString().slice(0, 10);
+
+      if (exportFormat === 'csv') {
+        const csvStr = exportCsv(vault);
+        const blob = new Blob([csvStr], { type: 'text/csv;charset=utf-8' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `stashfill-export-${dateStr}.csv`;
+        a.click();
+        URL.revokeObjectURL(url);
+      } else if (exportFormat === 'encrypted') {
+        if (exportPassphrase.length < 6) {
+          showToast(t.vault.passphraseMinLength, 'error');
+          return;
+        }
+        const encryptedVaultPayload = await repo.getEncryptedVault();
+        const envelope = await exportEncryptedBackup(
+          vault,
+          encryptedVaultPayload,
+          exportPassphrase,
+        );
+        const blob = new Blob([JSON.stringify(envelope, null, 2)], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `stashfill-encrypted-backup-${dateStr}.json`;
+        a.click();
+        URL.revokeObjectURL(url);
+        setExportPassphrase('');
+      } else {
+        const plainEnvelope = exportPlainJson(vault);
+        const blob = new Blob([JSON.stringify(plainEnvelope, null, 2)], {
+          type: 'application/json',
+        });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `stashfill-backup-${dateStr}.json`;
+        a.click();
+        URL.revokeObjectURL(url);
+      }
+
+      const updatedSettings = await repo.updateSettings({ lastBackupExportedAt: Date.now() });
+      setSettings(updatedSettings);
+      showToast(t.messages.exportDownloaded, 'success');
+    } catch {
+      showToast(t.messages.importInvalid, 'error');
+    }
   };
 
-  const handleImport = async (e: Event) => {
+  const handleFileSelectedForPreview = async (e: Event) => {
     const input = e.target as HTMLInputElement;
     const file = input.files?.[0];
     if (!file) return;
 
     try {
       const text = await file.text();
-      const parsed = JSON.parse(text);
-      const result = await repo.importData(parsed);
+      setImportRawText(text);
+      const ext = file.name.toLowerCase().endsWith('.csv')
+        ? 'csv'
+        : file.name.toLowerCase().endsWith('.txt')
+          ? 'txt'
+          : importFormat;
+      setImportFormat(ext);
+      const preview = previewImport(text, ext, profiles);
+      setImportPreview(preview);
+      if (!preview.valid) {
+        showToast(preview.error || t.messages.importInvalid, 'error');
+      }
+    } catch {
+      showToast(t.messages.importInvalid, 'error');
+    } finally {
+      input.value = '';
+    }
+  };
 
-      const [allProfiles, activeId, curSettings, isInit, allSnips, allRules] = await Promise.all([
-        repo.getProfiles(),
-        repo.getActiveProfileId(),
-        repo.getSettings(),
-        vaultManager.isInitialized(),
-        repo.getSnippets(),
-        repo.getSiteRules(),
-      ]);
+  const handleApplyImport = async () => {
+    if (!importPreview || !importPreview.valid) return;
+
+    try {
+      await repo.createLocalBackupSnapshot();
+
+      if (importPreview.format === 'encrypted') {
+        const decrypted = await decryptEncryptedBackup(importRawText, importPassphrase);
+        await repo.importData({
+          vault: decrypted.vault,
+          encryptedPayload: decrypted.encryptedPayload,
+        });
+      } else {
+        const mergedProfiles = applyImportWithStrategy(importPreview, profiles, importStrategy);
+        for (const prof of mergedProfiles) {
+          await repo.upsertProfile(prof);
+        }
+        if (importPreview.encryptedPayload) {
+          await repo.saveEncryptedVault(importPreview.encryptedPayload);
+        }
+      }
+
+      const [allProfiles, activeId, curSettings, isInit, allSnips, allRules, history] =
+        await Promise.all([
+          repo.getProfiles(),
+          repo.getActiveProfileId(),
+          repo.getSettings(),
+          vaultManager.isInitialized(),
+          repo.getSnippets(),
+          repo.getSiteRules(),
+          repo.getLocalBackupHistory(),
+        ]);
 
       setProfiles(allProfiles);
       setSelectedProfileId(activeId);
@@ -543,13 +678,47 @@ export function App({ repository, vaultMgr, defaultOpenOnboarding = false }: Opt
       setVaultInitialized(isInit);
       setSnippets(allSnips);
       setSiteRules(allRules);
+      setLocalBackups(history);
+      setImportPreview(null);
+      setImportRawText('');
+      setImportPassphrase('');
 
-      showToast(formatString(t.settings.importSuccess, { count: result.profileCount }), 'success');
+      showToast(formatString(t.settings.importSuccess, { count: allProfiles.length }), 'success');
     } catch {
       showToast(t.messages.importInvalid, 'error');
-    } finally {
-      input.value = '';
     }
+  };
+
+  const handleCreateLocalSnapshot = async () => {
+    await repo.createLocalBackupSnapshot();
+    const history = await repo.getLocalBackupHistory();
+    setLocalBackups(history);
+    showToast(t.messages.exportDownloaded, 'success');
+  };
+
+  const handleRestoreLocalSnapshot = async (snapshotId: string) => {
+    const ok = await repo.restoreLocalBackupSnapshot(snapshotId);
+    if (!ok) return;
+    const [allProfiles, activeId, curSettings, isInit, allSnips, allRules, history] =
+      await Promise.all([
+        repo.getProfiles(),
+        repo.getActiveProfileId(),
+        repo.getSettings(),
+        vaultManager.isInitialized(),
+        repo.getSnippets(),
+        repo.getSiteRules(),
+        repo.getLocalBackupHistory(),
+      ]);
+    setProfiles(allProfiles);
+    setSelectedProfileId(activeId);
+    const sel = allProfiles.find((p) => p.id === activeId) ?? allProfiles[0]!;
+    setProfileForm({ ...sel });
+    setSettings(curSettings);
+    setVaultInitialized(isInit);
+    setSnippets(allSnips);
+    setSiteRules(allRules);
+    setLocalBackups(history);
+    showToast(t.settings.snapshotRestored, 'success');
   };
 
   const filteredFields = useMemo(() => {
@@ -1271,6 +1440,9 @@ export function App({ repository, vaultMgr, defaultOpenOnboarding = false }: Opt
                   <h3 class="text-sm font-semibold text-slate-900 dark:text-slate-100">
                     {t.vault.setupPassphrase}
                   </h3>
+                  <div class="rounded-lg border border-amber-300 bg-amber-50 p-3 text-xs leading-relaxed text-amber-950 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-200">
+                    {t.vault.passphraseIrrecoverableWarning}
+                  </div>
                   <div class="space-y-3">
                     <div>
                       <label for="new-vault-passphrase" class="sr-only">
@@ -1350,7 +1522,7 @@ export function App({ repository, vaultMgr, defaultOpenOnboarding = false }: Opt
                 </div>
               ) : (
                 <div class="space-y-6">
-                  <div class="flex items-center justify-between">
+                  <div class="flex flex-wrap items-center justify-between gap-2">
                     <p class="text-xs text-slate-600 dark:text-slate-300">
                       {formatString(t.vault.autoLockNote, {
                         minutes: settings.vaultTimeoutMinutes,
@@ -1369,6 +1541,13 @@ export function App({ repository, vaultMgr, defaultOpenOnboarding = false }: Opt
                       </button>
                       <button
                         type="button"
+                        onClick={() => setIsChangingPassphrase((prev) => !prev)}
+                        class="rounded-md border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-100 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
+                      >
+                        {t.vault.changePassphraseTitle}
+                      </button>
+                      <button
+                        type="button"
                         onClick={handleLockVault}
                         class="rounded-md border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-100 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
                       >
@@ -1376,6 +1555,80 @@ export function App({ repository, vaultMgr, defaultOpenOnboarding = false }: Opt
                       </button>
                     </div>
                   </div>
+
+                  {/* Change Passphrase Form */}
+                  {isChangingPassphrase && (
+                    <form
+                      onSubmit={handleChangeMasterPassphrase}
+                      aria-label={t.vault.changePassphraseTitle}
+                      class="space-y-3 rounded-lg border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-800/40"
+                    >
+                      <h3 class="text-xs font-bold uppercase tracking-wider text-slate-800 dark:text-slate-200">
+                        {t.vault.changePassphraseTitle}
+                      </h3>
+                      <p class="text-xs text-amber-800 dark:text-amber-300">
+                        {t.vault.passphraseIrrecoverableWarning}
+                      </p>
+                      <div class="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                        <input
+                          type="password"
+                          required
+                          value={oldPassphraseInput}
+                          onInput={(e) =>
+                            setOldPassphraseInput((e.target as HTMLInputElement).value)
+                          }
+                          placeholder={t.vault.currentPassphrasePlaceholder}
+                          aria-label={t.vault.currentPassphrasePlaceholder}
+                          class="rounded-md border border-slate-300 bg-white p-2 text-xs text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                        />
+                        <input
+                          type="password"
+                          required
+                          value={nextPassphraseInput}
+                          onInput={(e) =>
+                            setNextPassphraseInput((e.target as HTMLInputElement).value)
+                          }
+                          placeholder={t.vault.newPassphrasePlaceholder}
+                          aria-label={t.vault.newPassphrasePlaceholder}
+                          class="rounded-md border border-slate-300 bg-white p-2 text-xs text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                        />
+                        <input
+                          type="password"
+                          required
+                          value={confirmNextPassphraseInput}
+                          onInput={(e) =>
+                            setConfirmNextPassphraseInput((e.target as HTMLInputElement).value)
+                          }
+                          placeholder={t.vault.confirmPassphrasePlaceholder}
+                          aria-label={t.vault.confirmPassphrasePlaceholder}
+                          class="rounded-md border border-slate-300 bg-white p-2 text-xs text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                        />
+                      </div>
+                      {changePassphraseError && (
+                        <p
+                          role="alert"
+                          class="text-xs font-medium text-rose-700 dark:text-rose-400"
+                        >
+                          {changePassphraseError}
+                        </p>
+                      )}
+                      <div class="flex justify-end gap-2">
+                        <button
+                          type="button"
+                          onClick={() => setIsChangingPassphrase(false)}
+                          class="rounded-md border border-slate-300 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200"
+                        >
+                          {t.actions.cancel}
+                        </button>
+                        <button
+                          type="submit"
+                          class="rounded-md bg-brand-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-brand-700"
+                        >
+                          {t.actions.save}
+                        </button>
+                      </div>
+                    </form>
+                  )}
 
                   {/* Card Form with live Luhn validation, brand detection, expiry picker, optional CVV */}
                   {(isAddingCard || editingCard) && (
@@ -1397,56 +1650,82 @@ export function App({ repository, vaultMgr, defaultOpenOnboarding = false }: Opt
                     </div>
                   ) : (
                     <div role="list" class="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                      {cards.map((c) => (
-                        <div
-                          key={c.id}
-                          role="listitem"
-                          class="flex flex-col justify-between rounded-xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-800/50"
-                        >
-                          <div class="flex items-start justify-between">
-                            <div>
-                              <div class="flex items-center gap-2">
-                                <CardBrandIcon brand={c.brand} />
-                                <span class="text-sm font-bold text-slate-900 dark:text-slate-100">
-                                  {c.nickname}
-                                </span>
+                      {cards.map((c) => {
+                        const isRevealed = Boolean(revealedCardIds[c.id]);
+                        return (
+                          <div
+                            key={c.id}
+                            role="listitem"
+                            class="flex flex-col justify-between rounded-xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-800/50"
+                          >
+                            <div class="flex items-start justify-between">
+                              <div>
+                                <div class="flex items-center gap-2">
+                                  <CardBrandIcon brand={c.brand} />
+                                  <span class="text-sm font-bold text-slate-900 dark:text-slate-100">
+                                    {c.nickname}
+                                  </span>
+                                </div>
+                                <div class="mt-2 flex items-center gap-2 font-mono text-xs text-slate-700 dark:text-slate-300">
+                                  <span>
+                                    {isRevealed ? c.cardNumber : maskCardNumber(c.cardNumber)}
+                                  </span>
+                                  <button
+                                    type="button"
+                                    onClick={() =>
+                                      setRevealedCardIds((prev) => ({
+                                        ...prev,
+                                        [c.id]: !prev[c.id],
+                                      }))
+                                    }
+                                    aria-label={`${
+                                      isRevealed ? t.vault.hideCardNumber : t.vault.revealCardNumber
+                                    }: ${c.nickname}`}
+                                    class="font-sans text-[11px] font-semibold text-brand-700 hover:underline dark:text-brand-300"
+                                  >
+                                    {isRevealed
+                                      ? t.actions.hide.split(' ')[0]
+                                      : t.actions.reveal.split(' ')[0]}
+                                  </button>
+                                </div>
                               </div>
-                              <p class="mt-2 font-mono text-xs text-slate-700 dark:text-slate-300">
-                                {maskCardNumber(c.cardNumber)}
-                              </p>
+                              <div class="flex items-center gap-1">
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setEditingCard(c);
+                                    setIsAddingCard(false);
+                                  }}
+                                  class="rounded px-2 py-1 text-xs font-medium text-brand-700 hover:bg-brand-50 dark:text-brand-300"
+                                >
+                                  {t.actions.edit}
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => setCardToDelete(c)}
+                                  class="rounded px-2 py-1 text-xs font-medium text-rose-700 hover:bg-rose-50 dark:text-rose-400"
+                                >
+                                  {t.actions.delete}
+                                </button>
+                              </div>
                             </div>
-                            <div class="flex items-center gap-1">
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  setEditingCard(c);
-                                  setIsAddingCard(false);
-                                }}
-                                class="rounded px-2 py-1 text-xs font-medium text-brand-700 hover:bg-brand-50 dark:text-brand-300"
-                              >
-                                {t.actions.edit}
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => setCardToDelete(c)}
-                                class="rounded px-2 py-1 text-xs font-medium text-rose-700 hover:bg-rose-50 dark:text-rose-400"
-                              >
-                                {t.actions.delete}
-                              </button>
+                            <div class="mt-4 flex items-center justify-between border-t border-slate-200/80 pt-2 text-[11px] text-slate-600 dark:border-slate-700/60 dark:text-slate-300">
+                              <span>{c.cardholderName || '—'}</span>
+                              <span>
+                                {c.expMonth}/{c.expYear}
+                              </span>
                             </div>
                           </div>
-                          <div class="mt-4 flex items-center justify-between border-t border-slate-200/80 pt-2 text-[11px] text-slate-600 dark:border-slate-700/60 dark:text-slate-300">
-                            <span>{c.cardholderName || '—'}</span>
-                            <span>
-                              {c.expMonth}/{c.expYear}
-                            </span>
-                          </div>
-                        </div>
-                      ))}
+                        );
+                      })}
                     </div>
                   )}
                 </div>
               )}
+
+              <div class="rounded-lg border border-slate-200 bg-slate-50/70 p-3 text-xs text-slate-600 dark:border-slate-800 dark:bg-slate-800/40 dark:text-slate-300">
+                {t.vault.walletDisclaimer}
+              </div>
             </div>
           )}
 
@@ -1633,6 +1912,10 @@ export function App({ repository, vaultMgr, defaultOpenOnboarding = false }: Opt
                 </h2>
               </div>
 
+              <div class="rounded-lg border border-amber-300 bg-amber-50/70 p-3 text-xs text-amber-950 dark:border-amber-800/60 dark:bg-amber-950/30 dark:text-amber-200">
+                {t.settings.exportPlainExclusionNotice}
+              </div>
+
               <div class="grid grid-cols-1 gap-6 sm:grid-cols-2">
                 {/* Export Box */}
                 <div class="flex flex-col justify-between rounded-xl border border-slate-200 p-5 dark:border-slate-800">
@@ -1643,17 +1926,46 @@ export function App({ repository, vaultMgr, defaultOpenOnboarding = false }: Opt
                     <p class="text-xs leading-relaxed text-slate-600 dark:text-slate-300">
                       {t.settings.exportDesc}
                     </p>
-                    <label class="flex cursor-pointer items-start gap-2 pt-2 text-xs text-slate-700 dark:text-slate-200">
-                      <input
-                        type="checkbox"
-                        checked={includeVaultInExport}
+
+                    <div>
+                      <label
+                        for="export-format-select"
+                        class="mb-1 block text-xs font-semibold text-slate-700 dark:text-slate-200"
+                      >
+                        {t.settings.exportFormatLabel}
+                      </label>
+                      <select
+                        id="export-format-select"
+                        value={exportFormat}
                         onChange={(e) =>
-                          setIncludeVaultInExport((e.target as HTMLInputElement).checked)
+                          setExportFormat(
+                            (e.target as HTMLSelectElement).value as
+                              'plainJson' | 'csv' | 'encrypted',
+                          )
                         }
-                        class="mt-0.5 rounded border-slate-300 text-brand-600"
-                      />
-                      <span>{t.settings.exportWithVault}</span>
-                    </label>
+                        class="w-full rounded-md border border-slate-300 bg-white p-2 text-xs text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                      >
+                        <option value="plainJson">{t.settings.exportFormatPlainJson}</option>
+                        <option value="csv">{t.settings.exportFormatCsv}</option>
+                        <option value="encrypted">{t.settings.exportFormatEncrypted}</option>
+                      </select>
+                    </div>
+
+                    {exportFormat === 'encrypted' && (
+                      <div>
+                        <label for="export-passphrase-input" class="sr-only">
+                          {t.settings.exportPassphrasePlaceholder}
+                        </label>
+                        <input
+                          id="export-passphrase-input"
+                          type="password"
+                          value={exportPassphrase}
+                          onInput={(e) => setExportPassphrase((e.target as HTMLInputElement).value)}
+                          placeholder={t.settings.exportPassphrasePlaceholder}
+                          class="w-full rounded-md border border-slate-300 bg-white p-2 text-xs text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                        />
+                      </div>
+                    )}
                   </div>
 
                   <button
@@ -1665,7 +1977,7 @@ export function App({ repository, vaultMgr, defaultOpenOnboarding = false }: Opt
                   </button>
                 </div>
 
-                {/* Import Box */}
+                {/* Import Box with Dry-Run Preview & Merge Strategy */}
                 <div class="flex flex-col justify-between rounded-xl border border-slate-200 p-5 dark:border-slate-800">
                   <div class="space-y-3">
                     <h3 class="text-sm font-semibold text-slate-900 dark:text-slate-100">
@@ -1674,18 +1986,136 @@ export function App({ repository, vaultMgr, defaultOpenOnboarding = false }: Opt
                     <p class="text-xs leading-relaxed text-slate-600 dark:text-slate-300">
                       {t.settings.importDesc}
                     </p>
+
+                    <div>
+                      <label
+                        for="import-merge-strategy"
+                        class="mb-1 block text-xs font-semibold text-slate-700 dark:text-slate-200"
+                      >
+                        {t.settings.importMergeStrategyLabel}
+                      </label>
+                      <select
+                        id="import-merge-strategy"
+                        value={importStrategy}
+                        onChange={(e) =>
+                          setImportStrategy((e.target as HTMLSelectElement).value as MergeStrategy)
+                        }
+                        class="w-full rounded-md border border-slate-300 bg-white p-2 text-xs text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                      >
+                        <option value="skip">{t.settings.mergeSkip}</option>
+                        <option value="replace">{t.settings.mergeReplace}</option>
+                        <option value="keepBoth">{t.settings.mergeKeepBoth}</option>
+                      </select>
+                    </div>
+
+                    {importPreview && (
+                      <div class="space-y-2 rounded-lg border border-brand-200 bg-brand-50/50 p-3 text-xs dark:border-brand-800 dark:bg-brand-950/40">
+                        <div class="font-bold text-slate-900 dark:text-slate-100">
+                          {t.settings.dryRunTitle} ({importPreview.format.toUpperCase()})
+                        </div>
+                        {importPreview.valid ? (
+                          <div class="space-y-2">
+                            <p class="text-slate-700 dark:text-slate-300">
+                              {formatString(t.settings.dryRunSummary, {
+                                newCount: importPreview.newCount,
+                                duplicateCount: importPreview.duplicateCount,
+                                invalidCount: importPreview.invalidCount,
+                              })}
+                            </p>
+                            {importPreview.format === 'encrypted' && (
+                              <input
+                                type="password"
+                                value={importPassphrase}
+                                onInput={(e) =>
+                                  setImportPassphrase((e.target as HTMLInputElement).value)
+                                }
+                                placeholder={t.vault.enterPassphrase}
+                                aria-label={t.vault.enterPassphrase}
+                                class="w-full rounded border border-slate-300 bg-white p-1.5 text-xs text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                              />
+                            )}
+                            <button
+                              type="button"
+                              onClick={handleApplyImport}
+                              class="w-full rounded bg-emerald-700 py-1.5 text-xs font-semibold text-white hover:bg-emerald-800"
+                            >
+                              {t.settings.applyImportBtn}
+                            </button>
+                          </div>
+                        ) : (
+                          <p role="alert" class="font-medium text-rose-700 dark:text-rose-400">
+                            {importPreview.error}
+                          </p>
+                        )}
+                      </div>
+                    )}
                   </div>
 
                   <label class="mt-6 block w-full cursor-pointer rounded-md border border-slate-300 bg-slate-100 py-2 text-center text-xs font-semibold text-slate-800 transition-colors hover:bg-slate-200 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:hover:bg-slate-700">
                     <span>{t.actions.import}</span>
                     <input
                       type="file"
-                      accept=".json,application/json"
-                      onChange={handleImport}
+                      accept=".json,.csv,.txt,application/json,text/csv,text/plain"
+                      onChange={handleFileSelectedForPreview}
                       class="sr-only"
                     />
                   </label>
                 </div>
+              </div>
+
+              {/* Automatic Local Backups & Restore Screen */}
+              <div class="space-y-4 rounded-xl border border-slate-200 p-5 dark:border-slate-800">
+                <div class="flex flex-wrap items-center justify-between gap-2">
+                  <div>
+                    <h3 class="text-sm font-semibold text-slate-900 dark:text-slate-100">
+                      {t.settings.localBackupsTitle}
+                    </h3>
+                    <p class="mt-0.5 text-xs text-slate-600 dark:text-slate-300">
+                      {formatString(t.settings.localBackupsDesc, {
+                        max: settings.maxLocalBackups ?? 5,
+                      })}
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleCreateLocalSnapshot}
+                    class="rounded-md border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-800 hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                  >
+                    + {t.settings.createSnapshotBtn}
+                  </button>
+                </div>
+
+                {localBackups.length === 0 ? (
+                  <p class="py-4 text-center text-xs text-slate-600 dark:text-slate-300">
+                    {t.settings.noLocalBackups}
+                  </p>
+                ) : (
+                  <div role="list" class="space-y-2">
+                    {localBackups.map((snap) => (
+                      <div
+                        key={snap.id}
+                        role="listitem"
+                        class="flex items-center justify-between rounded-lg border border-slate-200 bg-slate-50/70 p-3 dark:border-slate-800 dark:bg-slate-800/40"
+                      >
+                        <div>
+                          <div class="text-xs font-semibold text-slate-900 dark:text-slate-100">
+                            {new Date(snap.timestamp).toLocaleString()}
+                          </div>
+                          <div class="text-[11px] text-slate-600 dark:text-slate-300">
+                            {snap.profileCount} profiles · {snap.fieldCount} fields
+                          </div>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => handleRestoreLocalSnapshot(snap.id)}
+                          class="rounded bg-brand-600 px-3 py-1 text-xs font-semibold text-white hover:bg-brand-700"
+                        >
+                          {t.settings.restoreSnapshotBtn}
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             </div>
           )}
@@ -1839,6 +2269,22 @@ export function App({ repository, vaultMgr, defaultOpenOnboarding = false }: Opt
                       {t.settings.inlineChipsExplanation}
                     </p>
                   </div>
+
+                  <label class="flex cursor-pointer items-center gap-2.5 text-xs font-medium text-slate-700 dark:text-slate-200">
+                    <input
+                      type="checkbox"
+                      checked={Boolean(settings.allowSensitiveInInlineChips)}
+                      onChange={async (e) => {
+                        const checked = (e.target as HTMLInputElement).checked;
+                        const updated = await repo.updateSettings({
+                          allowSensitiveInInlineChips: checked,
+                        });
+                        setSettings(updated);
+                      }}
+                      class="rounded border-slate-300 text-brand-600"
+                    />
+                    <span>{t.settings.allowSensitiveInChips}</span>
+                  </label>
                 </div>
 
                 {/* Re-open 3-Step Onboarding Wizard */}

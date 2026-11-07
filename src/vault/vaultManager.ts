@@ -7,9 +7,19 @@ import {
 } from '../types/vault';
 import { encryptVault, decryptVault, VaultDecryptionError } from './crypto';
 
+export class CardReauthRequiredError extends Error {
+  constructor(
+    message = 'Passphrase re-entry required: vault was unlocked more than the allowed minutes ago',
+  ) {
+    super(message);
+    this.name = 'CardReauthRequiredError';
+  }
+}
+
 export class VaultManager {
   private unlockedContent: VaultContent | null = null;
   private currentPassphrase: string | null = null;
+  private lastUnlockedAt: number | null = null;
   private autoLockTimeoutHandle: ReturnType<typeof setTimeout> | null = null;
   private onLockListeners = new Set<() => void>();
 
@@ -22,6 +32,29 @@ export class VaultManager {
 
   isUnlocked(): boolean {
     return this.unlockedContent !== null && this.currentPassphrase !== null;
+  }
+
+  getLastUnlockedAt(): number | null {
+    return this.lastUnlockedAt;
+  }
+
+  /**
+   * Checks whether card access requires step-up passphrase re-entry.
+   * Returns true if the vault is locked OR if the last unlock/re-auth was more than `maxAgeMinutes` ago (default 5).
+   */
+  requiresCardReauth(maxAgeMinutes = 5, now = Date.now()): boolean {
+    if (!this.isUnlocked() || this.lastUnlockedAt === null) {
+      return true;
+    }
+    const elapsedMs = now - this.lastUnlockedAt;
+    return elapsedMs > maxAgeMinutes * 60 * 1000;
+  }
+
+  /**
+   * Verifies the passphrase and refreshes the lastUnlockedAt timestamp for step-up card authentication.
+   */
+  async reauthenticate(passphrase: string): Promise<VaultContent> {
+    return await this.unlock(passphrase);
   }
 
   onLock(listener: () => void): () => void {
@@ -50,6 +83,7 @@ export class VaultManager {
   lock(): void {
     this.unlockedContent = null;
     this.currentPassphrase = null;
+    this.lastUnlockedAt = null;
     if (this.autoLockTimeoutHandle) {
       clearTimeout(this.autoLockTimeoutHandle);
       this.autoLockTimeoutHandle = null;
@@ -78,6 +112,7 @@ export class VaultManager {
 
     this.unlockedContent = emptyContent;
     this.currentPassphrase = passphrase;
+    this.lastUnlockedAt = Date.now();
 
     const settings = await this.repo.getSettings();
     this.resetAutoLockTimer(settings.vaultTimeoutMinutes);
@@ -94,6 +129,7 @@ export class VaultManager {
 
     this.unlockedContent = parsed;
     this.currentPassphrase = passphrase;
+    this.lastUnlockedAt = Date.now();
 
     const settings = await this.repo.getSettings();
     this.resetAutoLockTimer(settings.vaultTimeoutMinutes);
@@ -116,15 +152,35 @@ export class VaultManager {
       throw new Error('New master passphrase must be at least 6 characters');
     }
 
-    // Verify old passphrase by attempting unlock
-    const currentContent = this.isUnlocked()
-      ? this.unlockedContent!
-      : await this.unlock(oldPassphrase);
+    // Always verify oldPassphrase by decrypting the stored vault payload
+    const payload = await this.repo.getEncryptedVault();
+    if (!payload) {
+      throw new Error('Vault is not initialized');
+    }
+    const decryptedStr = await decryptVault(payload, oldPassphrase);
+    const currentContent = VaultContentSchema.parse(JSON.parse(decryptedStr));
 
     const newPayload = await encryptVault(JSON.stringify(currentContent), newPassphrase);
     await this.repo.saveEncryptedVault(newPayload);
 
+    this.unlockedContent = currentContent;
     this.currentPassphrase = newPassphrase;
+    this.lastUnlockedAt = Date.now();
+  }
+
+  /**
+   * Returns a card for filling/revealing only if the vault is unlocked AND within the step-up re-auth window (default 5 mins).
+   */
+  async getCardWithFreshAuth(
+    id: string,
+    maxAgeMinutes = 5,
+    now = Date.now(),
+  ): Promise<PaymentCard | null> {
+    this.ensureUnlocked();
+    if (this.requiresCardReauth(maxAgeMinutes, now)) {
+      throw new CardReauthRequiredError();
+    }
+    return await this.getCard(id);
   }
 
   async getCards(): Promise<PaymentCard[]> {

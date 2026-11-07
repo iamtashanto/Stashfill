@@ -114,6 +114,7 @@ export const SettingsSchema = z.object({
   language: z.enum(['en', 'bn']).default('en'),
   theme: z.enum(['system', 'light', 'dark']).default('system'),
   vaultTimeoutMinutes: z.number().int().min(0).max(120).default(15),
+  cardReauthMinutes: z.number().int().min(1).max(60).default(5),
   confirmBeforePaymentFill: z.boolean().default(true),
   requiresEncryptionForCards: z.boolean().default(true),
   showNotifications: z.boolean().default(true),
@@ -122,7 +123,13 @@ export const SettingsSchema = z.object({
   customCategories: z.array(z.string()).optional(),
   showMenuValuePreviews: z.boolean().optional(),
   enableInlineChips: z.boolean().optional(),
+  allowSensitiveInInlineChips: z.boolean().optional(),
+  confirmedSensitiveOrigins: z.array(z.string()).optional(),
   snippetTriggerPrefix: z.string().optional(),
+  backupReminderDays: z.number().int().min(1).max(365).default(14),
+  lastBackupExportedAt: z.number().nullable().optional(),
+  backupReminderDismissedAt: z.number().nullable().optional(),
+  maxLocalBackups: z.number().int().min(1).max(20).default(5),
 });
 
 export type Settings = z.infer<typeof SettingsSchema>;
@@ -131,9 +138,12 @@ export const DEFAULT_SETTINGS: Settings = {
   language: 'en',
   theme: 'system',
   vaultTimeoutMinutes: 15,
+  cardReauthMinutes: 5,
   confirmBeforePaymentFill: true,
   requiresEncryptionForCards: true,
   showNotifications: true,
+  backupReminderDays: 14,
+  maxLocalBackups: 5,
 };
 
 export const CURRENT_VAULT_VERSION = 2;

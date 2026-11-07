@@ -7,7 +7,7 @@ export class VaultDecryptionError extends Error {
   }
 }
 
-const PBKDF2_ITERATIONS = 250_000;
+export const PBKDF2_ITERATIONS = 600_000;
 const SALT_BYTE_LENGTH = 16;
 const IV_BYTE_LENGTH = 12;
 

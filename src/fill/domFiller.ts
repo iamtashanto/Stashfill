@@ -714,11 +714,11 @@ export function hasCrossOriginPaymentIframe(root: Document | Element): boolean {
 }
 
 /**
- * Copies a sensitive card value to clipboard and schedules auto-clear after `clearAfterMs`.
+ * Copies a sensitive card value to clipboard and schedules auto-clear after `clearAfterMs` (default 15 seconds).
  */
 export async function copyCardNumberWithAutoClear(
   cardNumber: string,
-  clearAfterMs = 30000,
+  clearAfterMs = 15000,
 ): Promise<boolean> {
   try {
     await navigator.clipboard.writeText(cardNumber);
@@ -742,13 +742,13 @@ export async function copyCardNumberWithAutoClear(
  * PART C CARD FILL RULES:
  * - Only on https pages (block http and warn; allow about:/chrome-extension:/file: only in test harness if allowInsecureForTest is not false, or check protocol).
  * - Only through an explicit confirmed Fill card action.
- * - Handles split 4-box card numbers, MM/YY and MM/YYYY expiry formats, month/year selects, and optional CVV.
+ * - Handles split 4-box card numbers, MM/YY and MM/YYYY expiry formats, month/year selects, and optional/ephemeral CVV.
  * - Does not force cross-origin payment iframes; reports `hasCrossOriginPaymentIframe` so caller can offer Copy number with auto-clear.
  */
 export function fillPaymentCard(
   root: Document | Element,
   card: FillableCard,
-  options: { protocol?: string; confirmed?: boolean } = {},
+  options: { protocol?: string; confirmed?: boolean; ephemeralCvv?: string } = {},
 ): CardFillResult {
   const protocol =
     options.protocol ??
@@ -786,7 +786,8 @@ export function fillPaymentCard(
       : 'cardholderName' in card && typeof card.cardholderName === 'string'
         ? card.cardholderName
         : '';
-  const cvv = card.cvv || '';
+  // CVV is never persisted unless enabled; allow ephemeral in-memory CVV at fill time
+  const cvv = options.ephemeralCvv?.trim() || card.cvv || '';
   const expMonth = (card.expMonth || '').padStart(2, '0');
   const rawYear = card.expYear || '';
   const expYear2 = rawYear.length === 4 ? rawYear.slice(-2) : rawYear;

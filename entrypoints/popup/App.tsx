@@ -11,11 +11,12 @@ import {
 } from '../../src/core/schemas/vault';
 import { createPersonalTemplate } from '../../src/core/templates';
 import { type PaymentCard, maskCardNumber } from '../../src/types/vault';
+import { copyCardNumberWithAutoClear } from '../../src/fill/domFiller';
+import { exportPlainJson } from '../../src/storage/importExport';
 import { getTranslations, formatString, type Language } from '../../src/i18n';
 import { StashItemRow } from '../../src/components/StashItemRow';
 import { CardBrandIcon } from '../../src/components/CardBrandIcon';
 import { Toast, type ToastMessage } from '../../src/components/Toast';
-import { ConfirmModal } from '../../src/components/ConfirmModal';
 
 export interface PopupProps {
   repository?: StashRepository;
@@ -46,6 +47,16 @@ export function App({ repository, vaultMgr }: PopupProps = {}) {
   const [vaultError, setVaultError] = useState('');
   const [cards, setCards] = useState<PaymentCard[]>([]);
   const [cardToConfirmFill, setCardToConfirmFill] = useState<PaymentCard | null>(null);
+  const [ephemeralCvv, setEphemeralCvv] = useState('');
+  const [revealedCardIds, setRevealedCardIds] = useState<Record<string, boolean>>({});
+  const [reauthPendingAction, setReauthPendingAction] = useState<
+    | { kind: 'fill'; card: PaymentCard }
+    | { kind: 'reveal'; cardId: string }
+    | { kind: 'copy'; cardNumber: string }
+    | null
+  >(null);
+  const [reauthPassphrase, setReauthPassphrase] = useState('');
+  const [reauthError, setReauthError] = useState('');
 
   // Keyboard navigation
   const [selectedItemIndex, setSelectedItemIndex] = useState(-1);
@@ -173,7 +184,13 @@ export function App({ repository, vaultMgr }: PopupProps = {}) {
   };
 
   // Fill single field into active focused element
-  const handleFillField = async (fieldId: string, key: string, value: string) => {
+  const handleFillField = async (
+    fieldId: string,
+    key: string,
+    value: string,
+    label?: string,
+    sensitive?: boolean,
+  ) => {
     await markFieldUsed(fieldId);
     try {
       const tabs = await browser.tabs.query({ active: true, currentWindow: true });
@@ -185,7 +202,7 @@ export function App({ repository, vaultMgr }: PopupProps = {}) {
 
       const res = (await browser.tabs.sendMessage(activeTab.id, {
         type: 'FILL_ACTIVE_FIELD',
-        target: { kind: 'profileField', fieldPath: key, value },
+        target: { kind: 'profileField', fieldPath: key, value, label, sensitive },
       })) as { success: boolean };
 
       if (res && res.success) {
@@ -266,9 +283,52 @@ export function App({ repository, vaultMgr }: PopupProps = {}) {
     setVaultUnlocked(false);
     setCards([]);
     setVaultPassphrase('');
+    setRevealedCardIds({});
+    setReauthPendingAction(null);
+  };
+
+  const checkCardReauthRequired = (): boolean => {
+    const maxMins = settings.cardReauthMinutes ?? 5;
+    return vaultManager.requiresCardReauth(maxMins);
+  };
+
+  const handleToggleRevealCard = (cardId: string) => {
+    if (revealedCardIds[cardId]) {
+      setRevealedCardIds((prev) => ({ ...prev, [cardId]: false }));
+      return;
+    }
+    if (checkCardReauthRequired()) {
+      setReauthError('');
+      setReauthPassphrase('');
+      setReauthPendingAction({ kind: 'reveal', cardId });
+      return;
+    }
+    setRevealedCardIds((prev) => ({ ...prev, [cardId]: true }));
+  };
+
+  const handleCopyCardNumber15s = async (cardNumber: string) => {
+    if (checkCardReauthRequired()) {
+      setReauthError('');
+      setReauthPassphrase('');
+      setReauthPendingAction({ kind: 'copy', cardNumber });
+      return;
+    }
+    const ok = await copyCardNumberWithAutoClear(cardNumber, 15000);
+    if (ok) {
+      showToast(t.vault.cardCopiedAutoClear, 'success');
+    } else {
+      showToast(t.actions.copyFailed, 'error');
+    }
   };
 
   const handleRequestFillCard = (card: PaymentCard) => {
+    if (checkCardReauthRequired()) {
+      setReauthError('');
+      setReauthPassphrase('');
+      setReauthPendingAction({ kind: 'fill', card });
+      return;
+    }
+    setEphemeralCvv('');
     if (settings.confirmBeforePaymentFill) {
       setCardToConfirmFill(card);
     } else {
@@ -276,7 +336,34 @@ export function App({ repository, vaultMgr }: PopupProps = {}) {
     }
   };
 
-  const executeCardFill = async (card: PaymentCard) => {
+  const handleVerifyReauth = async () => {
+    setReauthError('');
+    try {
+      await vaultManager.reauthenticate(reauthPassphrase);
+      const pending = reauthPendingAction;
+      setReauthPendingAction(null);
+      setReauthPassphrase('');
+      if (!pending) return;
+
+      if (pending.kind === 'reveal') {
+        setRevealedCardIds((prev) => ({ ...prev, [pending.cardId]: true }));
+      } else if (pending.kind === 'copy') {
+        await copyCardNumberWithAutoClear(pending.cardNumber, 15000);
+        showToast(t.vault.cardCopiedAutoClear, 'success');
+      } else if (pending.kind === 'fill') {
+        setEphemeralCvv('');
+        if (settings.confirmBeforePaymentFill) {
+          setCardToConfirmFill(pending.card);
+        } else {
+          await executeCardFill(pending.card);
+        }
+      }
+    } catch {
+      setReauthError(t.vault.invalidPassphrase);
+    }
+  };
+
+  const executeCardFill = async (card: PaymentCard, oneTimeCvv?: string) => {
     try {
       const tabs = await browser.tabs.query({ active: true, currentWindow: true });
       const activeTab = tabs[0];
@@ -286,6 +373,7 @@ export function App({ repository, vaultMgr }: PopupProps = {}) {
         type: 'FILL_PAYMENT_CARD',
         card,
         confirmed: true,
+        ephemeralCvv: oneTimeCvv?.trim() || undefined,
       })) as { success: boolean; count?: number };
 
       if (res && res.success && res.count && res.count > 0) {
@@ -297,7 +385,55 @@ export function App({ repository, vaultMgr }: PopupProps = {}) {
       showToast(t.messages.cardFillError, 'error');
     } finally {
       setCardToConfirmFill(null);
+      setEphemeralCvv('');
     }
+  };
+
+  // Backup reminder banner check (shows if user has fields and hasn't exported or dismissed within backupReminderDays)
+  const shouldShowBackupReminder = useMemo(() => {
+    const totalFields = profiles.reduce(
+      (sum, p) => sum + p.fields.filter((f) => f.value.trim().length > 0).length,
+      0,
+    );
+    if (totalFields === 0) return false;
+    const reminderDays = settings.backupReminderDays ?? 14;
+    const thresholdMs = reminderDays * 24 * 60 * 60 * 1000;
+    const now = Date.now();
+    if (
+      settings.backupReminderDismissedAt &&
+      now - settings.backupReminderDismissedAt < thresholdMs
+    ) {
+      return false;
+    }
+    if (!settings.lastBackupExportedAt) {
+      return true;
+    }
+    return now - settings.lastBackupExportedAt >= thresholdMs;
+  }, [
+    profiles,
+    settings.backupReminderDays,
+    settings.lastBackupExportedAt,
+    settings.backupReminderDismissedAt,
+  ]);
+
+  const handleQuickDownloadBackup = async () => {
+    const vault = await repo.loadVault();
+    const envelope = exportPlainJson(vault);
+    const blob = new Blob([JSON.stringify(envelope, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `stashfill-backup-${new Date().toISOString().slice(0, 10)}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+    const updated = await repo.updateSettings({ lastBackupExportedAt: Date.now() });
+    setSettings(updated);
+    showToast(t.messages.exportDownloaded, 'success');
+  };
+
+  const handleDismissBackupReminder = async () => {
+    const updated = await repo.updateSettings({ backupReminderDismissedAt: Date.now() });
+    setSettings(updated);
   };
 
   // Sorted & filtered field list: sorted by recent (lastUsedAt desc) then most used (useCount desc)
@@ -372,7 +508,7 @@ export function App({ repository, vaultMgr }: PopupProps = {}) {
         const item = visibleItems[selectedItemIndex];
         if (item) {
           e.preventDefault();
-          handleFillField(item.id, item.key, item.value);
+          handleFillField(item.id, item.key, item.value, item.label, item.sensitive);
         }
       }
     };
@@ -487,6 +623,34 @@ export function App({ repository, vaultMgr }: PopupProps = {}) {
       </header>
 
       <main class="flex flex-1 flex-col overflow-hidden">
+        {/* Backup Reminder Banner (no notification permission) */}
+        {shouldShowBackupReminder && (
+          <div
+            role="region"
+            aria-label={t.settings.exportImportTitle}
+            class="flex shrink-0 items-center justify-between gap-2 border-b border-amber-200 bg-amber-50 px-3 py-1.5 text-[11px] text-amber-950 dark:border-amber-800/60 dark:bg-amber-950/40 dark:text-amber-200"
+          >
+            <span class="leading-tight">{t.settings.backupReminderBanner}</span>
+            <div class="flex shrink-0 items-center gap-1">
+              <button
+                type="button"
+                onClick={handleQuickDownloadBackup}
+                class="rounded bg-amber-700 px-2 py-0.5 text-[10px] font-semibold text-white hover:bg-amber-800"
+              >
+                {t.settings.backupReminderDownload}
+              </button>
+              <button
+                type="button"
+                onClick={handleDismissBackupReminder}
+                aria-label={t.settings.backupReminderDismiss}
+                class="rounded px-1.5 py-0.5 text-[10px] font-semibold text-amber-900 hover:bg-amber-200/60 dark:text-amber-200 dark:hover:bg-amber-900/50"
+              >
+                ×
+              </button>
+            </div>
+          </div>
+        )}
+
         {/* Profile Bar & Primary Actions */}
         <div class="shrink-0 space-y-2 border-b border-slate-200 bg-white p-3 dark:border-slate-800 dark:bg-slate-900">
           <div class="flex items-center gap-2">
@@ -688,7 +852,9 @@ export function App({ repository, vaultMgr }: PopupProps = {}) {
                   revealLabel={t.actions.reveal}
                   hideLabel={t.actions.hide}
                   isSelected={idx === selectedItemIndex}
-                  onFill={() => handleFillField(item.id, item.key, item.value)}
+                  onFill={() =>
+                    handleFillField(item.id, item.key, item.value, item.label, item.sensitive)
+                  }
                   onCopy={() => handleCopy(item.id, item.value)}
                 />
               ))}
@@ -772,36 +938,112 @@ export function App({ repository, vaultMgr }: PopupProps = {}) {
               </div>
             ) : (
               <div class="space-y-1.5 p-1">
+                {reauthPendingAction && (
+                  <div class="space-y-1.5 rounded border border-amber-300 bg-amber-50 p-2 dark:border-amber-800 dark:bg-amber-950/40">
+                    <p class="text-[11px] font-semibold text-amber-950 dark:text-amber-200">
+                      {formatString(t.vault.reauthRequiredDesc, {
+                        minutes: settings.cardReauthMinutes ?? 5,
+                      })}
+                    </p>
+                    <div class="flex items-center gap-1.5">
+                      <label for="popup-reauth-passphrase" class="sr-only">
+                        {t.vault.enterPassphrase}
+                      </label>
+                      <input
+                        id="popup-reauth-passphrase"
+                        type="password"
+                        value={reauthPassphrase}
+                        onInput={(e) => setReauthPassphrase((e.target as HTMLInputElement).value)}
+                        onKeyDown={(e) => e.key === 'Enter' && handleVerifyReauth()}
+                        placeholder={t.vault.enterPassphrase}
+                        class="flex-1 rounded border border-slate-300 bg-white px-2 py-1 text-xs text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                      />
+                      <button
+                        type="button"
+                        onClick={handleVerifyReauth}
+                        class="rounded bg-brand-600 px-2 py-1 text-xs font-semibold text-white hover:bg-brand-700"
+                      >
+                        {t.actions.confirm}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setReauthPendingAction(null)}
+                        class="rounded px-1.5 py-1 text-xs text-slate-700 hover:bg-slate-200 dark:text-slate-300"
+                      >
+                        {t.actions.cancel}
+                      </button>
+                    </div>
+                    {reauthError && (
+                      <p
+                        role="alert"
+                        class="text-[10px] font-medium text-rose-700 dark:text-rose-400"
+                      >
+                        {reauthError}
+                      </p>
+                    )}
+                  </div>
+                )}
+
                 {cards.length === 0 ? (
                   <p class="px-2 py-1 text-xs text-slate-600 dark:text-slate-300">
                     {t.vault.noCardsYet}
                   </p>
                 ) : (
-                  cards.map((card) => (
-                    <div
-                      key={card.id}
-                      class="flex items-center justify-between rounded border border-slate-200 bg-slate-50/70 p-2 dark:border-slate-700 dark:bg-slate-800/40"
-                    >
-                      <div>
-                        <div class="flex items-center gap-1.5 text-xs font-semibold text-slate-900 dark:text-slate-100">
-                          <CardBrandIcon brand={card.brand} />
-                          <span>{card.nickname}</span>
+                  cards.map((card) => {
+                    const isRevealed = Boolean(revealedCardIds[card.id]);
+                    return (
+                      <div
+                        key={card.id}
+                        class="flex items-center justify-between rounded border border-slate-200 bg-slate-50/70 p-2 dark:border-slate-700 dark:bg-slate-800/40"
+                      >
+                        <div>
+                          <div class="flex items-center gap-1.5 text-xs font-semibold text-slate-900 dark:text-slate-100">
+                            <CardBrandIcon brand={card.brand} />
+                            <span>{card.nickname}</span>
+                          </div>
+                          <div class="mt-0.5 flex items-center gap-1.5 font-mono text-[11px] text-slate-700 dark:text-slate-300">
+                            <span>
+                              {isRevealed ? card.cardNumber : maskCardNumber(card.cardNumber)} (
+                              {card.expMonth}/{card.expYear})
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => handleToggleRevealCard(card.id)}
+                              aria-label={`${
+                                isRevealed ? t.vault.hideCardNumber : t.vault.revealCardNumber
+                              }: ${card.nickname}`}
+                              title={isRevealed ? t.vault.hideCardNumber : t.vault.revealCardNumber}
+                              class="rounded px-1 font-sans text-[10px] font-semibold text-brand-700 hover:underline dark:text-brand-300"
+                            >
+                              {isRevealed
+                                ? t.actions.hide.split(' ')[0]
+                                : t.actions.reveal.split(' ')[0]}
+                            </button>
+                          </div>
                         </div>
-                        <div class="mt-0.5 font-mono text-[11px] text-slate-700 dark:text-slate-300">
-                          {maskCardNumber(card.cardNumber)} ({card.expMonth}/{card.expYear})
+
+                        <div class="flex items-center gap-1">
+                          <button
+                            type="button"
+                            onClick={() => handleCopyCardNumber15s(card.cardNumber)}
+                            aria-label={`${t.vault.copyCardNumber15s}: ${card.nickname}`}
+                            title={t.vault.copyCardNumber15s}
+                            class="rounded border border-slate-300 bg-white px-2 py-1 text-[11px] font-semibold text-slate-700 hover:bg-slate-100 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200"
+                          >
+                            {t.actions.copy}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleRequestFillCard(card)}
+                            aria-label={`${t.actions.fillCard} ${card.nickname}`}
+                            class="rounded border border-amber-600/40 bg-amber-500/15 px-2 py-1 text-xs font-semibold text-amber-900 transition-colors hover:bg-amber-500/25 dark:text-amber-200"
+                          >
+                            {t.actions.fillCard}
+                          </button>
                         </div>
                       </div>
-
-                      <button
-                        type="button"
-                        onClick={() => handleRequestFillCard(card)}
-                        aria-label={`${t.actions.fillCard} ${card.nickname}`}
-                        class="rounded border border-amber-600/40 bg-amber-500/15 px-2 py-1 text-xs font-semibold text-amber-900 transition-colors hover:bg-amber-500/25 dark:text-amber-200"
-                      >
-                        {t.actions.fillCard}
-                      </button>
-                    </div>
-                  ))
+                    );
+                  })
                 )}
               </div>
             )}
@@ -809,24 +1051,69 @@ export function App({ repository, vaultMgr }: PopupProps = {}) {
         </div>
       </main>
 
-      {/* Confirmation Modal for Sensitive Payment Card Fill (Principle 6) */}
-      <ConfirmModal
-        isOpen={cardToConfirmFill !== null}
-        title={t.vault.confirmFillTitle}
-        message={
-          cardToConfirmFill
-            ? formatString(t.vault.confirmFillWarning, {
+      {/* Confirmation Modal for Sensitive Payment Card Fill (Principle 6 + runtime CVV prompt if not saved) */}
+      {cardToConfirmFill !== null && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-label={t.vault.confirmFillTitle}
+          class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-3"
+        >
+          <div class="w-full max-w-xs space-y-3 rounded-xl border border-slate-200 bg-white p-4 shadow-xl dark:border-slate-700 dark:bg-slate-900">
+            <h3 class="text-xs font-bold text-slate-900 dark:text-white">
+              {t.vault.confirmFillTitle}
+            </h3>
+            <p class="text-[11px] leading-relaxed text-slate-700 dark:text-slate-300">
+              {formatString(t.vault.confirmFillWarning, {
                 nickname: cardToConfirmFill.nickname,
                 masked: maskCardNumber(cardToConfirmFill.cardNumber),
-              })
-            : ''
-        }
-        confirmLabel={t.vault.confirmFillButton}
-        cancelLabel={t.actions.cancel}
-        isDestructive={false}
-        onConfirm={() => cardToConfirmFill && executeCardFill(cardToConfirmFill)}
-        onCancel={() => setCardToConfirmFill(null)}
-      />
+              })}
+            </p>
+            {!cardToConfirmFill.cvv && (
+              <div>
+                <label
+                  for="popup-ephemeral-cvv"
+                  class="mb-1 block text-[10px] font-semibold text-slate-700 dark:text-slate-300"
+                >
+                  {t.vault.ephemeralCvvLabel}
+                </label>
+                <input
+                  id="popup-ephemeral-cvv"
+                  type="password"
+                  inputMode="numeric"
+                  maxLength={4}
+                  value={ephemeralCvv}
+                  onInput={(e) => setEphemeralCvv((e.target as HTMLInputElement).value)}
+                  placeholder={t.vault.cvvPlaceholder}
+                  class="w-full rounded border border-slate-300 bg-white px-2 py-1 font-mono text-xs text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                />
+                <p class="mt-0.5 text-[10px] text-slate-600 dark:text-slate-400">
+                  {t.vault.ephemeralCvvHint}
+                </p>
+              </div>
+            )}
+            <div class="flex justify-end gap-1.5 pt-1">
+              <button
+                type="button"
+                onClick={() => {
+                  setCardToConfirmFill(null);
+                  setEphemeralCvv('');
+                }}
+                class="rounded border border-slate-300 bg-white px-2.5 py-1 text-xs font-medium text-slate-700 hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200"
+              >
+                {t.actions.cancel}
+              </button>
+              <button
+                type="button"
+                onClick={() => executeCardFill(cardToConfirmFill, ephemeralCvv)}
+                class="rounded bg-brand-600 px-3 py-1 text-xs font-semibold text-white hover:bg-brand-700"
+              >
+                {t.vault.confirmFillButton}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Toast Notification */}
       <Toast toast={toast} onClose={() => setToast(null)} closeLabel={t.actions.close} />

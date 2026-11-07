@@ -22,7 +22,7 @@ export interface EncryptedPayload {
   ciphertext: string; // Base64
   iv: string; // Base64 (12 bytes for AES-GCM)
   salt: string; // Base64 (16 bytes for PBKDF2)
-  iterations: number; // e.g. 250,000
+  iterations: number; // >= 600,000
 }
 
 export const EncryptedPayloadSchema = z.object({
@@ -30,7 +30,7 @@ export const EncryptedPayloadSchema = z.object({
   ciphertext: z.string(),
   iv: z.string(),
   salt: z.string(),
-  iterations: z.number().int().min(10000),
+  iterations: z.number().int().min(600000),
 });
 
 export const VaultContentSchema = z.object({
