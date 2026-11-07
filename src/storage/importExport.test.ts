@@ -232,3 +232,4 @@ describe('Import, Export, and Automatic Local Backups', () => {
     expect(profilesAfterRestore[0]?.name).toBe('Profile V2');
   });
 });
+
