@@ -20,11 +20,7 @@ export const migrationV1: Migration = {
   toVersion: 1,
   description: 'Initialize v1 vault structure from legacy profiles format',
   migrate: (raw) => {
-    const rawProfiles = Array.isArray(raw.profiles)
-      ? raw.profiles
-      : Array.isArray(raw)
-        ? raw
-        : [];
+    const rawProfiles = Array.isArray(raw.profiles) ? raw.profiles : Array.isArray(raw) ? raw : [];
 
     const profiles = rawProfiles.map((p: any, idx: number) => {
       // Map flat legacy profile fields to Field array if needed
@@ -90,10 +86,10 @@ export const migrationV1: Migration = {
       cards: Array.isArray(raw.cards) ? raw.cards : [],
       siteRules: [],
       settings: {
-        language: raw.settings?.language || 'en',
-        theme: raw.settings?.theme || 'system',
-        vaultTimeoutMinutes: raw.settings?.vaultTimeoutMinutes ?? 15,
-        confirmBeforePaymentFill: raw.settings?.confirmBeforePaymentFill ?? true,
+        language: (raw as any).settings?.language || 'en',
+        theme: (raw as any).settings?.theme || 'system',
+        vaultTimeoutMinutes: (raw as any).settings?.vaultTimeoutMinutes ?? 15,
+        confirmBeforePaymentFill: (raw as any).settings?.confirmBeforePaymentFill ?? true,
         requiresEncryptionForCards: true,
       },
     };
@@ -131,13 +127,13 @@ export const migrationV2: Migration = {
       cards: Array.isArray(v1Data.cards) ? v1Data.cards : [],
       siteRules: Array.isArray(v1Data.siteRules) ? v1Data.siteRules : [],
       settings: {
-        language: v1Data.settings?.language || 'en',
-        theme: v1Data.settings?.theme || 'system',
-        vaultTimeoutMinutes: v1Data.settings?.vaultTimeoutMinutes ?? 15,
-        confirmBeforePaymentFill: v1Data.settings?.confirmBeforePaymentFill ?? true,
+        language: (v1Data as any).settings?.language || 'en',
+        theme: (v1Data as any).settings?.theme || 'system',
+        vaultTimeoutMinutes: (v1Data as any).settings?.vaultTimeoutMinutes ?? 15,
+        confirmBeforePaymentFill: (v1Data as any).settings?.confirmBeforePaymentFill ?? true,
         requiresEncryptionForCards:
-          typeof v1Data.settings?.requiresEncryptionForCards === 'boolean'
-            ? v1Data.settings.requiresEncryptionForCards
+          typeof (v1Data as any).settings?.requiresEncryptionForCards === 'boolean'
+            ? (v1Data as any).settings.requiresEncryptionForCards
             : true,
       },
     };
@@ -149,7 +145,7 @@ export const MIGRATIONS: Migration[] = [migrationV1, migrationV2];
 export class MigrationRunner {
   static run(rawData: unknown): { vault: Vault; appliedVersions: number[] } {
     if (!rawData || typeof rawData !== 'object') {
-      return { vault: createEmptyVault(), appliedVersions: [] };
+      throw new Error('Invalid vault raw data: expected an object');
     }
 
     let current = { ...(rawData as Record<string, unknown>) };

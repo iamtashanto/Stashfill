@@ -1,4 +1,5 @@
-import type { Profile } from '../types/profile';
+import type { Profile as LegacyProfile } from '../types/profile';
+import type { Profile as VaultProfile, Card } from '../core/schemas/vault';
 import type { PaymentCard } from '../types/vault';
 import {
   type FieldAttributes,
@@ -6,7 +7,10 @@ import {
   matchPaymentField,
   resolveProfileValue,
   type ProfileFieldKey,
-} from './matcher';
+} from '../matcher';
+
+export type FillableProfile = VaultProfile | LegacyProfile;
+export type FillableCard = PaymentCard | Card;
 
 export type FillableElement =
   HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement | HTMLElement;
@@ -272,7 +276,7 @@ function dispatchInputEvents(el: HTMLElement) {
  */
 export function fillFormWithProfile(
   root: Document | Element,
-  profile: Profile,
+  profile: FillableProfile,
 ): { filledCount: number; matchedFields: ProfileFieldKey[] } {
   // If active focused element is inside a form, prioritize that form
   let container: Document | Element = root;
@@ -315,10 +319,16 @@ export function fillFormWithProfile(
  */
 export function fillPaymentCard(
   root: Document | Element,
-  card: PaymentCard,
+  card: FillableCard,
 ): { filledCount: number } {
   const elements = collectFillableElements(root);
   let filledCount = 0;
+
+  const cardNumber = (card as any).number || (card as any).cardNumber || '';
+  const cardholderName = (card as any).cardholder || (card as any).cardholderName || '';
+  const cvv = card.cvv || '';
+  const expMonth = card.expMonth || '';
+  const expYear = card.expYear || '';
 
   for (const el of elements) {
     const attrs = extractFieldAttributes(el);
@@ -329,23 +339,23 @@ export function fillPaymentCard(
     let valueToFill = '';
     switch (field) {
       case 'cardNumber':
-        valueToFill = card.cardNumber;
+        valueToFill = cardNumber;
         break;
       case 'cardholderName':
-        valueToFill = card.cardholderName;
+        valueToFill = cardholderName;
         break;
       case 'cvv':
-        valueToFill = card.cvv;
+        valueToFill = cvv;
         break;
       case 'expMonth':
-        valueToFill = card.expMonth;
+        valueToFill = expMonth;
         break;
       case 'expYear':
-        valueToFill = card.expYear.length === 4 ? card.expYear.slice(-2) : card.expYear;
+        valueToFill = expYear.length === 4 ? expYear.slice(-2) : expYear;
         break;
       case 'expiry':
         // MM/YY format
-        valueToFill = `${card.expMonth}/${card.expYear.slice(-2)}`;
+        valueToFill = `${expMonth}/${expYear.slice(-2)}`;
         break;
     }
 

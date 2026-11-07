@@ -65,6 +65,7 @@ export default defineBackground(() => {
     if (!tab?.id) return;
 
     const profile = await repo.getActiveProfile();
+    if (!profile) return;
 
     switch (info.menuItemId) {
       case 'stashfill-fill-form': {
@@ -76,8 +77,9 @@ export default defineBackground(() => {
       }
       case 'stashfill-fill-name': {
         const val =
-          profile.fullName ||
-          (profile.firstName ? `${profile.firstName} ${profile.lastName}`.trim() : '');
+          (profile as any).fullName ||
+          (profile as any).fields?.find((f: any) => f.key === 'full_name')?.value ||
+          '';
         if (val) {
           await browser.tabs.sendMessage(tab.id, {
             type: 'FILL_ACTIVE_FIELD',
@@ -87,28 +89,40 @@ export default defineBackground(() => {
         break;
       }
       case 'stashfill-fill-email': {
-        if (profile.email) {
+        const val =
+          (profile as any).email ||
+          (profile as any).fields?.find((f: any) => f.key === 'email')?.value ||
+          '';
+        if (val) {
           await browser.tabs.sendMessage(tab.id, {
             type: 'FILL_ACTIVE_FIELD',
-            target: { kind: 'profileField', fieldPath: 'email', value: profile.email },
+            target: { kind: 'profileField', fieldPath: 'email', value: val },
           });
         }
         break;
       }
       case 'stashfill-fill-phone': {
-        if (profile.phone) {
+        const val =
+          (profile as any).phone ||
+          (profile as any).fields?.find((f: any) => f.key === 'phone')?.value ||
+          '';
+        if (val) {
           await browser.tabs.sendMessage(tab.id, {
             type: 'FILL_ACTIVE_FIELD',
-            target: { kind: 'profileField', fieldPath: 'phone', value: profile.phone },
+            target: { kind: 'profileField', fieldPath: 'phone', value: val },
           });
         }
         break;
       }
       case 'stashfill-fill-address': {
-        if (profile.address1) {
+        const val =
+          (profile as any).address1 ||
+          (profile as any).fields?.find((f: any) => f.key === 'address_line1')?.value ||
+          '';
+        if (val) {
           await browser.tabs.sendMessage(tab.id, {
             type: 'FILL_ACTIVE_FIELD',
-            target: { kind: 'profileField', fieldPath: 'address1', value: profile.address1 },
+            target: { kind: 'profileField', fieldPath: 'address1', value: val },
           });
         }
         break;

@@ -1,6 +1,10 @@
 import type { Field, Profile, FieldType } from '../schemas/vault';
 import type { CanonicalKey } from '../canonical';
 
+function generateId(prefix: string): string {
+  return `${prefix}_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
+}
+
 function makeField(
   key: CanonicalKey | string,
   label: string,
@@ -11,7 +15,7 @@ function makeField(
 ): Field {
   const now = Date.now();
   return {
-    id: `f_${now}_${Math.random().toString(36).substring(2, 8)}`,
+    id: generateId('f'),
     key,
     label,
     type,
@@ -28,7 +32,7 @@ function makeField(
 
 export function createPersonalTemplate(name = 'Personal'): Profile {
   return {
-    id: `prof_personal_${Date.now()}`,
+    id: generateId('prof_personal'),
     name,
     icon: 'user',
     fields: [
@@ -46,7 +50,7 @@ export function createPersonalTemplate(name = 'Personal'): Profile {
 
 export function createAddressTemplate(name = 'Address'): Profile {
   return {
-    id: `prof_address_${Date.now()}`,
+    id: generateId('prof_address'),
     name,
     icon: 'map-pin',
     fields: [
@@ -62,7 +66,7 @@ export function createAddressTemplate(name = 'Address'): Profile {
 
 export function createWorkTemplate(name = 'Work'): Profile {
   return {
-    id: `prof_work_${Date.now()}`,
+    id: generateId('prof_work'),
     name,
     icon: 'briefcase',
     fields: [
@@ -78,7 +82,7 @@ export function createWorkTemplate(name = 'Work'): Profile {
 
 export function createSocialLinksTemplate(name = 'Social Links'): Profile {
   return {
-    id: `prof_social_${Date.now()}`,
+    id: generateId('prof_social'),
     name,
     icon: 'share-2',
     fields: [
@@ -92,7 +96,7 @@ export function createSocialLinksTemplate(name = 'Social Links'): Profile {
 
 export function createFreelancerTemplate(name = 'Freelancer'): Profile {
   return {
-    id: `prof_freelancer_${Date.now()}`,
+    id: generateId('prof_freelancer'),
     name,
     icon: 'code',
     fields: [
@@ -109,7 +113,7 @@ export function createFreelancerTemplate(name = 'Freelancer'): Profile {
 
 export function createJobApplicantTemplate(name = 'Job Applicant'): Profile {
   return {
-    id: `prof_applicant_${Date.now()}`,
+    id: generateId('prof_applicant'),
     name,
     icon: 'file-text',
     fields: [
@@ -130,7 +134,7 @@ export function createJobApplicantTemplate(name = 'Job Applicant'): Profile {
 
 export function createStudentTemplate(name = 'Student'): Profile {
   return {
-    id: `prof_student_${Date.now()}`,
+    id: generateId('prof_student'),
     name,
     icon: 'book-open',
     fields: [
@@ -148,7 +152,7 @@ export function createStudentTemplate(name = 'Student'): Profile {
 // Regional Packs
 export function createBangladeshPack(name = 'Bangladesh Pack'): Profile {
   return {
-    id: `prof_regional_bd_${Date.now()}`,
+    id: generateId('prof_regional_bd'),
     name,
     icon: 'flag',
     fields: [
@@ -165,7 +169,7 @@ export function createBangladeshPack(name = 'Bangladesh Pack'): Profile {
 
 export function createIndiaPack(name = 'India Pack'): Profile {
   return {
-    id: `prof_regional_in_${Date.now()}`,
+    id: generateId('prof_regional_in'),
     name,
     icon: 'flag',
     fields: [
@@ -182,7 +186,7 @@ export function createIndiaPack(name = 'India Pack'): Profile {
 
 export function createUSPack(name = 'US Pack'): Profile {
   return {
-    id: `prof_regional_us_${Date.now()}`,
+    id: generateId('prof_regional_us'),
     name,
     icon: 'flag',
     fields: [
@@ -199,7 +203,7 @@ export function createUSPack(name = 'US Pack'): Profile {
 
 export function createUKPack(name = 'UK Pack'): Profile {
   return {
-    id: `prof_regional_uk_${Date.now()}`,
+    id: generateId('prof_regional_uk'),
     name,
     icon: 'flag',
     fields: [

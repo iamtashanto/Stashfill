@@ -1,4 +1,5 @@
-import type { Profile } from '../types/profile';
+import type { Profile as LegacyProfile } from '../types/profile';
+import type { Profile as VaultProfile } from '../core/schemas/vault';
 
 export type ProfileFieldKey =
   | 'fullName'
@@ -286,15 +287,68 @@ export function isPaymentField(attrs: FieldAttributes): boolean {
   return matchPaymentField(attrs) !== null;
 }
 
+const CANONICAL_MAPPING: Record<ProfileFieldKey, string[]> = {
+  fullName: ['full_name'],
+  firstName: ['first_name'],
+  lastName: ['last_name'],
+  email: ['email'],
+  phone: ['phone', 'mobile'],
+  altPhone: ['mobile', 'phone'],
+  address1: ['address_line1'],
+  address2: ['address_line2'],
+  city: ['city'],
+  state: ['state'],
+  postalCode: ['postal_code'],
+  country: ['country'],
+  website: ['website'],
+  title: ['job_title'],
+  gender: ['gender'],
+};
+
 /**
  * Resolves the profile value for a given field key.
+ * Supports both canonical Part B Profile schema (with fields array)
+ * and legacy profile shape.
  */
-export function resolveProfileValue(profile: Profile, key: ProfileFieldKey): string {
+export function resolveProfileValue(
+  profile: VaultProfile | LegacyProfile | any,
+  key: ProfileFieldKey,
+): string {
+  if (!profile) return '';
+
+  if (Array.isArray(profile.fields)) {
+    const keysToCheck = CANONICAL_MAPPING[key] || [key];
+    for (const k of keysToCheck) {
+      const match = profile.fields.find((f: any) => f.key === k);
+      if (match && match.value) return match.value;
+    }
+    const directMatch = profile.fields.find((f: any) => f.key === key || f.id === key);
+    if (directMatch && directMatch.value) return directMatch.value;
+
+    if (key === 'fullName') {
+      const fn = profile.fields.find((f: any) => f.key === 'first_name')?.value || '';
+      const ln = profile.fields.find((f: any) => f.key === 'last_name')?.value || '';
+      if (fn || ln) return `${fn} ${ln}`.trim();
+    }
+    if (key === 'firstName') {
+      const full = profile.fields.find((f: any) => f.key === 'full_name')?.value || '';
+      if (full) return full.split(/\s+/)[0] || '';
+    }
+    if (key === 'lastName') {
+      const full = profile.fields.find((f: any) => f.key === 'full_name')?.value || '';
+      if (full) {
+        const parts = full.split(/\s+/);
+        return parts.length > 1 ? parts.slice(1).join(' ') : '';
+      }
+    }
+    return '';
+  }
+
   switch (key) {
     case 'fullName':
       if (profile.fullName) return profile.fullName;
       if (profile.firstName || profile.lastName) {
-        return `${profile.firstName} ${profile.lastName}`.trim();
+        return `${profile.firstName || ''} ${profile.lastName || ''}`.trim();
       }
       return '';
     case 'firstName':

@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { FieldKeySchema } from '../canonical';
-import { validateLuhn, type CardBrand } from '../luhn';
+import { validateLuhn } from '../luhn';
 
 export const FieldTypeSchema = z.enum([
   'text',
@@ -98,10 +98,20 @@ export const SettingsSchema = z.object({
   vaultTimeoutMinutes: z.number().int().min(0).max(120).default(15),
   confirmBeforePaymentFill: z.boolean().default(true),
   requiresEncryptionForCards: z.boolean().default(true),
+  showNotifications: z.boolean().default(true),
   defaultProfileId: z.string().optional(),
 });
 
 export type Settings = z.infer<typeof SettingsSchema>;
+
+export const DEFAULT_SETTINGS: Settings = {
+  language: 'en',
+  theme: 'system',
+  vaultTimeoutMinutes: 15,
+  confirmBeforePaymentFill: true,
+  requiresEncryptionForCards: true,
+  showNotifications: true,
+};
 
 export const CURRENT_VAULT_VERSION = 2;
 
@@ -111,13 +121,7 @@ export const VaultSchema = z.object({
   snippets: z.array(SnippetSchema).default([]),
   cards: z.array(CardSchema).default([]),
   siteRules: z.array(SiteRuleSchema).default([]),
-  settings: SettingsSchema.default(() => ({
-    language: 'en',
-    theme: 'system',
-    vaultTimeoutMinutes: 15,
-    confirmBeforePaymentFill: true,
-    requiresEncryptionForCards: true,
-  })),
+  settings: SettingsSchema.default(DEFAULT_SETTINGS),
 });
 
 export type Vault = z.infer<typeof VaultSchema>;
@@ -129,12 +133,6 @@ export function createEmptyVault(): Vault {
     snippets: [],
     cards: [],
     siteRules: [],
-    settings: {
-      language: 'en',
-      theme: 'system',
-      vaultTimeoutMinutes: 15,
-      confirmBeforePaymentFill: true,
-      requiresEncryptionForCards: true,
-    },
+    settings: { ...DEFAULT_SETTINGS },
   };
 }

@@ -2,7 +2,6 @@ import type { StorageAdapter } from './StorageAdapter';
 import {
   type Vault,
   type Profile,
-  type Field,
   type Card,
   type Snippet,
   type SiteRule,
@@ -14,6 +13,7 @@ import {
   SiteRuleSchema,
   createEmptyVault,
 } from '../core/schemas/vault';
+import type { EncryptedPayload } from '../types/vault';
 import { MigrationRunner } from './migrations';
 
 export class EncryptionRequiredError extends Error {
@@ -32,12 +32,14 @@ export interface RecoveryReport {
 const STORAGE_KEYS = {
   PRIMARY: 'stashfill_vault_primary',
   BACKUP: 'stashfill_vault_backup',
+  ENCRYPTED_VAULT: 'stashfill_encrypted_vault',
 } as const;
 
 export class StashRepository {
   private inMemoryCache: Vault | null = null;
+  private loadPromise: Promise<Vault> | null = null;
+  private opQueue: Promise<unknown> = Promise.resolve();
   private debounceTimeout: ReturnType<typeof setTimeout> | null = null;
-  private pendingSavePromise: Promise<void> | null = null;
   private lastRecoveryReport: RecoveryReport = {
     recovered: false,
     source: 'none',
@@ -64,6 +66,16 @@ export class StashRepository {
       return JSON.parse(JSON.stringify(this.inMemoryCache));
     }
 
+    if (!this.loadPromise) {
+      this.loadPromise = this.doLoadVault().finally(() => {
+        this.loadPromise = null;
+      });
+    }
+
+    return await this.loadPromise;
+  }
+
+  private async doLoadVault(): Promise<Vault> {
     let rawPrimary: unknown = null;
     try {
       rawPrimary = await this.storage.load(STORAGE_KEYS.PRIMARY);
@@ -71,13 +83,15 @@ export class StashRepository {
       rawPrimary = null;
     }
 
-    if (rawPrimary) {
+    if (rawPrimary !== null && rawPrimary !== undefined) {
       try {
+        if (typeof rawPrimary !== 'object') {
+          throw new Error('Primary vault data corrupted: not an object');
+        }
         const { vault } = MigrationRunner.run(rawPrimary);
         this.inMemoryCache = vault;
         return JSON.parse(JSON.stringify(vault));
       } catch {
-        // Primary corrupted or schema mismatch -> attempt recovery from backup
         return await this.recoverFromCorruptedData();
       }
     }
@@ -90,8 +104,11 @@ export class StashRepository {
       rawBackup = null;
     }
 
-    if (rawBackup) {
+    if (rawBackup !== null && rawBackup !== undefined) {
       try {
+        if (typeof rawBackup !== 'object') {
+          throw new Error('Backup vault data corrupted: not an object');
+        }
         const { vault } = MigrationRunner.run(rawBackup);
         this.inMemoryCache = vault;
         await this.storage.save(STORAGE_KEYS.PRIMARY, vault);
@@ -123,8 +140,11 @@ export class StashRepository {
       rawBackup = null;
     }
 
-    if (rawBackup) {
+    if (rawBackup !== null && rawBackup !== undefined) {
       try {
+        if (typeof rawBackup !== 'object') {
+          throw new Error('Backup corrupted');
+        }
         const { vault } = MigrationRunner.run(rawBackup);
         this.inMemoryCache = vault;
         await this.storage.save(STORAGE_KEYS.PRIMARY, vault);
@@ -168,9 +188,7 @@ export class StashRepository {
     return new Promise((resolve, reject) => {
       this.debounceTimeout = setTimeout(async () => {
         try {
-          // 1. Write to primary
           await this.storage.save(STORAGE_KEYS.PRIMARY, validated);
-          // 2. Update last-known-good backup copy
           await this.storage.save(STORAGE_KEYS.BACKUP, validated);
           resolve();
         } catch (err) {
@@ -178,6 +196,22 @@ export class StashRepository {
         }
       }, this.debounceMs);
     });
+  }
+
+  /**
+   * Serializes mutations onto an internal queue so concurrent in-memory updates
+   * are cleanly ordered and debounced.
+   */
+  private async queueMutation<T>(mutation: (vault: Vault) => Promise<T> | T): Promise<T> {
+    const next = this.opQueue.then(async () => {
+      const vault = await this.loadVault();
+      const result = await mutation(vault);
+      await this.saveVault(vault);
+      return result;
+    });
+
+    this.opQueue = next.catch(() => {});
+    return next;
   }
 
   /**
@@ -206,25 +240,21 @@ export class StashRepository {
 
   async upsertProfile(profile: Profile): Promise<Profile> {
     const validated = ProfileSchema.parse(profile);
-    const vault = await this.loadVault();
-
-    const idx = vault.profiles.findIndex((p) => p.id === validated.id);
-    if (idx >= 0) {
-      vault.profiles[idx] = validated;
-    } else {
-      vault.profiles.push(validated);
-    }
-
-    await this.saveVault(vault);
-    await this.flush();
-    return validated;
+    return this.queueMutation((vault) => {
+      const idx = vault.profiles.findIndex((p) => p.id === validated.id);
+      if (idx >= 0) {
+        vault.profiles[idx] = validated;
+      } else {
+        vault.profiles.push(validated);
+      }
+      return validated;
+    });
   }
 
   async deleteProfile(id: string): Promise<void> {
-    const vault = await this.loadVault();
-    vault.profiles = vault.profiles.filter((p) => p.id !== id);
-    await this.saveVault(vault);
-    await this.flush();
+    await this.queueMutation((vault) => {
+      vault.profiles = vault.profiles.filter((p) => p.id !== id);
+    });
   }
 
   // --- Cards CRUD with Encryption Enforcement ---
@@ -244,33 +274,28 @@ export class StashRepository {
    * Strictly enforces that encryption is active if requiresEncryptionForCards is true.
    */
   async saveCard(card: Card, isEncryptionActive = false): Promise<Card> {
-    const vault = await this.loadVault();
+    return this.queueMutation((vault) => {
+      if (vault.settings.requiresEncryptionForCards && !isEncryptionActive) {
+        throw new EncryptionRequiredError(
+          'Refusing to save payment card: vault encryption is required but inactive',
+        );
+      }
 
-    if (vault.settings.requiresEncryptionForCards && !isEncryptionActive) {
-      throw new EncryptionRequiredError(
-        'Refusing to save payment card: vault encryption is required but inactive',
-      );
-    }
-
-    const validated = CardSchema.parse(card);
-
-    const idx = vault.cards.findIndex((c) => c.id === validated.id);
-    if (idx >= 0) {
-      vault.cards[idx] = validated;
-    } else {
-      vault.cards.push(validated);
-    }
-
-    await this.saveVault(vault);
-    await this.flush();
-    return validated;
+      const validated = CardSchema.parse(card);
+      const idx = vault.cards.findIndex((c) => c.id === validated.id);
+      if (idx >= 0) {
+        vault.cards[idx] = validated;
+      } else {
+        vault.cards.push(validated);
+      }
+      return validated;
+    });
   }
 
   async deleteCard(id: string): Promise<void> {
-    const vault = await this.loadVault();
-    vault.cards = vault.cards.filter((c) => c.id !== id);
-    await this.saveVault(vault);
-    await this.flush();
+    await this.queueMutation((vault) => {
+      vault.cards = vault.cards.filter((c) => c.id !== id);
+    });
   }
 
   // --- Snippets CRUD ---
@@ -282,25 +307,21 @@ export class StashRepository {
 
   async upsertSnippet(snippet: Snippet): Promise<Snippet> {
     const validated = SnippetSchema.parse(snippet);
-    const vault = await this.loadVault();
-
-    const idx = vault.snippets.findIndex((s) => s.id === validated.id);
-    if (idx >= 0) {
-      vault.snippets[idx] = validated;
-    } else {
-      vault.snippets.push(validated);
-    }
-
-    await this.saveVault(vault);
-    await this.flush();
-    return validated;
+    return this.queueMutation((vault) => {
+      const idx = vault.snippets.findIndex((s) => s.id === validated.id);
+      if (idx >= 0) {
+        vault.snippets[idx] = validated;
+      } else {
+        vault.snippets.push(validated);
+      }
+      return validated;
+    });
   }
 
   async deleteSnippet(id: string): Promise<void> {
-    const vault = await this.loadVault();
-    vault.snippets = vault.snippets.filter((s) => s.id !== id);
-    await this.saveVault(vault);
-    await this.flush();
+    await this.queueMutation((vault) => {
+      vault.snippets = vault.snippets.filter((s) => s.id !== id);
+    });
   }
 
   // --- Site Rules CRUD ---
@@ -312,25 +333,21 @@ export class StashRepository {
 
   async upsertSiteRule(rule: SiteRule): Promise<SiteRule> {
     const validated = SiteRuleSchema.parse(rule);
-    const vault = await this.loadVault();
-
-    const idx = vault.siteRules.findIndex((r) => r.id === validated.id);
-    if (idx >= 0) {
-      vault.siteRules[idx] = validated;
-    } else {
-      vault.siteRules.push(validated);
-    }
-
-    await this.saveVault(vault);
-    await this.flush();
-    return validated;
+    return this.queueMutation((vault) => {
+      const idx = vault.siteRules.findIndex((r) => r.id === validated.id);
+      if (idx >= 0) {
+        vault.siteRules[idx] = validated;
+      } else {
+        vault.siteRules.push(validated);
+      }
+      return validated;
+    });
   }
 
   async deleteSiteRule(id: string): Promise<void> {
-    const vault = await this.loadVault();
-    vault.siteRules = vault.siteRules.filter((r) => r.id !== id);
-    await this.saveVault(vault);
-    await this.flush();
+    await this.queueMutation((vault) => {
+      vault.siteRules = vault.siteRules.filter((r) => r.id !== id);
+    });
   }
 
   // --- Settings ---
@@ -341,10 +358,87 @@ export class StashRepository {
   }
 
   async updateSettings(patch: Partial<Settings>): Promise<Settings> {
+    return this.queueMutation((vault) => {
+      vault.settings = { ...vault.settings, ...patch };
+      return vault.settings;
+    });
+  }
+
+  // --- Active Profile ---
+
+  async getActiveProfileId(): Promise<string> {
     const vault = await this.loadVault();
-    vault.settings = { ...vault.settings, ...patch };
-    await this.saveVault(vault);
+    return vault.settings.defaultProfileId || vault.profiles[0]?.id || '';
+  }
+
+  async getActiveProfile(): Promise<Profile | null> {
+    const vault = await this.loadVault();
+    const activeId = await this.getActiveProfileId();
+    return vault.profiles.find((p) => p.id === activeId) || vault.profiles[0] || null;
+  }
+
+  async setActiveProfileId(id: string): Promise<void> {
+    await this.updateSettings({ defaultProfileId: id });
+  }
+
+  // --- Export & Import ---
+
+  async exportData(includeVault = false): Promise<{
+    version: number;
+    exportedAt: number;
+    vault: Vault;
+    encryptedPayload?: EncryptedPayload | null;
+  }> {
+    const vault = await this.loadVault();
+    const encryptedPayload = includeVault ? await this.getEncryptedVault() : null;
+    return {
+      version: vault.version,
+      exportedAt: Date.now(),
+      vault,
+      encryptedPayload,
+    };
+  }
+
+  async importData(data: any): Promise<{ profileCount: number; hasVault: boolean }> {
+    if (!data || typeof data !== 'object') {
+      throw new Error('Invalid backup file');
+    }
+
+    let vaultToImport: Vault;
+    if (data.vault) {
+      const { vault } = MigrationRunner.run(data.vault);
+      vaultToImport = vault;
+    } else {
+      const { vault } = MigrationRunner.run(data);
+      vaultToImport = vault;
+    }
+
+    await this.saveVault(vaultToImport);
     await this.flush();
-    return vault.settings;
+
+    let hasVault = false;
+    if (data.encryptedPayload) {
+      await this.saveEncryptedVault(data.encryptedPayload);
+      hasVault = true;
+    }
+
+    return {
+      profileCount: vaultToImport.profiles.length,
+      hasVault,
+    };
+  }
+
+  // --- Encrypted Vault Payload (Passphrase protected) ---
+
+  async getEncryptedVault(): Promise<EncryptedPayload | null> {
+    return await this.storage.load<EncryptedPayload>(STORAGE_KEYS.ENCRYPTED_VAULT);
+  }
+
+  async saveEncryptedVault(payload: EncryptedPayload): Promise<void> {
+    await this.storage.save(STORAGE_KEYS.ENCRYPTED_VAULT, payload);
+  }
+
+  async clearEncryptedVault(): Promise<void> {
+    await this.storage.save(STORAGE_KEYS.ENCRYPTED_VAULT, null);
   }
 }

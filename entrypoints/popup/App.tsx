@@ -3,8 +3,8 @@ import { browser } from 'wxt/browser';
 import { LocalStorageAdapter } from '../../src/storage/LocalStorageAdapter';
 import { StashRepository } from '../../src/storage/StashRepository';
 import { VaultManager } from '../../src/vault/vaultManager';
-import { type Profile } from '../../src/types/profile';
-import { type Settings, DEFAULT_SETTINGS } from '../../src/types/settings';
+import { type Profile, type Settings, DEFAULT_SETTINGS } from '../../src/core/schemas/vault';
+import { createPersonalTemplate } from '../../src/core/templates';
 import { type PaymentCard, maskCardNumber } from '../../src/types/vault';
 import { getTranslations, formatString, type Language } from '../../src/i18n';
 import { StashItemRow } from '../../src/components/StashItemRow';
@@ -46,15 +46,21 @@ export function App() {
   // Load initial data
   useEffect(() => {
     async function load() {
-      const [allProfiles, active, curSettings, isInit] = await Promise.all([
-        repo.getProfiles(),
+      let allProfiles = await repo.getProfiles();
+      if (allProfiles.length === 0) {
+        const initialProfile = createPersonalTemplate('Personal');
+        await repo.upsertProfile(initialProfile);
+        allProfiles = [initialProfile];
+      }
+
+      const [active, curSettings, isInit] = await Promise.all([
         repo.getActiveProfile(),
         repo.getSettings(),
         vaultManager.isInitialized(),
       ]);
 
       setProfiles(allProfiles);
-      setActiveProfile(active);
+      setActiveProfile(active || allProfiles[0] || null);
       setSettings(curSettings);
       setVaultInitialized(isInit);
 
@@ -217,145 +223,32 @@ export function App() {
 
   // Flat list of profile items for search and keyboard navigation
   const visibleItems = useMemo(() => {
-    if (!activeProfile) return [];
+    if (!activeProfile || !activeProfile.fields) return [];
 
-    const items: { id: string; label: string; value: string; group: string }[] = [];
+    const items: { id: string; label: string; value: string; group: string; key: string }[] = [];
 
-    // Personal
-    if (activeProfile.fullName)
-      items.push({
-        id: 'fullName',
-        label: t.fields.fullName,
-        value: activeProfile.fullName,
-        group: t.sections.personal,
-      });
-    if (activeProfile.firstName)
-      items.push({
-        id: 'firstName',
-        label: t.fields.firstName,
-        value: activeProfile.firstName,
-        group: t.sections.personal,
-      });
-    if (activeProfile.lastName)
-      items.push({
-        id: 'lastName',
-        label: t.fields.lastName,
-        value: activeProfile.lastName,
-        group: t.sections.personal,
-      });
-
-    // Contact
-    if (activeProfile.email)
-      items.push({
-        id: 'email',
-        label: t.fields.email,
-        value: activeProfile.email,
-        group: t.sections.contact,
-      });
-    if (activeProfile.phone)
-      items.push({
-        id: 'phone',
-        label: t.fields.phone,
-        value: activeProfile.phone,
-        group: t.sections.contact,
-      });
-    if (activeProfile.altPhone)
-      items.push({
-        id: 'altPhone',
-        label: t.fields.altPhone,
-        value: activeProfile.altPhone,
-        group: t.sections.contact,
-      });
-
-    // Address
-    if (activeProfile.address1)
-      items.push({
-        id: 'address1',
-        label: t.fields.address1,
-        value: activeProfile.address1,
-        group: t.sections.address,
-      });
-    if (activeProfile.address2)
-      items.push({
-        id: 'address2',
-        label: t.fields.address2,
-        value: activeProfile.address2,
-        group: t.sections.address,
-      });
-    if (activeProfile.city)
-      items.push({
-        id: 'city',
-        label: t.fields.city,
-        value: activeProfile.city,
-        group: t.sections.address,
-      });
-    if (activeProfile.state)
-      items.push({
-        id: 'state',
-        label: t.fields.state,
-        value: activeProfile.state,
-        group: t.sections.address,
-      });
-    if (activeProfile.postalCode)
-      items.push({
-        id: 'postalCode',
-        label: t.fields.postalCode,
-        value: activeProfile.postalCode,
-        group: t.sections.address,
-      });
-    if (activeProfile.country)
-      items.push({
-        id: 'country',
-        label: t.fields.country,
-        value: activeProfile.country,
-        group: t.sections.address,
-      });
-
-    // Links
-    if (activeProfile.website)
-      items.push({
-        id: 'website',
-        label: t.fields.website,
-        value: activeProfile.website,
-        group: t.sections.links,
-      });
-    if (activeProfile.github)
-      items.push({
-        id: 'github',
-        label: t.fields.github,
-        value: activeProfile.github,
-        group: t.sections.links,
-      });
-    if (activeProfile.linkedin)
-      items.push({
-        id: 'linkedin',
-        label: t.fields.linkedin,
-        value: activeProfile.linkedin,
-        group: t.sections.links,
-      });
-    if (activeProfile.twitter)
-      items.push({
-        id: 'twitter',
-        label: t.fields.twitter,
-        value: activeProfile.twitter,
-        group: t.sections.links,
-      });
-
-    // Custom Fields
-    activeProfile.customFields.forEach((cf) => {
-      items.push({
-        id: `custom_${cf.id}`,
-        label: cf.label,
-        value: cf.value,
-        group: t.sections.custom,
-      });
-    });
+    for (const field of activeProfile.fields) {
+      if (field.value && field.value.trim().length > 0) {
+        items.push({
+          id: field.id,
+          label: field.label,
+          value: field.value,
+          group: field.category
+            ? field.category.charAt(0).toUpperCase() + field.category.slice(1)
+            : t.sections.personal,
+          key: field.key,
+        });
+      }
+    }
 
     if (!searchQuery.trim()) return items;
 
     const q = searchQuery.toLowerCase();
     return items.filter(
-      (item) => item.label.toLowerCase().includes(q) || item.value.toLowerCase().includes(q),
+      (item) =>
+        item.label.toLowerCase().includes(q) ||
+        item.value.toLowerCase().includes(q) ||
+        item.group.toLowerCase().includes(q),
     );
   }, [activeProfile, searchQuery, t]);
 
@@ -479,7 +372,7 @@ export function App() {
           >
             {profiles.map((p) => (
               <option key={p.id} value={p.id}>
-                {p.name} {p.isDefault ? '★' : ''}
+                {p.name} {settings.defaultProfileId === p.id ? '★' : ''}
               </option>
             ))}
           </select>

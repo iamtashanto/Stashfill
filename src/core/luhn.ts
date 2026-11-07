@@ -1,12 +1,5 @@
 export type CardBrand =
-  | 'visa'
-  | 'mastercard'
-  | 'amex'
-  | 'discover'
-  | 'jcb'
-  | 'diners'
-  | 'unionpay'
-  | 'other';
+  'visa' | 'mastercard' | 'amex' | 'discover' | 'jcb' | 'diners' | 'unionpay' | 'other';
 
 /**
  * Validates a card number using the Luhn checksum formula (Mod 10).

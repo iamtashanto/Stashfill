@@ -33,7 +33,9 @@ export const CanonicalKeySchema = z.enum(CANONICAL_KEYS);
  */
 export const FieldKeySchema = z.string().refine(
   (val) => {
-    return CANONICAL_KEYS.includes(val as CanonicalKey) || val.startsWith('custom') || val.length > 0;
+    return (
+      CANONICAL_KEYS.includes(val as CanonicalKey) || val.startsWith('custom') || val.length > 0
+    );
   },
   { message: 'Invalid field key' },
 );

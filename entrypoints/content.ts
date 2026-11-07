@@ -5,8 +5,8 @@ import {
   extractFieldAttributes,
   isFillable,
   type FillableElement,
-} from '../src/filler/domFiller';
-import { matchProfileField } from '../src/filler/matcher';
+} from '../src/fill';
+import { matchProfileField } from '../src/matcher';
 import type { ExtensionMessage } from '../src/types/messages';
 import { browser } from 'wxt/browser';
 
