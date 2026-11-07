@@ -18,5 +18,11 @@ export default defineConfig({
     action: {
       default_title: '__MSG_actionTitle__',
     },
+    browser_specific_settings: {
+      gecko: {
+        id: 'stashfill@stashfill.org',
+        strict_min_version: '109.0',
+      },
+    },
   },
 });
