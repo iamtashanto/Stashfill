@@ -48,3 +48,4 @@ if (result.status !== 0) {
 }
 
 console.log(`\nSuccessfully created clean sources zip at:\n${ZIP_PATH}\n`);
+
