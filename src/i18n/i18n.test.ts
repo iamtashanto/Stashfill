@@ -40,4 +40,3 @@ describe('i18n', () => {
     expect(formatted).toBe('Filled 5 fields in 2 minutes!');
   });
 });
-

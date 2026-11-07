@@ -6,4 +6,3 @@ const root = document.getElementById('root');
 if (root) {
   render(<App />, root);
 }
-

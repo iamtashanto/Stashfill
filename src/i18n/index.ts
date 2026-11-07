@@ -20,4 +20,3 @@ export function formatString(template: string, params: Record<string, string | n
     return params[key] !== undefined ? String(params[key]) : `{${key}}`;
   });
 }
-

@@ -19,4 +19,3 @@ export type ExtensionMessage =
       hasFocusedInput: boolean;
       fieldTypeGuess?: string;
     };
-

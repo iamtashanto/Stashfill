@@ -127,4 +127,3 @@ export const bn: Translations = {
     cardDeleted: 'কার্ড মুছে ফেলা হয়েছে।',
   },
 };
-

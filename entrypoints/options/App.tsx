@@ -154,7 +154,9 @@ export function App() {
 
   const isProfileDefault = (p: Profile | null) => {
     if (!p) return false;
-    return settings.defaultProfileId ? settings.defaultProfileId === p.id : profiles[0]?.id === p.id;
+    return settings.defaultProfileId
+      ? settings.defaultProfileId === p.id
+      : profiles[0]?.id === p.id;
   };
 
   const applyTheme = (theme: 'system' | 'light' | 'dark') => {
@@ -322,7 +324,10 @@ export function App() {
       expMonth,
       expYear,
       cvv: cvv.trim(),
-      brand: (brand === 'visa' || brand === 'mastercard' || brand === 'amex' || brand === 'discover') ? brand : 'other',
+      brand:
+        brand === 'visa' || brand === 'mastercard' || brand === 'amex' || brand === 'discover'
+          ? brand
+          : 'other',
       createdAt: Date.now(),
     };
 

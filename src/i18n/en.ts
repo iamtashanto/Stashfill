@@ -133,4 +133,3 @@ export const en = {
 };
 
 export type Translations = typeof en;
-

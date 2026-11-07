@@ -158,4 +158,3 @@ describe('Data Model Zod Schemas', () => {
     expect(parsed.settings.requiresEncryptionForCards).toBe(true);
   });
 });
-

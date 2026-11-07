@@ -6,4 +6,3 @@ export default defineContentScript({
     // Mounts an isolated container to display inline quick-actions
   },
 });
-

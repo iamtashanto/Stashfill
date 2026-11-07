@@ -68,4 +68,3 @@ describe('ConfirmModal Component', () => {
     expect(onCancel).not.toHaveBeenCalled();
   });
 });
-
