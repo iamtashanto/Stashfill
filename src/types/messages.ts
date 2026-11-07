@@ -77,4 +77,5 @@ export type ExtensionMessage =
       type: 'FOCUSED_INPUT_INFO_RESPONSE';
       hasFocusedInput: boolean;
       fieldTypeGuess?: string;
-    };
+    }
+  | { type: 'SCHEDULE_CLIPBOARD_CLEAR'; value: string; delayMs?: number };

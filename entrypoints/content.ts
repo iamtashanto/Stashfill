@@ -924,6 +924,30 @@ export default defineContentScript({
           return true;
         }
 
+        case 'SCHEDULE_CLIPBOARD_CLEAR': {
+          const val = (msg as unknown as { value?: string }).value;
+          const delay = (msg as unknown as { delayMs?: number }).delayMs ?? 15000;
+          if (typeof val === 'string' && val.length > 0) {
+            setTimeout(async () => {
+              try {
+                if (navigator.clipboard?.readText) {
+                  try {
+                    const current = await navigator.clipboard.readText();
+                    if (current !== val) return;
+                  } catch {
+                    // ignore
+                  }
+                }
+                await navigator.clipboard.writeText('');
+              } catch {
+                // ignore
+              }
+            }, delay);
+          }
+          sendResponse({ success: true });
+          return true;
+        }
+
         case 'OPEN_QUICK_PICKER': {
           openQuickPickerModal(msg.profiles, msg.snippets, msg.activeProfileId);
           sendResponse({ success: true });

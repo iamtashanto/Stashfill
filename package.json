@@ -1,6 +1,6 @@
 {
   "name": "stashfill",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "description": "Offline, no-login, privacy-first autofill and quick-paste browser extension",
   "private": true,
   "type": "module",

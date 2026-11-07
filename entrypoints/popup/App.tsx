@@ -314,6 +314,20 @@ export function App({ repository, vaultMgr }: PopupProps = {}) {
       return;
     }
     const ok = await copyCardNumberWithAutoClear(cardNumber, 15000);
+    try {
+      const tabs = await browser.tabs.query({ active: true, currentWindow: true });
+      if (tabs[0]?.id) {
+        browser.tabs
+          .sendMessage(tabs[0].id, {
+            type: 'SCHEDULE_CLIPBOARD_CLEAR',
+            value: cardNumber,
+            delayMs: 15000,
+          })
+          .catch(() => {});
+      }
+    } catch {
+      // ignore
+    }
     if (ok) {
       showToast(t.vault.cardCopiedAutoClear, 'success');
     } else {
@@ -349,6 +363,20 @@ export function App({ repository, vaultMgr }: PopupProps = {}) {
         setRevealedCardIds((prev) => ({ ...prev, [pending.cardId]: true }));
       } else if (pending.kind === 'copy') {
         await copyCardNumberWithAutoClear(pending.cardNumber, 15000);
+        try {
+          const tabs = await browser.tabs.query({ active: true, currentWindow: true });
+          if (tabs[0]?.id) {
+            browser.tabs
+              .sendMessage(tabs[0].id, {
+                type: 'SCHEDULE_CLIPBOARD_CLEAR',
+                value: pending.cardNumber,
+                delayMs: 15000,
+              })
+              .catch(() => {});
+          }
+        } catch {
+          // ignore
+        }
         showToast(t.vault.cardCopiedAutoClear, 'success');
       } else if (pending.kind === 'fill') {
         setEphemeralCvv('');
@@ -374,10 +402,20 @@ export function App({ repository, vaultMgr }: PopupProps = {}) {
         card,
         confirmed: true,
         ephemeralCvv: oneTimeCvv?.trim() || undefined,
-      })) as { success: boolean; count?: number };
+      })) as {
+        success: boolean;
+        count?: number;
+        error?: string;
+        hasCrossOriginPaymentIframe?: boolean;
+      };
 
       if (res && res.success && res.count && res.count > 0) {
         showToast(formatString(t.actions.filled, { count: res.count }), 'success');
+      } else if (res && !res.success && res.error) {
+        showToast(res.error, 'error');
+      } else if (res && res.hasCrossOriginPaymentIframe) {
+        showToast('Payment iframe detected. Copying card number with 15s auto-clear...', 'info');
+        await copyCardNumberWithAutoClear(card.cardNumber, 15000);
       } else {
         showToast(t.messages.noFormFound, 'info');
       }

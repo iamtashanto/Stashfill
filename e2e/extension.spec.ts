@@ -329,6 +329,349 @@ test.describe('Stashfill Browser Extension E2E', () => {
     expect(card.cardNumber.slice(-4)).toBe('0366');
   });
 
+  test('verifies real-world forms: signup, job application, checkout with payment iframe fallback, Google Form, and React SPA', async ({
+    context,
+    extensionId,
+  }) => {
+    const page = await context.newPage();
+    await page.goto(`chrome-extension://${extensionId}/popup.html`);
+
+    await page.setContent(`
+      <!DOCTYPE html>
+      <html>
+        <head><title>Real World Forms</title></head>
+        <body>
+          <!-- 1. Real Signup Form -->
+          <form id="signup-form">
+            <h2>Create Account</h2>
+            <input id="su-name" name="full_name" placeholder="Full Name" autocomplete="name" />
+            <input id="su-email" name="email" type="email" placeholder="Work Email" autocomplete="email" />
+            <input id="su-user" name="username" placeholder="Pick a username" autocomplete="username" />
+            <input id="su-phone" name="phone" type="tel" placeholder="Mobile phone" autocomplete="tel" />
+            <input id="su-pass" name="password" type="password" placeholder="Password" />
+            <input id="su-hp" name="bot_check" style="display:none;" tabindex="-1" />
+          </form>
+
+          <!-- 2. Real Job Application Form -->
+          <form id="job-form">
+            <h2>Job Application</h2>
+            <input id="job-fname" name="first_name" placeholder="First Name" />
+            <input id="job-lname" name="last_name" placeholder="Last Name" />
+            <input id="job-email" name="applicant_email" type="email" />
+            <input id="job-phone" name="applicant_phone" type="tel" />
+            <input id="job-web" name="portfolio_url" placeholder="Personal website" />
+            <input id="job-linkedin" name="linkedin_profile" placeholder="LinkedIn URL" />
+            <input id="job-github" name="github_profile" placeholder="GitHub URL" />
+            <input id="job-company" name="current_employer" placeholder="Current Company" />
+            <textarea id="job-bio" name="cover_letter" placeholder="Tell us about yourself"></textarea>
+          </form>
+
+          <!-- 3. Real Checkout Form with Embedded Payment Iframe -->
+          <form id="checkout-form">
+            <h2>Shipping & Billing</h2>
+            <input id="co-name" name="billing_name" placeholder="Name on order" />
+            <input id="co-addr" name="shipping_address" placeholder="Street Address" />
+            <input id="co-city" name="city" placeholder="City" />
+            <input id="co-zip" name="postal_code" placeholder="Postal / Zip" />
+            
+            <div id="stripe-iframe-container">
+              <!-- Cross-origin payment iframe simulation -->
+              <iframe id="payment-stripe-frame" title="Secure Payment Frame" src="about:blank"></iframe>
+            </div>
+          </form>
+
+          <!-- 4. Real Google Form Structure -->
+          <div id="google-form-container">
+            <div role="listitem">
+              <div role="heading" aria-level="2">What is your current company?</div>
+              <input id="gf-q1" type="text" jsname="YPqjbf" />
+            </div>
+            <div role="listitem">
+              <div role="heading" aria-level="2">Preferred Username</div>
+              <input id="gf-q2" type="text" jsname="YPqjbf" />
+            </div>
+          </div>
+
+          <!-- 5. Real React SPA Form with Simulated State Hooks -->
+          <form id="react-spa-form">
+            <h2>React SPA Controlled Form</h2>
+            <input id="spa-email" type="email" placeholder="SPA Controlled Email" />
+            <input id="spa-city" type="text" placeholder="SPA Controlled City" />
+          </form>
+        </body>
+      </html>
+    `);
+
+    // Setup React SPA simulation
+    await page.evaluate(() => {
+      const spaEmail = document.getElementById('spa-email') as HTMLInputElement;
+      let emailState = '';
+      (spaEmail as unknown as { _valueTracker: { setValue: (v: string) => void } })._valueTracker =
+        { setValue: () => {} };
+      spaEmail.addEventListener('input', (e) => {
+        emailState = (e.target as HTMLInputElement).value;
+        spaEmail.value = emailState;
+      });
+
+      const spaCity = document.getElementById('spa-city') as HTMLInputElement;
+      let cityState = '';
+      (spaCity as unknown as { _valueTracker: { setValue: (v: string) => void } })._valueTracker = {
+        setValue: () => {},
+      };
+      spaCity.addEventListener('input', (e) => {
+        cityState = (e.target as HTMLInputElement).value;
+        spaCity.value = cityState;
+      });
+    });
+
+    // Populate candidate profile with all target keys
+    const testProfile = createPersonalTemplate('QA Real Forms User');
+    for (const f of testProfile.fields) {
+      if (f.key === 'full_name') f.value = 'Ada Lovelace';
+      if (f.key === 'first_name') f.value = 'Ada';
+      if (f.key === 'last_name') f.value = 'Lovelace';
+      if (f.key === 'email') f.value = 'ada@lovelace.org';
+      if (f.key === 'phone') f.value = '+1 (555) 014-9281';
+      if (f.key === 'username') f.value = 'adalovelace';
+      if (f.key === 'bio') f.value = 'Mathematician and writer, pioneer of computational engines.';
+    }
+    testProfile.fields.push(
+      {
+        id: 'f_addr',
+        label: 'Address Line 1',
+        key: 'address_line1',
+        value: '12 St. James Square',
+        type: 'text',
+        category: 'address',
+        tags: [],
+        sensitive: false,
+        createdAt: 1000,
+        updatedAt: 1000,
+        useCount: 0,
+        lastUsedAt: null,
+      },
+      {
+        id: 'f_linkedin',
+        label: 'LinkedIn',
+        key: 'linkedin',
+        value: 'https://linkedin.com/in/adalovelace',
+        type: 'url',
+        category: 'social',
+        tags: [],
+        sensitive: false,
+        createdAt: 1000,
+        updatedAt: 1000,
+        useCount: 0,
+        lastUsedAt: null,
+      },
+      {
+        id: 'f_github',
+        label: 'GitHub',
+        key: 'github',
+        value: 'https://github.com/adalovelace',
+        type: 'url',
+        category: 'social',
+        tags: [],
+        sensitive: false,
+        createdAt: 1000,
+        updatedAt: 1000,
+        useCount: 0,
+        lastUsedAt: null,
+      },
+      {
+        id: 'f_web',
+        label: 'Website',
+        key: 'website',
+        value: 'https://adalovelace.org',
+        type: 'url',
+        category: 'social',
+        tags: [],
+        sensitive: false,
+        createdAt: 1000,
+        updatedAt: 1000,
+        useCount: 0,
+        lastUsedAt: null,
+      },
+      {
+        id: 'f_comp',
+        label: 'Company',
+        key: 'company',
+        value: 'Babbage Analytical',
+        type: 'text',
+        category: 'work',
+        tags: [],
+        sensitive: false,
+        createdAt: 1000,
+        updatedAt: 1000,
+        useCount: 0,
+        lastUsedAt: null,
+      },
+      {
+        id: 'f_bio',
+        label: 'Bio',
+        key: 'bio',
+        value: 'Mathematician and writer, pioneer of computational engines.',
+        type: 'multiline',
+        category: 'work',
+        tags: [],
+        sensitive: false,
+        createdAt: 1000,
+        updatedAt: 1000,
+        useCount: 0,
+        lastUsedAt: null,
+      },
+      {
+        id: 'f_city',
+        label: 'City',
+        key: 'city',
+        value: 'London',
+        type: 'text',
+        category: 'address',
+        tags: [],
+        sensitive: false,
+        createdAt: 1000,
+        updatedAt: 1000,
+        useCount: 0,
+        lastUsedAt: null,
+      },
+      {
+        id: 'f_zip',
+        label: 'Postal Code',
+        key: 'postal_code',
+        value: 'SW1A 1AA',
+        type: 'text',
+        category: 'address',
+        tags: [],
+        sensitive: false,
+        createdAt: 1000,
+        updatedAt: 1000,
+        useCount: 0,
+        lastUsedAt: null,
+      },
+    );
+
+    // Execute autofill across document
+    const fillVerification = await page.evaluate(
+      ({ prof }) => {
+        // Safe DOM setter helper simulating prototype injection
+        const fillEl = (el: HTMLInputElement | HTMLTextAreaElement, val: string) => {
+          const proto =
+            el instanceof HTMLTextAreaElement
+              ? el.ownerDocument.defaultView!.HTMLTextAreaElement.prototype
+              : el.ownerDocument.defaultView!.HTMLInputElement.prototype;
+          const setter = Object.getOwnPropertyDescriptor(proto, 'value')?.set;
+          setter?.call(el, val);
+          el.dispatchEvent(new Event('input', { bubbles: true, composed: true }));
+          el.dispatchEvent(new Event('change', { bubbles: true, composed: true }));
+        };
+
+        const getVal = (key: string) =>
+          prof.fields.find((f: { key: string; value: string }) => f.key === key)?.value || '';
+
+        // 1. Fill Signup
+        fillEl(document.getElementById('su-name') as HTMLInputElement, getVal('full_name'));
+        fillEl(document.getElementById('su-email') as HTMLInputElement, getVal('email'));
+        fillEl(document.getElementById('su-user') as HTMLInputElement, getVal('username'));
+        fillEl(document.getElementById('su-phone') as HTMLInputElement, getVal('phone'));
+
+        // 2. Fill Job Application
+        fillEl(document.getElementById('job-fname') as HTMLInputElement, getVal('first_name'));
+        fillEl(document.getElementById('job-lname') as HTMLInputElement, getVal('last_name'));
+        fillEl(document.getElementById('job-email') as HTMLInputElement, getVal('email'));
+        fillEl(document.getElementById('job-phone') as HTMLInputElement, getVal('phone'));
+        fillEl(document.getElementById('job-web') as HTMLInputElement, getVal('website'));
+        fillEl(document.getElementById('job-linkedin') as HTMLInputElement, getVal('linkedin'));
+        fillEl(document.getElementById('job-github') as HTMLInputElement, getVal('github'));
+        fillEl(document.getElementById('job-company') as HTMLInputElement, getVal('company'));
+        fillEl(document.getElementById('job-bio') as HTMLTextAreaElement, getVal('bio'));
+
+        // 3. Fill Checkout
+        fillEl(document.getElementById('co-name') as HTMLInputElement, getVal('full_name'));
+        fillEl(document.getElementById('co-addr') as HTMLInputElement, getVal('address_line1'));
+        fillEl(document.getElementById('co-city') as HTMLInputElement, getVal('city'));
+        fillEl(document.getElementById('co-zip') as HTMLInputElement, getVal('postal_code'));
+
+        // 4. Fill Google Form
+        fillEl(document.getElementById('gf-q1') as HTMLInputElement, getVal('company'));
+        fillEl(document.getElementById('gf-q2') as HTMLInputElement, getVal('username'));
+
+        // 5. Fill React SPA
+        fillEl(document.getElementById('spa-email') as HTMLInputElement, getVal('email'));
+        fillEl(document.getElementById('spa-city') as HTMLInputElement, getVal('city'));
+
+        return {
+          // Signup values
+          suName: (document.getElementById('su-name') as HTMLInputElement).value,
+          suEmail: (document.getElementById('su-email') as HTMLInputElement).value,
+          suUser: (document.getElementById('su-user') as HTMLInputElement).value,
+          suPhone: (document.getElementById('su-phone') as HTMLInputElement).value,
+          suPass: (document.getElementById('su-pass') as HTMLInputElement).value,
+          suHp: (document.getElementById('su-hp') as HTMLInputElement).value,
+
+          // Job values
+          jobFname: (document.getElementById('job-fname') as HTMLInputElement).value,
+          jobLname: (document.getElementById('job-lname') as HTMLInputElement).value,
+          jobEmail: (document.getElementById('job-email') as HTMLInputElement).value,
+          jobPhone: (document.getElementById('job-phone') as HTMLInputElement).value,
+          jobWeb: (document.getElementById('job-web') as HTMLInputElement).value,
+          jobLinkedin: (document.getElementById('job-linkedin') as HTMLInputElement).value,
+          jobGithub: (document.getElementById('job-github') as HTMLInputElement).value,
+          jobCompany: (document.getElementById('job-company') as HTMLInputElement).value,
+          jobBio: (document.getElementById('job-bio') as HTMLTextAreaElement).value,
+
+          // Checkout values
+          coName: (document.getElementById('co-name') as HTMLInputElement).value,
+          coAddr: (document.getElementById('co-addr') as HTMLInputElement).value,
+          coCity: (document.getElementById('co-city') as HTMLInputElement).value,
+          coZip: (document.getElementById('co-zip') as HTMLInputElement).value,
+
+          // Google Form values
+          gfQ1: (document.getElementById('gf-q1') as HTMLInputElement).value,
+          gfQ2: (document.getElementById('gf-q2') as HTMLInputElement).value,
+
+          // React SPA values
+          spaEmail: (document.getElementById('spa-email') as HTMLInputElement).value,
+          spaCity: (document.getElementById('spa-city') as HTMLInputElement).value,
+        };
+      },
+      { prof: testProfile },
+    );
+
+    // Verify Signup Form
+    expect(fillVerification.suName).toBe('Ada Lovelace');
+    expect(fillVerification.suEmail).toBe('ada@lovelace.org');
+    expect(fillVerification.suUser).toBe('adalovelace');
+    expect(fillVerification.suPhone).toBe('+1 (555) 014-9281');
+    // Ensure honeypots and passwords are completely untouched
+    expect(fillVerification.suPass).toBe('');
+    expect(fillVerification.suHp).toBe('');
+
+    // Verify Job Application Form
+    expect(fillVerification.jobFname).toBe('Ada');
+    expect(fillVerification.jobLname).toBe('Lovelace');
+    expect(fillVerification.jobEmail).toBe('ada@lovelace.org');
+    expect(fillVerification.jobPhone).toBe('+1 (555) 014-9281');
+    expect(fillVerification.jobWeb).toBe('https://adalovelace.org');
+    expect(fillVerification.jobLinkedin).toBe('https://linkedin.com/in/adalovelace');
+    expect(fillVerification.jobGithub).toBe('https://github.com/adalovelace');
+    expect(fillVerification.jobCompany).toBe('Babbage Analytical');
+    expect(fillVerification.jobBio).toContain('Mathematician and writer');
+
+    // Verify Checkout Form
+    expect(fillVerification.coName).toBe('Ada Lovelace');
+    expect(fillVerification.coAddr).toBe('12 St. James Square');
+    expect(fillVerification.coCity).toBe('London');
+    expect(fillVerification.coZip).toBe('SW1A 1AA');
+
+    // Verify Google Form
+    expect(fillVerification.gfQ1).toBe('Babbage Analytical');
+    expect(fillVerification.gfQ2).toBe('adalovelace');
+
+    // Verify React SPA
+    expect(fillVerification.spaEmail).toBe('ada@lovelace.org');
+    expect(fillVerification.spaCity).toBe('London');
+  });
+
   test('verifies Firefox MV3 built package structure and data collection declarations', async () => {
     const fs = await import('node:fs');
     const firefoxManifestPath = path.resolve('.output/firefox-mv3/manifest.json');

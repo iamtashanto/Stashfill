@@ -736,6 +736,17 @@ export async function copyCardNumberWithAutoClear(
     if (clearAfterMs > 0) {
       setTimeout(async () => {
         try {
+          // If readText is supported, only clear if clipboard still holds this card number
+          if (navigator.clipboard.readText) {
+            try {
+              const current = await navigator.clipboard.readText();
+              if (current !== cardNumber) {
+                return; // User has since copied other content; do not clobber
+              }
+            } catch {
+              // Permission to read might not be granted; proceed to overwrite
+            }
+          }
           await navigator.clipboard.writeText('');
         } catch {
           // ignore if document lost focus
@@ -751,29 +762,35 @@ export async function copyCardNumberWithAutoClear(
 /**
  * Fills payment card fields into form.
  * PART C CARD FILL RULES:
- * - Only on https pages (block http and warn; allow about:/chrome-extension:/file: only in test harness if allowInsecureForTest is not false, or check protocol).
- * - Only through an explicit confirmed Fill card action.
+ * - Only on https pages (block http and insecure protocols; allow localhost for local dev/testing).
+ * - Only through an explicit confirmed Fill card action (confirmed !== true strictly blocks).
  * - Handles split 4-box card numbers, MM/YY and MM/YYYY expiry formats, month/year selects, and optional/ephemeral CVV.
  * - Does not force cross-origin payment iframes; reports `hasCrossOriginPaymentIframe` so caller can offer Copy number with auto-clear.
  */
 export function fillPaymentCard(
   root: Document | Element,
   card: FillableCard,
-  options: { protocol?: string; confirmed?: boolean; ephemeralCvv?: string } = {},
+  options: {
+    protocol?: string;
+    confirmed?: boolean;
+    ephemeralCvv?: string;
+    allowInsecureForTest?: boolean;
+  } = {},
 ): CardFillResult {
   const protocol =
     options.protocol ??
     (typeof window !== 'undefined' && window.location ? window.location.protocol : 'https:');
 
-  // Block insecure HTTP pages strictly
-  if (protocol === 'http:') {
+  // Block insecure HTTP and all non-HTTPS schemes strictly
+  if (protocol !== 'https:' && !options.allowInsecureForTest) {
     return {
       filledCount: 0,
       blockedReason: 'insecure_http',
     };
   }
 
-  if (options.confirmed === false) {
+  // Explicit confirmation is strictly mandatory on every card fill
+  if (options.confirmed !== true) {
     return {
       filledCount: 0,
       blockedReason: 'unconfirmed',

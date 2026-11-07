@@ -86,6 +86,12 @@ describe('Import, Export, and Automatic Local Backups', () => {
     expect(csvText).toContain('Full Name,Ada Lovelace,full_name,personal,Personal,false');
     expect(csvText).not.toContain('4532015112830366');
     expect(csvText).not.toContain('Secret Visa');
+
+    // Verify CSV formula injection neutralization
+    expect(escapeCsvCell('=SUM(A1:A10)')).toBe("'=SUM(A1:A10)");
+    expect(escapeCsvCell('+cmd|')).toBe("'+cmd|");
+    expect(escapeCsvCell('-123')).toBe("'-123");
+    expect(escapeCsvCell('@eval')).toBe("'@eval");
   });
 
   it('completes encrypted export and decrypt round-trip including encrypted vault cards', async () => {

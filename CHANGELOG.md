@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.0] - 2026-11-07
+
+### Added
+
+- Comprehensive security audit (`AUDIT.md`) with senior reviewer sign-off.
+- Real-world forms verification suite in Playwright E2E: Signup, Job Application, Checkout with embedded payment iframe fallback, Google Form, and React SPA.
+- Iteration downgrade protection in `decryptVault` enforcing $\ge 600,000$ iterations at the cryptographic core.
+- OWASP-compliant CSV formula injection protection prepending `'` to spreadsheet formula trigger tokens (`=,+,-,@,\t,\r,%`).
+- Cross-context 15-second clipboard auto-clear coordination between popup and active tab content script.
+- Strict HTTPS requirement for payment card filling, blocking insecure HTTP and non-HTTPS origins.
+- Mandatory explicit user confirmation gate for card autofill (`options.confirmed === true`).
+- Production packages built for Chrome MV3, Edge MV3, Firefox MV3, and clean AMO source archive (`stashfill-sources.zip`).
+
 ## [0.1.0] - 2026-11-07
 
 ### Added

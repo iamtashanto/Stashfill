@@ -97,6 +97,14 @@ export async function encryptVault(
  * Throws VaultDecryptionError if the passphrase is wrong or the ciphertext is tampered.
  */
 export async function decryptVault(payload: EncryptedPayload, passphrase: string): Promise<string> {
+  if (!payload || typeof payload !== 'object') {
+    throw new VaultDecryptionError('Invalid vault payload format');
+  }
+  if (!payload.iterations || payload.iterations < 600_000) {
+    throw new VaultDecryptionError(
+      'Inadequate cryptographic strength: iteration count below 600,000 threshold',
+    );
+  }
   try {
     const salt = new Uint8Array(base64ToArrayBuffer(payload.salt));
     const iv = new Uint8Array(base64ToArrayBuffer(payload.iv));

@@ -246,7 +246,7 @@ describe('DOM Filler Engine, Card Rules, Snippets, and Context Menu Triggers', (
       createdAt: Date.now(),
     };
 
-    // 1. Blocked on insecure HTTP
+    // 1. Blocked on insecure HTTP and non-HTTPS schemes
     const httpRes = fillPaymentCard(document, cardWithoutCvv, {
       protocol: 'http:',
       confirmed: true,
@@ -255,13 +255,26 @@ describe('DOM Filler Engine, Card Rules, Snippets, and Context Menu Triggers', (
     expect(httpRes.blockedReason).toBe('insecure_http');
     expect((document.getElementById('cc-1') as HTMLInputElement).value).toBe('');
 
-    // 2. Blocked when confirmed === false
+    const fileRes = fillPaymentCard(document, cardWithoutCvv, {
+      protocol: 'file:',
+      confirmed: true,
+    });
+    expect(fileRes.filledCount).toBe(0);
+    expect(fileRes.blockedReason).toBe('insecure_http');
+
+    // 2. Blocked when confirmed is false or omitted
     const unconfirmedRes = fillPaymentCard(document, cardWithoutCvv, {
       protocol: 'https:',
       confirmed: false,
     });
     expect(unconfirmedRes.filledCount).toBe(0);
     expect(unconfirmedRes.blockedReason).toBe('unconfirmed');
+
+    const omittedConfirmRes = fillPaymentCard(document, cardWithoutCvv, {
+      protocol: 'https:',
+    });
+    expect(omittedConfirmRes.filledCount).toBe(0);
+    expect(omittedConfirmRes.blockedReason).toBe('unconfirmed');
 
     // 3. Allowed on HTTPS with confirmation: fills 4 split boxes + MM/YYYY expiry + cardholder, leaves CVV empty
     const httpsRes = fillPaymentCard(document, cardWithoutCvv, {

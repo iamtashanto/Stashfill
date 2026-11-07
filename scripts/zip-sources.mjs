@@ -21,21 +21,40 @@ if (existsSync(ZIP_PATH)) {
 
 console.log('Creating clean sources zip for Mozilla AMO & store review...');
 
-const excludePatterns = [
-  'node_modules/*',
-  '.output/*',
-  '.wxt/*',
-  'dist/*',
-  'coverage/*',
-  '.v8-coverage/*',
-  'test-results/*',
-  'playwright-report/*',
-  '.git/*',
-  '*.log',
-  '.DS_Store',
+const sourceEntries = [
+  'src',
+  'entrypoints',
+  'public',
+  'scripts',
+  'docs',
+  'store',
+  'e2e',
+  '.github',
+  'package.json',
+  'pnpm-workspace.yaml',
+  'tsconfig.json',
+  'wxt.config.ts',
+  'tailwind.config.js',
+  'postcss.config.js',
+  'eslint.config.js',
+  'playwright.config.ts',
+  'vitest.config.ts',
+  'README.md',
+  'BUILD.md',
+  'AUDIT.md',
+  'LICENSE',
+  'PRIVACY.md',
+  'SECURITY.md',
+  'THREAT_MODEL.md',
+  'CONTRIBUTING.md',
+  'CODE_OF_CONDUCT.md',
+  'ROADMAP.md',
+  'CHANGELOG.md',
+  'GOOD_FIRST_ISSUES.md',
+  'MANUAL_TEST_CHECKLIST.md',
 ];
 
-const args = ['-r', ZIP_PATH, '.', '-x', ...excludePatterns];
+const args = ['-r', ZIP_PATH, ...sourceEntries];
 
 const result = spawnSync('zip', args, {
   cwd: ROOT_DIR,
@@ -48,4 +67,3 @@ if (result.status !== 0) {
 }
 
 console.log(`\nSuccessfully created clean sources zip at:\n${ZIP_PATH}\n`);
-

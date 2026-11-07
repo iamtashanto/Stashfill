@@ -54,6 +54,15 @@ describe('Web Crypto Vault & Encryption', () => {
     };
     await expect(decryptVault(tamperedIv, 'password')).rejects.toThrow(VaultDecryptionError);
   });
+
+  it('rejects iteration downgrade attacks (< 600,000 iterations)', async () => {
+    const payload = await encryptVault('secret', 'password');
+    const downgraded = {
+      ...payload,
+      iterations: 1000,
+    };
+    await expect(decryptVault(downgraded, 'password')).rejects.toThrow(VaultDecryptionError);
+  });
 });
 
 describe('VaultManager', () => {

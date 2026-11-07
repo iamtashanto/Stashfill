@@ -123,9 +123,12 @@ export function exportPlainJson(vault: Vault): PlainJsonExportEnvelope {
 }
 
 export function escapeCsvCell(value: string): string {
-  const clean = value.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
-  // Prevent CSV formula injection (=, +, -, @) by quoting
-  if (/[",\n]/.test(clean) || /^[=+\-@]/.test(clean)) {
+  let clean = value.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+  // Prevent CSV formula injection in spreadsheet software (=, +, -, @, \t, \r, %)
+  if (/^[=+\-@\t\r%]/.test(clean)) {
+    clean = `'${clean}`;
+  }
+  if (/[",\n]/.test(clean)) {
     return `"${clean.replace(/"/g, '""')}"`;
   }
   return clean;
