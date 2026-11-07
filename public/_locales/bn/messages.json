@@ -1,0 +1,14 @@
+{
+  "extName": {
+    "message": "স্ট্যাশফিল (Stashfill)",
+    "description": "Extension name"
+  },
+  "extDescription": {
+    "message": "অফলাইন, নো-লগইন, প্রাইভেসী-ফার্স্ট অটোফিল এবং কুইক-পেস্ট এক্সটেনশন।",
+    "description": "Extension description"
+  },
+  "actionTitle": {
+    "message": "স্ট্যাশফিল খুলুন",
+    "description": "Action title"
+  }
+}

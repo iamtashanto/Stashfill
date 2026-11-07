@@ -1,0 +1,14 @@
+{
+  "extName": {
+    "message": "Stashfill",
+    "description": "Extension name"
+  },
+  "extDescription": {
+    "message": "Offline, no-login, privacy-first autofill and quick-paste extension.",
+    "description": "Extension description"
+  },
+  "actionTitle": {
+    "message": "Open Stashfill",
+    "description": "Action title"
+  }
+}
