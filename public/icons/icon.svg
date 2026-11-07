@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" width="128" height="128">
+  <defs>
+    <linearGradient id="stashGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#4f46e5"/>
+      <stop offset="100%" stop-color="#6366f1"/>
+    </linearGradient>
+  </defs>
+  <!-- Background rounded shield -->
+  <rect x="8" y="8" width="112" height="112" rx="28" fill="url(#stashGrad)"/>
+  <!-- Vault / Stash box symbol -->
+  <rect x="28" y="44" width="72" height="52" rx="12" fill="#ffffff" fill-opacity="0.95"/>
+  <!-- Shackle -->
+  <path d="M44 44 V32 C44 21 53 16 64 16 C75 16 84 21 84 32 V44" fill="none" stroke="#ffffff" stroke-width="8" stroke-linecap="round"/>
+  <!-- Keyhole / checkmark -->
+  <circle cx="64" cy="66" r="6" fill="#4f46e5"/>
+  <rect x="61" y="66" width="6" height="14" rx="2" fill="#4f46e5"/>
+  <!-- Small privacy offline dot -->
+  <circle cx="92" cy="36" r="6" fill="#10b981"/>
+</svg>

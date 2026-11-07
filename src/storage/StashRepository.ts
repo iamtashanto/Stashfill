@@ -1,46 +1,202 @@
 import type { StorageAdapter } from './StorageAdapter';
-import { type Profile, ProfileSchema, createDefaultProfile } from '../types/profile';
-import { type Settings, SettingsSchema, DEFAULT_SETTINGS } from '../types/settings';
-import { type EncryptedPayload, EncryptedPayloadSchema } from '../types/vault';
-import { z } from 'zod';
+import {
+  type Vault,
+  type Profile,
+  type Field,
+  type Card,
+  type Snippet,
+  type SiteRule,
+  type Settings,
+  VaultSchema,
+  ProfileSchema,
+  CardSchema,
+  SnippetSchema,
+  SiteRuleSchema,
+  createEmptyVault,
+} from '../core/schemas/vault';
+import { MigrationRunner } from './migrations';
+
+export class EncryptionRequiredError extends Error {
+  constructor(message = 'Cannot save payment card while vault encryption is disabled') {
+    super(message);
+    this.name = 'EncryptionRequiredError';
+  }
+}
+
+export interface RecoveryReport {
+  recovered: boolean;
+  source: 'backup' | 'fresh_empty' | 'none';
+  timestamp: number;
+}
 
 const STORAGE_KEYS = {
-  PROFILES: 'stashfill_profiles',
-  ACTIVE_PROFILE_ID: 'stashfill_active_profile_id',
-  SETTINGS: 'stashfill_settings',
-  VAULT: 'stashfill_vault',
+  PRIMARY: 'stashfill_vault_primary',
+  BACKUP: 'stashfill_vault_backup',
 } as const;
 
-export const ExportDataSchema = z.object({
-  version: z.literal(1),
-  exportedAt: z.number(),
-  profiles: z.array(ProfileSchema),
-  activeProfileId: z.string().optional(),
-  settings: SettingsSchema,
-  vault: EncryptedPayloadSchema.nullable().optional(),
-});
-
-export type ExportData = z.infer<typeof ExportDataSchema>;
-
 export class StashRepository {
-  constructor(private storage: StorageAdapter) {}
+  private inMemoryCache: Vault | null = null;
+  private debounceTimeout: ReturnType<typeof setTimeout> | null = null;
+  private pendingSavePromise: Promise<void> | null = null;
+  private lastRecoveryReport: RecoveryReport = {
+    recovered: false,
+    source: 'none',
+    timestamp: 0,
+  };
 
-  // --- Profiles ---
+  constructor(
+    private storage: StorageAdapter,
+    private debounceMs = 50,
+  ) {}
 
-  async getProfiles(): Promise<Profile[]> {
-    const raw = await this.storage.get<Profile[]>(STORAGE_KEYS.PROFILES);
-    if (!raw || !Array.isArray(raw) || raw.length === 0) {
-      const defaultProf = createDefaultProfile('Personal');
-      await this.saveProfiles([defaultProf]);
-      await this.setActiveProfileId(defaultProf.id);
-      return [defaultProf];
-    }
-    return raw;
+  getLastRecoveryReport(): RecoveryReport {
+    return { ...this.lastRecoveryReport };
   }
 
-  async saveProfiles(profiles: Profile[]): Promise<void> {
-    const parsed = z.array(ProfileSchema).parse(profiles);
-    await this.storage.set(STORAGE_KEYS.PROFILES, parsed);
+  /**
+   * Loads the vault from storage.
+   * If primary data is corrupted or invalid, automatically recovers from the
+   * last-known-good backup copy. If that also fails, initializes a fresh valid vault.
+   * Never logs user data values.
+   */
+  async loadVault(): Promise<Vault> {
+    if (this.inMemoryCache) {
+      return JSON.parse(JSON.stringify(this.inMemoryCache));
+    }
+
+    let rawPrimary: unknown = null;
+    try {
+      rawPrimary = await this.storage.load(STORAGE_KEYS.PRIMARY);
+    } catch {
+      rawPrimary = null;
+    }
+
+    if (rawPrimary) {
+      try {
+        const { vault } = MigrationRunner.run(rawPrimary);
+        this.inMemoryCache = vault;
+        return JSON.parse(JSON.stringify(vault));
+      } catch {
+        // Primary corrupted or schema mismatch -> attempt recovery from backup
+        return await this.recoverFromCorruptedData();
+      }
+    }
+
+    // Primary was empty or null -> check if backup exists
+    let rawBackup: unknown = null;
+    try {
+      rawBackup = await this.storage.load(STORAGE_KEYS.BACKUP);
+    } catch {
+      rawBackup = null;
+    }
+
+    if (rawBackup) {
+      try {
+        const { vault } = MigrationRunner.run(rawBackup);
+        this.inMemoryCache = vault;
+        await this.storage.save(STORAGE_KEYS.PRIMARY, vault);
+        this.lastRecoveryReport = {
+          recovered: true,
+          source: 'backup',
+          timestamp: Date.now(),
+        };
+        return JSON.parse(JSON.stringify(vault));
+      } catch {
+        // Backup also invalid
+      }
+    }
+
+    // Initialize fresh empty vault
+    const emptyVault = createEmptyVault();
+    this.inMemoryCache = emptyVault;
+    await this.storage.save(STORAGE_KEYS.PRIMARY, emptyVault);
+    await this.storage.save(STORAGE_KEYS.BACKUP, emptyVault);
+
+    return JSON.parse(JSON.stringify(emptyVault));
+  }
+
+  private async recoverFromCorruptedData(): Promise<Vault> {
+    let rawBackup: unknown = null;
+    try {
+      rawBackup = await this.storage.load(STORAGE_KEYS.BACKUP);
+    } catch {
+      rawBackup = null;
+    }
+
+    if (rawBackup) {
+      try {
+        const { vault } = MigrationRunner.run(rawBackup);
+        this.inMemoryCache = vault;
+        await this.storage.save(STORAGE_KEYS.PRIMARY, vault);
+        this.lastRecoveryReport = {
+          recovered: true,
+          source: 'backup',
+          timestamp: Date.now(),
+        };
+        return JSON.parse(JSON.stringify(vault));
+      } catch {
+        // Backup also corrupted
+      }
+    }
+
+    // Both primary and backup corrupted: reset to fresh empty vault
+    const fresh = createEmptyVault();
+    this.inMemoryCache = fresh;
+    await this.storage.save(STORAGE_KEYS.PRIMARY, fresh);
+    await this.storage.save(STORAGE_KEYS.BACKUP, fresh);
+
+    this.lastRecoveryReport = {
+      recovered: true,
+      source: 'fresh_empty',
+      timestamp: Date.now(),
+    };
+    return JSON.parse(JSON.stringify(fresh));
+  }
+
+  /**
+   * Saves the vault using debounced atomic writes and updates the last-known-good backup.
+   */
+  async saveVault(vault: Vault): Promise<void> {
+    const validated = VaultSchema.parse(vault);
+    this.inMemoryCache = JSON.parse(JSON.stringify(validated));
+
+    if (this.debounceTimeout) {
+      clearTimeout(this.debounceTimeout);
+      this.debounceTimeout = null;
+    }
+
+    return new Promise((resolve, reject) => {
+      this.debounceTimeout = setTimeout(async () => {
+        try {
+          // 1. Write to primary
+          await this.storage.save(STORAGE_KEYS.PRIMARY, validated);
+          // 2. Update last-known-good backup copy
+          await this.storage.save(STORAGE_KEYS.BACKUP, validated);
+          resolve();
+        } catch (err) {
+          reject(err);
+        }
+      }, this.debounceMs);
+    });
+  }
+
+  /**
+   * Immediately flush any pending debounced writes.
+   */
+  async flush(): Promise<void> {
+    if (this.debounceTimeout && this.inMemoryCache) {
+      clearTimeout(this.debounceTimeout);
+      this.debounceTimeout = null;
+      await this.storage.save(STORAGE_KEYS.PRIMARY, this.inMemoryCache);
+      await this.storage.save(STORAGE_KEYS.BACKUP, this.inMemoryCache);
+    }
+  }
+
+  // --- Profiles CRUD ---
+
+  async getProfiles(): Promise<Profile[]> {
+    const vault = await this.loadVault();
+    return vault.profiles;
   }
 
   async getProfile(id: string): Promise<Profile | null> {
@@ -49,145 +205,146 @@ export class StashRepository {
   }
 
   async upsertProfile(profile: Profile): Promise<Profile> {
-    const validated = ProfileSchema.parse({
-      ...profile,
-      updatedAt: Date.now(),
-    });
-    const profiles = await this.getProfiles();
-    const index = profiles.findIndex((p) => p.id === validated.id);
+    const validated = ProfileSchema.parse(profile);
+    const vault = await this.loadVault();
 
-    let updated: Profile[];
-    if (index >= 0) {
-      updated = [...profiles];
-      updated[index] = validated;
+    const idx = vault.profiles.findIndex((p) => p.id === validated.id);
+    if (idx >= 0) {
+      vault.profiles[idx] = validated;
     } else {
-      updated = [...profiles, validated];
+      vault.profiles.push(validated);
     }
 
-    // If marked as default, unset other defaults
-    if (validated.isDefault) {
-      updated = updated.map((p) => (p.id === validated.id ? p : { ...p, isDefault: false }));
-    }
-
-    await this.saveProfiles(updated);
+    await this.saveVault(vault);
+    await this.flush();
     return validated;
   }
 
   async deleteProfile(id: string): Promise<void> {
-    const profiles = await this.getProfiles();
-    const filtered = profiles.filter((p) => p.id !== id);
-    if (filtered.length === 0) {
-      const fresh = createDefaultProfile('Personal');
-      await this.saveProfiles([fresh]);
-      await this.setActiveProfileId(fresh.id);
-      return;
-    }
-
-    // If deleted profile was default, make the first one default
-    if (!filtered.some((p) => p.isDefault)) {
-      filtered[0]!.isDefault = true;
-    }
-
-    await this.saveProfiles(filtered);
-
-    const activeId = await this.getActiveProfileId();
-    if (activeId === id) {
-      const newActive = filtered.find((p) => p.isDefault) ?? filtered[0]!;
-      await this.setActiveProfileId(newActive.id);
-    }
+    const vault = await this.loadVault();
+    vault.profiles = vault.profiles.filter((p) => p.id !== id);
+    await this.saveVault(vault);
+    await this.flush();
   }
 
-  async getActiveProfileId(): Promise<string> {
-    const active = await this.storage.get<string>(STORAGE_KEYS.ACTIVE_PROFILE_ID);
-    if (active) return active;
-    const profiles = await this.getProfiles();
-    const def = profiles.find((p) => p.isDefault) ?? profiles[0]!;
-    await this.setActiveProfileId(def.id);
-    return def.id;
+  // --- Cards CRUD with Encryption Enforcement ---
+
+  async getCards(): Promise<Card[]> {
+    const vault = await this.loadVault();
+    return vault.cards;
   }
 
-  async getActiveProfile(): Promise<Profile> {
-    const activeId = await this.getActiveProfileId();
-    const profile = await this.getProfile(activeId);
-    if (profile) return profile;
-    const profiles = await this.getProfiles();
-    return profiles[0]!;
+  async getCard(id: string): Promise<Card | null> {
+    const cards = await this.getCards();
+    return cards.find((c) => c.id === id) ?? null;
   }
 
-  async setActiveProfileId(id: string): Promise<void> {
-    await this.storage.set(STORAGE_KEYS.ACTIVE_PROFILE_ID, id);
+  /**
+   * Saves a payment card.
+   * Strictly enforces that encryption is active if requiresEncryptionForCards is true.
+   */
+  async saveCard(card: Card, isEncryptionActive = false): Promise<Card> {
+    const vault = await this.loadVault();
+
+    if (vault.settings.requiresEncryptionForCards && !isEncryptionActive) {
+      throw new EncryptionRequiredError(
+        'Refusing to save payment card: vault encryption is required but inactive',
+      );
+    }
+
+    const validated = CardSchema.parse(card);
+
+    const idx = vault.cards.findIndex((c) => c.id === validated.id);
+    if (idx >= 0) {
+      vault.cards[idx] = validated;
+    } else {
+      vault.cards.push(validated);
+    }
+
+    await this.saveVault(vault);
+    await this.flush();
+    return validated;
+  }
+
+  async deleteCard(id: string): Promise<void> {
+    const vault = await this.loadVault();
+    vault.cards = vault.cards.filter((c) => c.id !== id);
+    await this.saveVault(vault);
+    await this.flush();
+  }
+
+  // --- Snippets CRUD ---
+
+  async getSnippets(): Promise<Snippet[]> {
+    const vault = await this.loadVault();
+    return vault.snippets;
+  }
+
+  async upsertSnippet(snippet: Snippet): Promise<Snippet> {
+    const validated = SnippetSchema.parse(snippet);
+    const vault = await this.loadVault();
+
+    const idx = vault.snippets.findIndex((s) => s.id === validated.id);
+    if (idx >= 0) {
+      vault.snippets[idx] = validated;
+    } else {
+      vault.snippets.push(validated);
+    }
+
+    await this.saveVault(vault);
+    await this.flush();
+    return validated;
+  }
+
+  async deleteSnippet(id: string): Promise<void> {
+    const vault = await this.loadVault();
+    vault.snippets = vault.snippets.filter((s) => s.id !== id);
+    await this.saveVault(vault);
+    await this.flush();
+  }
+
+  // --- Site Rules CRUD ---
+
+  async getSiteRules(): Promise<SiteRule[]> {
+    const vault = await this.loadVault();
+    return vault.siteRules;
+  }
+
+  async upsertSiteRule(rule: SiteRule): Promise<SiteRule> {
+    const validated = SiteRuleSchema.parse(rule);
+    const vault = await this.loadVault();
+
+    const idx = vault.siteRules.findIndex((r) => r.id === validated.id);
+    if (idx >= 0) {
+      vault.siteRules[idx] = validated;
+    } else {
+      vault.siteRules.push(validated);
+    }
+
+    await this.saveVault(vault);
+    await this.flush();
+    return validated;
+  }
+
+  async deleteSiteRule(id: string): Promise<void> {
+    const vault = await this.loadVault();
+    vault.siteRules = vault.siteRules.filter((r) => r.id !== id);
+    await this.saveVault(vault);
+    await this.flush();
   }
 
   // --- Settings ---
 
   async getSettings(): Promise<Settings> {
-    const raw = await this.storage.get<Settings>(STORAGE_KEYS.SETTINGS);
-    if (!raw) return DEFAULT_SETTINGS;
-    const parsed = SettingsSchema.safeParse(raw);
-    return parsed.success ? parsed.data : DEFAULT_SETTINGS;
+    const vault = await this.loadVault();
+    return vault.settings;
   }
 
   async updateSettings(patch: Partial<Settings>): Promise<Settings> {
-    const current = await this.getSettings();
-    const updated = SettingsSchema.parse({ ...current, ...patch });
-    await this.storage.set(STORAGE_KEYS.SETTINGS, updated);
-    return updated;
-  }
-
-  // --- Vault ---
-
-  async getEncryptedVault(): Promise<EncryptedPayload | null> {
-    const raw = await this.storage.get<EncryptedPayload>(STORAGE_KEYS.VAULT);
-    if (!raw) return null;
-    const parsed = EncryptedPayloadSchema.safeParse(raw);
-    return parsed.success ? parsed.data : null;
-  }
-
-  async saveEncryptedVault(payload: EncryptedPayload): Promise<void> {
-    const validated = EncryptedPayloadSchema.parse(payload);
-    await this.storage.set(STORAGE_KEYS.VAULT, validated);
-  }
-
-  async clearVault(): Promise<void> {
-    await this.storage.remove(STORAGE_KEYS.VAULT);
-  }
-
-  // --- Import / Export ---
-
-  async exportData(includeVault = false): Promise<ExportData> {
-    const profiles = await this.getProfiles();
-    const activeProfileId = await this.getActiveProfileId();
-    const settings = await this.getSettings();
-    const vault = includeVault ? await this.getEncryptedVault() : null;
-
-    return {
-      version: 1,
-      exportedAt: Date.now(),
-      profiles,
-      activeProfileId,
-      settings,
-      vault,
-    };
-  }
-
-  async importData(data: unknown): Promise<{ profileCount: number; hasVault: boolean }> {
-    const parsed = ExportDataSchema.parse(data);
-
-    await this.saveProfiles(parsed.profiles);
-    if (parsed.activeProfileId) {
-      await this.setActiveProfileId(parsed.activeProfileId);
-    }
-    await this.updateSettings(parsed.settings);
-
-    let hasVault = false;
-    if (parsed.vault) {
-      await this.saveEncryptedVault(parsed.vault);
-      hasVault = true;
-    }
-
-    return {
-      profileCount: parsed.profiles.length,
-      hasVault,
-    };
+    const vault = await this.loadVault();
+    vault.settings = { ...vault.settings, ...patch };
+    await this.saveVault(vault);
+    await this.flush();
+    return vault.settings;
   }
 }

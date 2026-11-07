@@ -1,59 +1,50 @@
-import type { StorageAdapter } from './StorageAdapter';
+import { type StorageAdapter, StorageQuotaExceededError } from './StorageAdapter';
 
-/**
- * In-memory storage adapter for unit tests and non-browser environments.
- */
 export class MemoryStorageAdapter implements StorageAdapter {
   private store = new Map<string, unknown>();
-  private listeners = new Map<string, Set<(newValue: unknown) => void>>();
+  private listeners = new Map<string, Set<(val: unknown) => void>>();
+  private maxByteSize = Infinity;
 
-  async get<T>(key: string): Promise<T | null> {
+  setMaxByteSize(bytes: number) {
+    this.maxByteSize = bytes;
+  }
+
+  async load<T>(key: string): Promise<T | null> {
     const val = this.store.get(key);
     if (val === undefined) return null;
     return JSON.parse(JSON.stringify(val)) as T;
   }
 
-  async set<T>(key: string, value: T): Promise<void> {
-    const cloned = JSON.parse(JSON.stringify(value));
+  async save<T>(key: string, value: T): Promise<void> {
+    const serialized = JSON.stringify(value);
+    if (serialized.length > this.maxByteSize) {
+      throw new StorageQuotaExceededError('QUOTA_BYTES quota exceeded in MemoryStorageAdapter');
+    }
+
+    const cloned = JSON.parse(serialized);
     this.store.set(key, cloned);
-    const setListeners = this.listeners.get(key);
-    if (setListeners) {
-      setListeners.forEach((fn) => fn(cloned));
+
+    const set = this.listeners.get(key);
+    if (set) {
+      set.forEach((fn) => fn(cloned));
     }
   }
 
-  async remove(key: string): Promise<void> {
-    this.store.delete(key);
-    const setListeners = this.listeners.get(key);
-    if (setListeners) {
-      setListeners.forEach((fn) => fn(null));
-    }
-  }
-
-  async clear(): Promise<void> {
-    this.store.clear();
-    this.listeners.forEach((setListeners) => {
-      setListeners.forEach((fn) => fn(null));
-    });
-  }
-
-  async getAll(): Promise<Record<string, unknown>> {
-    const result: Record<string, unknown> = {};
-    for (const [k, v] of this.store.entries()) {
-      result[k] = JSON.parse(JSON.stringify(v));
-    }
-    return result;
-  }
-
-  watch<T>(key: string, callback: (newValue: T | null) => void): () => void {
+  subscribe<T>(key: string, callback: (value: T | null) => void): () => void {
     if (!this.listeners.has(key)) {
       this.listeners.set(key, new Set());
     }
-    const setListeners = this.listeners.get(key)!;
-    const listener = callback as (newValue: unknown) => void;
-    setListeners.add(listener);
+    const set = this.listeners.get(key)!;
+    const listener = callback as (val: unknown) => void;
+    set.add(listener);
+
     return () => {
-      setListeners.delete(listener);
+      set.delete(listener);
     };
+  }
+
+  // Raw helper to simulate corruption in tests
+  setRawDirect(key: string, rawVal: unknown) {
+    this.store.set(key, rawVal);
   }
 }

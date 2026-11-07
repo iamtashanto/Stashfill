@@ -1,33 +1,33 @@
 import { browser } from 'wxt/browser';
-import type { StorageAdapter } from './StorageAdapter';
+import { type StorageAdapter, StorageQuotaExceededError } from './StorageAdapter';
 
-/**
- * LocalStorageAdapter uses browser.storage.local.
- * Completely offline, zero network requests, local to user device.
- */
 export class LocalStorageAdapter implements StorageAdapter {
-  async get<T>(key: string): Promise<T | null> {
-    const res = await browser.storage.local.get(key);
-    return (res[key] as T) ?? null;
+  async load<T>(key: string): Promise<T | null> {
+    try {
+      const res = await browser.storage.local.get(key);
+      return (res[key] as T) ?? null;
+    } catch {
+      return null;
+    }
   }
 
-  async set<T>(key: string, value: T): Promise<void> {
-    await browser.storage.local.set({ [key]: value });
+  async save<T>(key: string, value: T): Promise<void> {
+    try {
+      await browser.storage.local.set({ [key]: value });
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : String(err);
+      if (
+        message.includes('QUOTA_BYTES') ||
+        message.includes('quota exceeded') ||
+        message.includes('QuotaExceededError')
+      ) {
+        throw new StorageQuotaExceededError(message);
+      }
+      throw err;
+    }
   }
 
-  async remove(key: string): Promise<void> {
-    await browser.storage.local.remove(key);
-  }
-
-  async clear(): Promise<void> {
-    await browser.storage.local.clear();
-  }
-
-  async getAll(): Promise<Record<string, unknown>> {
-    return await browser.storage.local.get(null);
-  }
-
-  watch<T>(key: string, callback: (newValue: T | null) => void): () => void {
+  subscribe<T>(key: string, callback: (value: T | null) => void): () => void {
     const listener = (
       changes: { [k: string]: { oldValue?: unknown; newValue?: unknown } },
       areaName: string,
@@ -36,6 +36,7 @@ export class LocalStorageAdapter implements StorageAdapter {
         callback((changes[key]?.newValue as T) ?? null);
       }
     };
+
     browser.storage.onChanged.addListener(listener);
     return () => {
       browser.storage.onChanged.removeListener(listener);
