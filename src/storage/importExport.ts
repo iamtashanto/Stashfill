@@ -62,7 +62,7 @@ const FORBIDDEN_PROTOTYPE_KEYS = ['__proto__', 'constructor', 'prototype'];
 /**
  * Recursively checks an unknown object for prototype pollution keys or excessive depth.
  */
-function hasMaliciousStructure(obj: unknown, depth = 0): boolean {
+export function hasMaliciousStructure(obj: unknown, depth = 0): boolean {
   if (depth > 15) return true;
   if (!obj || typeof obj !== 'object') return false;
 
@@ -89,7 +89,7 @@ function hasMaliciousStructure(obj: unknown, depth = 0): boolean {
 /**
  * Safely parses JSON while rejecting raw `__proto__` or `constructor.prototype` tokens.
  */
-function safeParseJson(rawText: string): unknown {
+export function safeParseJson(rawText: string): unknown {
   if (rawText.length > 10 * 1024 * 1024) {
     throw new Error('Import file exceeds maximum allowed size (10 MB)');
   }
@@ -122,7 +122,7 @@ export function exportPlainJson(vault: Vault): PlainJsonExportEnvelope {
   };
 }
 
-function escapeCsvCell(value: string): string {
+export function escapeCsvCell(value: string): string {
   const clean = value.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
   // Prevent CSV formula injection (=, +, -, @) by quoting
   if (/[",\n]/.test(clean) || /^[=+\-@]/.test(clean)) {
@@ -211,7 +211,7 @@ export async function decryptEncryptedBackup(
 /**
  * Parses a single CSV line respecting quoted strings and escaped double quotes.
  */
-function parseCsvLine(line: string): string[] | null {
+export function parseCsvLine(line: string): string[] | null {
   const cells: string[] = [];
   let current = '';
   let inQuotes = false;
@@ -249,7 +249,7 @@ function parseCsvLine(line: string): string[] | null {
   return cells;
 }
 
-function inferCanonicalKeyFromLabel(label: string): FieldKey {
+export function inferCanonicalKeyFromLabel(label: string): FieldKey {
   const normalized = label
     .trim()
     .toLowerCase()
@@ -713,4 +713,3 @@ export function applyImportWithStrategy(
 
   return workingProfiles;
 }
-

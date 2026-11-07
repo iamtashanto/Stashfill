@@ -58,7 +58,10 @@ export default defineConfig({
       gecko: {
         id: 'stashfill@stashfill.org',
         strict_min_version: '109.0',
-      },
+        data_collection_permissions: {
+          required: ['none'],
+        },
+      } as Record<string, unknown>,
     },
   },
 });

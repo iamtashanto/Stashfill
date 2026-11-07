@@ -1,0 +1,60 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: Build & Publish Release Packages
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Verify Code Safety & Tests
+        run: |
+          pnpm check:safety
+          pnpm typecheck
+          pnpm test:coverage
+
+      - name: Build Extension Packages & Sources
+        run: |
+          pnpm zip
+          pnpm zip:firefox
+          pnpm zip:sources
+
+      - name: Validate Built Manifests
+        run: pnpm lint:manifest
+
+      - name: Check Performance Budgets
+        run: pnpm check:budgets
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            .output/stashfill-*-chrome.zip
+            .output/stashfill-*-firefox.zip
+            .output/stashfill-*-sources.zip
+            .output/stashfill-sources.zip
+          generate_release_notes: true
+          draft: false
+          prerelease: false

@@ -9,6 +9,7 @@ dist/
 
 # Test coverage & reports
 coverage/
+.v8-coverage/
 test-results/
 playwright-report/
 

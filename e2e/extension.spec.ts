@@ -11,9 +11,11 @@ export const test = base.extend<{
   // eslint-disable-next-line no-empty-pattern
   context: async ({}, use) => {
     const pathToExtension = path.resolve('.output/chrome-mv3');
+    const isHeadless = Boolean(process.env.CI || process.env.HEADLESS);
     const context = await chromium.launchPersistentContext('', {
-      headless: false,
+      headless: isHeadless,
       args: [
+        ...(isHeadless ? ['--headless=new'] : []),
         `--disable-extensions-except=${pathToExtension}`,
         `--load-extension=${pathToExtension}`,
       ],
@@ -325,5 +327,19 @@ test.describe('Stashfill Browser Extension E2E', () => {
     expect(typeof fillPaymentCard).toBe('function');
     expect(typeof undoLastFill).toBe('function');
     expect(card.cardNumber.slice(-4)).toBe('0366');
+  });
+
+  test('verifies Firefox MV3 built package structure and data collection declarations', async () => {
+    const fs = await import('node:fs');
+    const firefoxManifestPath = path.resolve('.output/firefox-mv3/manifest.json');
+    expect(fs.existsSync(firefoxManifestPath)).toBe(true);
+
+    const manifest = JSON.parse(fs.readFileSync(firefoxManifestPath, 'utf8'));
+    expect(manifest.manifest_version).toBe(3);
+    expect(manifest.browser_specific_settings.gecko.id).toBe('stashfill@stashfill.org');
+    expect(manifest.browser_specific_settings.gecko.strict_min_version).toBe('109.0');
+    expect(manifest.browser_specific_settings.gecko.data_collection_permissions.required).toEqual([
+      'none',
+    ]);
   });
 });

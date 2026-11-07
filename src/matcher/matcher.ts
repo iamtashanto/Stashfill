@@ -106,7 +106,7 @@ export function tokenizeIdentifier(raw: string): string[] {
 }
 
 const OTP_HONEYPOT_PATTERNS =
-  /\b(otp|one[-_\s]?time|totp|2fa|mfa|verification[-_\s]?code|verify[-_\s]?code|auth[-_\s]?code|passcode|pin[-_\s]?code|security[-_\s]?pin|captcha|honeypot|bot[-_\s]?check|website[-_\s]?url[-_\s]?trap)\b|(ওটিপি|যাচাইকরণ\s*কোড|ভেরিফিকেশন\s*কোড)/i;
+  /\b(otp[-_\s]?(code)?|one[-_\s]?time|totp|2fa|mfa|verification[-_\s]?code|verify[-_\s]?code|auth[-_\s]?code|passcode|pin[-_\s]?code|security[-_\s]?pin|captcha|honeypot|bot[-_\s]?check|website[-_\s]?url[-_\s]?trap)\b|(ওটিপি|যাচাইকরণ\s*কোড|ভেরিফিকেশন\s*কোড)/i;
 
 /**
  * Pure check for whether a field should be skipped (password, hidden, disabled, readonly,
@@ -218,16 +218,23 @@ const COMPILED_RULES: CompiledKeyRules[] = ORDERED_CANONICAL_KEYS.map((key) => {
   return { key, autocompletes, exactTokens, keywords };
 });
 
+const KEYWORD_REGEX_CACHE = new Map<string, RegExp>();
+
 function matchesKeywordPhrase(haystack: string, keyword: string): boolean {
   if (!haystack || !keyword) return false;
-  // For short ASCII keywords (<= 4 chars like "name", "city", "zip", "tel", "bio", "org", "dob"),
+  if (!haystack.includes(keyword)) return false;
+  // For short ASCII keywords (<= 5 chars like "name", "city", "zip", "tel", "bio", "org", "dob"),
   // require word boundaries so "username" or "company_name" doesn't falsely match generic "name"
   if (/^[a-z0-9\s]+$/i.test(keyword) && keyword.length <= 5) {
-    const escaped = keyword.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-    const re = new RegExp(`(^|[^a-z0-9])${escaped}($|[^a-z0-9])`, 'i');
+    let re = KEYWORD_REGEX_CACHE.get(keyword);
+    if (!re) {
+      const escaped = keyword.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      re = new RegExp(`(^|[^a-z0-9])${escaped}($|[^a-z0-9])`, 'i');
+      KEYWORD_REGEX_CACHE.set(keyword, re);
+    }
     return re.test(haystack);
   }
-  return haystack.includes(keyword);
+  return true;
 }
 
 /**

@@ -1,5 +1,6 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { MemoryStorageAdapter } from './MemoryStorageAdapter';
+import { LocalStorageAdapter } from './LocalStorageAdapter';
 import { StashRepository, EncryptionRequiredError } from './StashRepository';
 import { StorageQuotaExceededError } from './StorageAdapter';
 import { createPersonalTemplate } from '../core/templates';
@@ -175,6 +176,93 @@ describe('StashRepository & Storage Engine', () => {
 
       const largeProfile = createPersonalTemplate('Large Profile');
       await expect(repo.upsertProfile(largeProfile)).rejects.toThrow(StorageQuotaExceededError);
+    });
+  });
+
+  describe('Repository Helpers & LocalStorageAdapter', () => {
+    it('manages active profile, recordFieldUsage, exportData, and importData', async () => {
+      const profile = createPersonalTemplate('Default Profile');
+      await repo.upsertProfile(profile);
+
+      expect(await repo.getActiveProfileId()).toBe(profile.id);
+      const active = await repo.getActiveProfile();
+      expect(active?.id).toBe(profile.id);
+
+      const fieldId = profile.fields[0]!.id;
+      await repo.recordFieldUsage(profile.id, fieldId);
+      const updatedProfile = await repo.getProfile(profile.id);
+      expect(updatedProfile?.fields[0]?.useCount).toBeGreaterThanOrEqual(1);
+
+      const exported = await repo.exportData();
+      expect(exported.version).toBe(2);
+      expect(exported.vault.profiles.length).toBe(1);
+
+      const modified = { ...exported.vault, profiles: [] };
+      await repo.importData(modified);
+      expect(await repo.getProfiles()).toEqual([]);
+
+      await repo.saveEncryptedVault({
+        salt: 'salt123',
+        iv: 'iv123',
+        ciphertext: 'cipher123',
+        iterations: 600000,
+        version: 1,
+      });
+      const v = await repo.getEncryptedVault();
+      expect(v?.ciphertext).toBe('cipher123');
+
+      await repo.clearEncryptedVault();
+      const vCleared = await repo.getEncryptedVault();
+      expect(vCleared).toBeNull();
+    });
+
+    it('interacts with LocalStorageAdapter', async () => {
+      const mockStorage = new Map<string, unknown>();
+      const listeners: ((changes: Record<string, { newValue: unknown }>, area: string) => void)[] =
+        [];
+
+      const mockBrowserApi = {
+        storage: {
+          local: {
+            get: vi.fn(async (key: string) => ({ [key]: mockStorage.get(key) })),
+            set: vi.fn(async (obj: Record<string, unknown>) => {
+              for (const [k, v] of Object.entries(obj)) {
+                mockStorage.set(k, v);
+                listeners.forEach((l) => l({ [k]: { newValue: v } }, 'local'));
+              }
+            }),
+          },
+          onChanged: {
+            addListener: vi.fn(
+              (fn: (changes: Record<string, { newValue: unknown }>, area: string) => void) => {
+                listeners.push(fn);
+              },
+            ),
+            removeListener: vi.fn(
+              (fn: (changes: Record<string, { newValue: unknown }>, area: string) => void) => {
+                const idx = listeners.indexOf(fn);
+                if (idx !== -1) listeners.splice(idx, 1);
+              },
+            ),
+          },
+        },
+      };
+
+      (globalThis as unknown as { chrome: unknown; browser: unknown }).chrome = mockBrowserApi;
+      (globalThis as unknown as { chrome: unknown; browser: unknown }).browser = mockBrowserApi;
+
+      const adapter = new LocalStorageAdapter();
+      await adapter.save('test_key', { foo: 'bar' });
+      const loaded = await adapter.load<{ foo: string }>('test_key');
+      expect(loaded?.foo).toBe('bar');
+
+      let notifiedVal: unknown = null;
+      const unsubscribe = adapter.subscribe<{ foo: string }>('test_key', (val) => {
+        notifiedVal = val;
+      });
+      await adapter.save('test_key', { foo: 'baz' });
+      expect((notifiedVal as { foo: string })?.foo).toBe('baz');
+      unsubscribe();
     });
   });
 });

@@ -7,6 +7,11 @@ import {
   previewImport,
   applyImportWithStrategy,
   PLAIN_EXPORT_CARD_NOTICE,
+  hasMaliciousStructure,
+  safeParseJson,
+  escapeCsvCell,
+  parseCsvLine,
+  inferCanonicalKeyFromLabel,
 } from './importExport';
 import { createEmptyVault, type Vault } from '../core/schemas/vault';
 import { createPersonalTemplate } from '../core/templates';
@@ -231,5 +236,26 @@ describe('Import, Export, and Automatic Local Backups', () => {
     const profilesAfterRestore = await repo.getProfiles();
     expect(profilesAfterRestore[0]?.name).toBe('Profile V2');
   });
-});
 
+  it('directly verifies helper functions: hasMaliciousStructure, safeParseJson, escapeCsvCell, parseCsvLine, inferCanonicalKeyFromLabel', () => {
+    expect(hasMaliciousStructure(null)).toBe(false);
+    expect(hasMaliciousStructure({ a: 1, b: 2 })).toBe(false);
+    expect(hasMaliciousStructure(JSON.parse('{"__proto__": {}}'))).toBe(true);
+
+    expect(safeParseJson('{"valid": true}')).toEqual({ valid: true });
+    expect(() => safeParseJson('{"__proto__": {}}')).toThrow(/prototype pollution/);
+
+    expect(escapeCsvCell('simple')).toBe('simple');
+    expect(escapeCsvCell('with, comma')).toBe('"with, comma"');
+    expect(escapeCsvCell('with "quote"')).toBe('"with ""quote"""');
+
+    expect(parseCsvLine('a,b,c')).toEqual(['a', 'b', 'c']);
+    expect(parseCsvLine('"a,b",c')).toEqual(['a,b', 'c']);
+    expect(parseCsvLine('')).toEqual(['']);
+    expect(parseCsvLine('unclosed,"quote')).toBeNull();
+
+    expect(inferCanonicalKeyFromLabel('Email Address')).toBe('email');
+    expect(inferCanonicalKeyFromLabel('Phone Number')).toBe('phone');
+    expect(inferCanonicalKeyFromLabel('Random Custom')).toBe('custom_random_custom');
+  });
+});

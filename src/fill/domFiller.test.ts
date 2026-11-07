@@ -8,6 +8,14 @@ import {
   undoLastFill,
   expandSnippetVariables,
   findMatchingSnippetTrigger,
+  isElementHiddenOrHoneypot,
+  isFillable,
+  isElementNonEmpty,
+  normalizeDateValue,
+  setNativeInputValue,
+  highlightFilledElement,
+  hasCrossOriginPaymentIframe,
+  copyCardNumberWithAutoClear,
 } from './index';
 import { buildContextMenuDescriptors } from '../background/contextMenu';
 import { createDefaultProfile } from '../types/profile';
@@ -359,5 +367,63 @@ describe('DOM Filler Engine, Card Rules, Snippets, and Context Menu Triggers', (
     const cardEntry = httpsMenu.find((m) => m.id === 'stashfill-card:c1');
     expect(cardEntry).toBeDefined();
     expect(cardEntry?.title).toBe('Fill card: VISA •••• 0366');
+  });
+
+  it('directly tests helper functions: isElementHiddenOrHoneypot, isFillable, isElementNonEmpty, normalizeDateValue, setNativeInputValue, highlightFilledElement, hasCrossOriginPaymentIframe, copyCardNumberWithAutoClear', async () => {
+    document.body.innerHTML = `
+      <input type="text" id="visible_input" value="" />
+      <input type="text" id="non_empty_input" value="hello" />
+      <input type="hidden" id="hidden_input" />
+      <div style="display:none"><input type="text" id="display_none_input" /></div>
+    `;
+
+    const visible = document.getElementById('visible_input') as HTMLInputElement;
+    const nonEmpty = document.getElementById('non_empty_input') as HTMLInputElement;
+    const hidden = document.getElementById('hidden_input') as HTMLInputElement;
+    const displayNone = document.getElementById('display_none_input') as HTMLInputElement;
+
+    expect(isElementHiddenOrHoneypot(visible)).toBe(false);
+    expect(isElementHiddenOrHoneypot(hidden)).toBe(true);
+    expect(isElementHiddenOrHoneypot(displayNone)).toBe(true);
+
+    expect(isFillable(visible)).toBe(true);
+    expect(isFillable(hidden)).toBe(false);
+
+    expect(isElementNonEmpty(visible)).toBe(false);
+    expect(isElementNonEmpty(nonEmpty)).toBe(true);
+
+    expect(normalizeDateValue('1990-05-15')).toBe('1990-05-15');
+    expect(normalizeDateValue('15/05/1990')).toBe('1990-05-15');
+    expect(normalizeDateValue('05/15/1990')).toBe('1990-05-15');
+
+    setNativeInputValue(visible, 'direct-val');
+    expect(visible.value).toBe('direct-val');
+
+    highlightFilledElement(visible);
+    expect(visible.style.outline).toContain('10b981');
+
+    const mockRoot = {
+      querySelectorAll: () => [
+        {
+          getAttribute: (k: string) => (k === 'src' ? 'https://js.stripe.com/v3' : ''),
+          contentDocument: null,
+        },
+      ],
+    } as unknown as Element;
+    expect(hasCrossOriginPaymentIframe(mockRoot)).toBe(true);
+
+    // Test copyCardNumberWithAutoClear mock
+    let clipboardText = '';
+    Object.defineProperty(navigator, 'clipboard', {
+      value: {
+        writeText: async (t: string) => {
+          clipboardText = t;
+        },
+      },
+      configurable: true,
+      writable: true,
+    });
+    await copyCardNumberWithAutoClear('4111222233334444', 1);
+    expect(clipboardText).toBe('4111222233334444');
   });
 });

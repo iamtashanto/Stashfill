@@ -61,11 +61,22 @@ const COUNTRY_CODES: Record<string, string[]> = {
  * Checks whether an element is hidden, invisible, or a honeypot trap.
  */
 export function isElementHiddenOrHoneypot(el: Element): boolean {
-  if (el.hasAttribute('hidden') || el.getAttribute('aria-hidden') === 'true') {
+  if (
+    el.hasAttribute('hidden') ||
+    el.getAttribute('aria-hidden') === 'true' ||
+    el.getAttribute('type')?.toLowerCase() === 'hidden'
+  ) {
     return true;
   }
 
   const htmlEl = el as HTMLElement;
+  if (htmlEl.closest) {
+    const hiddenAncestor = htmlEl.closest(
+      '[hidden], [aria-hidden="true"], [style*="display:none"], [style*="display: none"], [style*="visibility:hidden"], [style*="visibility: hidden"]',
+    );
+    if (hiddenAncestor) return true;
+  }
+
   if (htmlEl.style) {
     if (
       htmlEl.style.display === 'none' ||

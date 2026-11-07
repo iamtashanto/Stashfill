@@ -1,0 +1,63 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    name: Lint, Typecheck, Test & Budget
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Code Safety & Zero-Network Audit
+        run: pnpm check:safety
+
+      - name: Linter & Format Check
+        run: |
+          pnpm lint
+          pnpm format:check
+
+      - name: Typecheck
+        run: pnpm typecheck
+
+      - name: Unit Tests & Coverage Check (>= 80%)
+        run: pnpm test:coverage
+
+      - name: Build Chrome & Firefox MV3 Extensions
+        run: |
+          pnpm build
+          pnpm build:firefox
+
+      - name: Validate Built Manifests
+        run: pnpm lint:manifest
+
+      - name: Performance Budgets Check (< 60KB gzip, < 50ms matcher, < 100ms popup)
+        run: pnpm check:budgets
+
+      - name: Install Playwright Browsers
+        run: pnpm exec playwright install --with-deps chromium
+
+      - name: End-to-End Tests
+        run: pnpm e2e
