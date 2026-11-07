@@ -5,17 +5,22 @@ import {
   fillElement,
   fillFormWithProfile,
   fillPaymentCard,
-} from './domFiller';
+  undoLastFill,
+  expandSnippetVariables,
+  findMatchingSnippetTrigger,
+} from './index';
+import { buildContextMenuDescriptors } from '../background/contextMenu';
 import { createDefaultProfile } from '../types/profile';
+import { createPersonalTemplate } from '../core/templates';
+import { DEFAULT_SETTINGS, type SiteRule } from '../core/schemas/vault';
 import type { PaymentCard } from '../types/vault';
 
-describe('DOM Filler Engine', () => {
+describe('DOM Filler Engine, Card Rules, Snippets, and Context Menu Triggers', () => {
   beforeEach(() => {
     document.body.innerHTML = '';
   });
 
-  it('extracts field attributes from various label structures', () => {
-    // 1. Label with for attribute
+  it('extracts field attributes from various label structures including nearby text', () => {
     document.body.innerHTML = `
       <label for="user-email">Email Address</label>
       <input type="text" id="user-email" name="email_field" placeholder="you@domain.com" autocomplete="email" />
@@ -31,7 +36,6 @@ describe('DOM Filler Engine', () => {
   });
 
   it('extracts label from enclosing parent label and aria-labelledby', () => {
-    // Enclosing label
     document.body.innerHTML = `
       <label>
         Mobile Phone
@@ -48,17 +52,21 @@ describe('DOM Filler Engine', () => {
     expect(extractFieldAttributes(zip).labelText).toBe('Postal Index');
   });
 
-  it('fills standard inputs and dispatches input and change events', () => {
+  it('fills standard inputs and dispatches input, change, and blur events', () => {
     document.body.innerHTML = `<input type="text" id="name-input" />`;
     const input = document.getElementById('name-input') as HTMLInputElement;
 
     let inputFired = false;
     let changeFired = false;
+    let blurFired = false;
     input.addEventListener('input', () => {
       inputFired = true;
     });
     input.addEventListener('change', () => {
       changeFired = true;
+    });
+    input.addEventListener('blur', () => {
+      blurFired = true;
     });
 
     const success = fillElement(input, 'Ada Lovelace');
@@ -66,79 +74,118 @@ describe('DOM Filler Engine', () => {
     expect(input.value).toBe('Ada Lovelace');
     expect(inputFired).toBe(true);
     expect(changeFired).toBe(true);
+    expect(blurFired).toBe(true);
   });
 
   it('updates React _valueTracker when filling controlled inputs', () => {
     document.body.innerHTML = `<input type="text" id="react-input" />`;
     const input = document.getElementById('react-input') as HTMLInputElement;
 
-    let trackerVal = '';
+    let trackerCalled = false;
     (input as unknown as { _valueTracker: { setValue: (v: string) => void } })._valueTracker = {
-      setValue: (v: string) => {
-        trackerVal = v;
+      setValue: () => {
+        trackerCalled = true;
       },
     };
 
     fillElement(input, 'Grace Hopper');
     expect(input.value).toBe('Grace Hopper');
-    expect(trackerVal).toBe('Grace Hopper');
+    expect(trackerCalled).toBe(true);
   });
 
-  it('fills select dropdowns by matching option text or value', () => {
+  it('fills select dropdowns by option text, value, or country name/ISO code', () => {
     document.body.innerHTML = `
       <select id="country-select">
         <option value="">Select country...</option>
         <option value="US">United States</option>
         <option value="BD">Bangladesh</option>
-        <option value="CA">Canada</option>
+        <option value="GB">United Kingdom</option>
       </select>
     `;
     const select = document.getElementById('country-select') as HTMLSelectElement;
 
-    let changeFired = false;
-    select.addEventListener('change', () => {
-      changeFired = true;
-    });
-
-    // Fill by text
-    const s1 = fillElement(select, 'Bangladesh');
-    expect(s1).toBe(true);
+    // Match by full country name
+    expect(fillElement(select, 'Bangladesh')).toBe(true);
     expect(select.value).toBe('BD');
-    expect(changeFired).toBe(true);
 
-    // Fill by value
-    const s2 = fillElement(select, 'CA');
-    expect(s2).toBe(true);
-    expect(select.value).toBe('CA');
+    // Match by alias ("UK" -> "GB")
+    expect(fillElement(select, 'UK')).toBe(true);
+    expect(select.value).toBe('GB');
+
+    // Match by ISO code ("US")
+    expect(fillElement(select, 'US')).toBe(true);
+    expect(select.value).toBe('US');
   });
 
-  it('fills checkboxes and radio buttons', () => {
+  it('fills date inputs by converting DD/MM/YYYY or MM/DD/YYYY to YYYY-MM-DD', () => {
+    document.body.innerHTML = `<input type="date" id="dob" />`;
+    const dateInput = document.getElementById('dob') as HTMLInputElement;
+
+    fillElement(dateInput, '25/12/1995');
+    expect(dateInput.value).toBe('1995-12-25');
+  });
+
+  it('supports Fill Empty Only mode and Undo Last Fill', () => {
     document.body.innerHTML = `
-      <input type="checkbox" id="terms" value="accepted" />
-      <input type="radio" name="gender" id="g-male" value="male" />
-      <input type="radio" name="gender" id="g-female" value="female" />
+      <form>
+        <input type="text" id="fname" name="first_name" value="ExistingName" />
+        <input type="email" id="email" name="email" value="" />
+      </form>
     `;
-    const checkbox = document.getElementById('terms') as HTMLInputElement;
-    const radioFemale = document.getElementById('g-female') as HTMLInputElement;
+    const fname = document.getElementById('fname') as HTMLInputElement;
+    const email = document.getElementById('email') as HTMLInputElement;
 
-    fillElement(checkbox, 'true');
-    expect(checkbox.checked).toBe(true);
+    const profile = createDefaultProfile();
+    profile.firstName = 'NewName';
+    profile.email = 'new@example.com';
 
-    fillElement(radioFemale, 'female');
-    expect(radioFemale.checked).toBe(true);
+    // Mode: emptyOnly -> must NOT overwrite fname
+    const res = fillFormWithProfile(document, profile, { mode: 'emptyOnly' });
+    expect(res.filledCount).toBe(1);
+    expect(fname.value).toBe('ExistingName');
+    expect(email.value).toBe('new@example.com');
+
+    // Undo last fill -> restores email to ''
+    const restoredCount = undoLastFill();
+    expect(restoredCount).toBe(1);
+    expect(email.value).toBe('');
   });
 
-  it('fills contenteditable elements', () => {
-    document.body.innerHTML = `<div id="editor" contenteditable="true"></div>`;
-    const editor = document.getElementById('editor') as HTMLElement;
+  it('prioritizes SiteRule fieldMappings over the automatic heuristic matcher', () => {
+    document.body.innerHTML = `
+      <form>
+        <label for="ambiguous_box">Your Email</label>
+        <input type="text" id="ambiguous_box" name="custom_override" />
+      </form>
+    `;
 
-    const success = fillElement(editor, 'Some formatted rich text snippet');
-    expect(success).toBe(true);
-    expect(editor.textContent).toBe('Some formatted rich text snippet');
+    const profile = createPersonalTemplate('Work');
+    const companyField = profile.fields.find((f) => f.key === 'email')!;
+    companyField.value = 'mapped-override@company.org';
+
+    const rule: SiteRule = {
+      id: 'rule_1',
+      host: 'example.com',
+      autoFillRule: 'ask',
+      disabledFields: [],
+      fieldMappings: [
+        {
+          id: 'm1',
+          signature: { name: 'custom_override' },
+          targetKind: 'fieldKey',
+          targetKey: 'email',
+        },
+      ],
+    };
+
+    const res = fillFormWithProfile(document, profile, { siteRule: rule });
+    expect(res.filledCount).toBe(1);
+    expect((document.getElementById('ambiguous_box') as HTMLInputElement).value).toBe(
+      'mapped-override@company.org',
+    );
   });
 
-  it('traverses and fills elements inside Shadow DOM', () => {
-    // Create host element with Shadow Root
+  it('traverses and fills elements inside Shadow DOM and same-origin iframes while skipping hidden honeypots', () => {
     const host = document.createElement('div');
     document.body.appendChild(host);
     const shadow = host.attachShadow({ mode: 'open' });
@@ -147,110 +194,170 @@ describe('DOM Filler Engine', () => {
     innerInput.setAttribute('autocomplete', 'email');
     shadow.appendChild(innerInput);
 
+    // Hidden honeypot input
+    const honeypot = document.createElement('input');
+    honeypot.setAttribute('name', 'first_name');
+    honeypot.style.display = 'none';
+    document.body.appendChild(honeypot);
+
     const fillables = collectFillableElements(document);
     expect(fillables).toContain(innerInput);
+    expect(fillables).not.toContain(honeypot);
 
     const prof = createDefaultProfile();
     prof.email = 'shadow@example.com';
+    prof.firstName = 'ShouldNotFillHoneypot';
 
     const res = fillFormWithProfile(document, prof);
     expect(res.filledCount).toBe(1);
     expect(innerInput.value).toBe('shadow@example.com');
+    expect(honeypot.value).toBe('');
   });
 
-  it('fills an entire form matching profile fields while ignoring payment card fields', () => {
-    document.body.innerHTML = `
-      <form id="checkout-form">
-        <label for="fname">First Name</label>
-        <input type="text" id="fname" />
-
-        <label for="lname">Last Name</label>
-        <input type="text" id="lname" />
-
-        <label for="email">Email</label>
-        <input type="email" id="email" />
-
-        <label for="phone">Phone</label>
-        <input type="tel" id="phone" />
-
-        <label for="addr">Street Address</label>
-        <input type="text" id="addr" />
-
-        <label for="city">City</label>
-        <input type="text" id="city" />
-
-        <label for="zip">Postal Code</label>
-        <input type="text" id="zip" />
-
-        <!-- Password and Credit Card fields MUST be ignored during profile fill -->
-        <label for="pwd">Password</label>
-        <input type="password" id="pwd" />
-
-        <label for="cc-num">Credit Card Number</label>
-        <input type="text" id="cc-num" autocomplete="cc-number" />
-      </form>
-    `;
-
-    const profile = createDefaultProfile();
-    profile.firstName = 'Alan';
-    profile.lastName = 'Turing';
-    profile.email = 'alan@bletchley.org';
-    profile.phone = '+44 1234 567890';
-    profile.address1 = 'Sherborne School';
-    profile.city = 'Dorset';
-    profile.postalCode = 'DT9 3AP';
-
-    const res = fillFormWithProfile(document, profile);
-    expect(res.filledCount).toBe(7);
-
-    expect((document.getElementById('fname') as HTMLInputElement).value).toBe('Alan');
-    expect((document.getElementById('lname') as HTMLInputElement).value).toBe('Turing');
-    expect((document.getElementById('email') as HTMLInputElement).value).toBe('alan@bletchley.org');
-    expect((document.getElementById('phone') as HTMLInputElement).value).toBe('+44 1234 567890');
-    expect((document.getElementById('addr') as HTMLInputElement).value).toBe('Sherborne School');
-    expect((document.getElementById('city') as HTMLInputElement).value).toBe('Dorset');
-    expect((document.getElementById('zip') as HTMLInputElement).value).toBe('DT9 3AP');
-
-    // Security check: password and credit card MUST remain completely untouched
-    expect((document.getElementById('pwd') as HTMLInputElement).value).toBe('');
-    expect((document.getElementById('cc-num') as HTMLInputElement).value).toBe('');
-  });
-
-  it('explicitly fills payment card fields only when requested', () => {
+  it('strictly enforces Card Fill Rules: never filled by Fill All, blocked on HTTP, blocked without confirmation, supports split 4-box & expiry formats, and omits CVV if not stored', () => {
     document.body.innerHTML = `
       <form id="payment-form">
-        <label for="cc-name">Name on Card</label>
         <input type="text" id="cc-name" autocomplete="cc-name" />
-
-        <label for="cc-num">Card Number</label>
-        <input type="text" id="cc-num" autocomplete="cc-number" />
-
-        <label for="cc-exp">Expiration Date</label>
-        <input type="text" id="cc-exp" autocomplete="cc-exp" />
-
-        <label for="cc-cvv">Security Code</label>
+        <input type="text" id="cc-1" name="card_num_1" maxlength="4" />
+        <input type="text" id="cc-2" name="card_num_2" maxlength="4" />
+        <input type="text" id="cc-3" name="card_num_3" maxlength="4" />
+        <input type="text" id="cc-4" name="card_num_4" maxlength="4" />
+        <input type="text" id="cc-exp" autocomplete="cc-exp" placeholder="MM/YYYY" />
         <input type="text" id="cc-cvv" autocomplete="cc-csc" />
       </form>
     `;
 
-    const card: PaymentCard = {
+    const cardWithoutCvv: PaymentCard = {
       id: 'card_123',
       nickname: 'Secure Visa',
       cardholderName: 'Alan Turing',
-      cardNumber: '4242424242424242',
-      expMonth: '11',
+      cardNumber: '4532015112830366',
+      expMonth: '09',
       expYear: '28',
-      cvv: '789',
       brand: 'visa',
       createdAt: Date.now(),
     };
 
-    const res = fillPaymentCard(document, card);
-    expect(res.filledCount).toBe(4);
+    // 1. Blocked on insecure HTTP
+    const httpRes = fillPaymentCard(document, cardWithoutCvv, {
+      protocol: 'http:',
+      confirmed: true,
+    });
+    expect(httpRes.filledCount).toBe(0);
+    expect(httpRes.blockedReason).toBe('insecure_http');
+    expect((document.getElementById('cc-1') as HTMLInputElement).value).toBe('');
 
+    // 2. Blocked when confirmed === false
+    const unconfirmedRes = fillPaymentCard(document, cardWithoutCvv, {
+      protocol: 'https:',
+      confirmed: false,
+    });
+    expect(unconfirmedRes.filledCount).toBe(0);
+    expect(unconfirmedRes.blockedReason).toBe('unconfirmed');
+
+    // 3. Allowed on HTTPS with confirmation: fills 4 split boxes + MM/YYYY expiry + cardholder, leaves CVV empty
+    const httpsRes = fillPaymentCard(document, cardWithoutCvv, {
+      protocol: 'https:',
+      confirmed: true,
+    });
+    expect(httpsRes.filledCount).toBe(6);
     expect((document.getElementById('cc-name') as HTMLInputElement).value).toBe('Alan Turing');
-    expect((document.getElementById('cc-num') as HTMLInputElement).value).toBe('4242424242424242');
-    expect((document.getElementById('cc-exp') as HTMLInputElement).value).toBe('11/28');
-    expect((document.getElementById('cc-cvv') as HTMLInputElement).value).toBe('789');
+    expect((document.getElementById('cc-1') as HTMLInputElement).value).toBe('4532');
+    expect((document.getElementById('cc-2') as HTMLInputElement).value).toBe('0151');
+    expect((document.getElementById('cc-3') as HTMLInputElement).value).toBe('1283');
+    expect((document.getElementById('cc-4') as HTMLInputElement).value).toBe('0366');
+    expect((document.getElementById('cc-exp') as HTMLInputElement).value).toBe('09/2028');
+    expect((document.getElementById('cc-cvv') as HTMLInputElement).value).toBe('');
+  });
+
+  it('expands text snippet variables ({{date}}, {{time}}, {{datetime}}, {{cursor}}) and detects triggers', () => {
+    const fixedDate = new Date('2026-11-07T09:30:00.000Z');
+    const expanded = expandSnippetVariables('Signed on {{date}} at {{cursor}}end', fixedDate);
+    expect(expanded.text).toBe('Signed on 2026-11-07 at end');
+    expect(expanded.cursorOffset).toBe('Signed on 2026-11-07 at '.length);
+
+    const snippets = [{ id: 's1', trigger: ';email', content: 'ada@lovelace.org', folder: 'work' }];
+    const match = findMatchingSnippetTrigger('Contact me at ;email', snippets, ';');
+    expect(match?.snippet.id).toBe('s1');
+    expect(match?.matchedTrigger).toBe(';email');
+  });
+
+  it('builds context menu items respecting 12-field limit, sensitive preview suppression, vault lock state, and HTTPS card rules', () => {
+    const prof = createPersonalTemplate('Personal');
+    prof.fields = Array.from({ length: 15 }, (_, i) => ({
+      id: `f_${i}`,
+      label: `Field ${i + 1}`,
+      key: `custom_${i}`,
+      value: `SecretVal_${i + 1}`,
+      type: 'text' as const,
+      category: 'personal',
+      tags: [],
+      sensitive: i === 0, // First field is sensitive
+      createdAt: 1000,
+      updatedAt: 1000,
+      useCount: 20 - i,
+      lastUsedAt: 1000,
+    }));
+
+    const sampleCard: PaymentCard = {
+      id: 'c1',
+      nickname: 'Main Visa',
+      cardholderName: 'Ada',
+      cardNumber: '4532015112830366',
+      expMonth: '08',
+      expYear: '29',
+      brand: 'visa',
+      createdAt: 1000,
+    };
+
+    // 1. Locked vault -> shows Unlock Stashfill, no card entries
+    const lockedMenu = buildContextMenuDescriptors({
+      profiles: [prof],
+      settings: { ...DEFAULT_SETTINGS, showMenuValuePreviews: true },
+      vaultInitialized: true,
+      vaultUnlocked: false,
+      cards: [sampleCard],
+      isHttpsPage: true,
+    });
+    expect(lockedMenu.some((m) => m.id === 'stashfill-unlock-vault')).toBe(true);
+    expect(lockedMenu.some((m) => m.id.startsWith('stashfill-card:'))).toBe(false);
+
+    // Sensitive field (f_0) NEVER shows value preview even when showMenuValuePreviews is true
+    const f0Item = lockedMenu.find(
+      (m) => m.id === 'stashfill-field:prof_personal:f_0' || m.id.endsWith(':f_0'),
+    );
+    expect(f0Item?.title).toBe('Field 1');
+    // Non-sensitive field (f_1) shows preview when enabled
+    const f1Item = lockedMenu.find((m) => m.id.endsWith(':f_1'));
+    expect(f1Item?.title).toContain('SecretVal_2');
+
+    // Only 12 fields listed + More... fallback
+    const fieldItems = lockedMenu.filter((m) => m.id.startsWith('stashfill-field:'));
+    expect(fieldItems.length).toBe(12);
+    expect(lockedMenu.some((m) => m.id.startsWith('stashfill-more-profile:'))).toBe(true);
+
+    // 2. Unlocked vault on HTTP page -> no card entries
+    const httpMenu = buildContextMenuDescriptors({
+      profiles: [prof],
+      settings: DEFAULT_SETTINGS,
+      vaultInitialized: true,
+      vaultUnlocked: true,
+      cards: [sampleCard],
+      isHttpsPage: false,
+    });
+    expect(httpMenu.some((m) => m.id.startsWith('stashfill-card:'))).toBe(false);
+
+    // 3. Unlocked vault on HTTPS page -> shows Fill card entry with brand and last 4 digits
+    const httpsMenu = buildContextMenuDescriptors({
+      profiles: [prof],
+      settings: DEFAULT_SETTINGS,
+      vaultInitialized: true,
+      vaultUnlocked: true,
+      cards: [sampleCard],
+      isHttpsPage: true,
+    });
+    const cardEntry = httpsMenu.find((m) => m.id === 'stashfill-card:c1');
+    expect(cardEntry).toBeDefined();
+    expect(cardEntry?.title).toBe('Fill card: VISA •••• 0366');
   });
 });

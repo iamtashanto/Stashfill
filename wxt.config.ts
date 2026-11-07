@@ -22,6 +22,29 @@ export default defineConfig({
       default_title: 'Stashfill',
       default_popup: 'popup.html',
     },
+    commands: {
+      'open-quick-picker': {
+        suggested_key: {
+          default: 'Ctrl+Shift+Space',
+          mac: 'Command+Shift+Space',
+        },
+        description: 'Open Stashfill Quick Picker overlay',
+      },
+      'fill-all-fields': {
+        suggested_key: {
+          default: 'Alt+Shift+F',
+          mac: 'Alt+Shift+F',
+        },
+        description: 'Fill all matching fields with default profile',
+      },
+      'fill-payment-card': {
+        suggested_key: {
+          default: 'Alt+Shift+C',
+          mac: 'Alt+Shift+C',
+        },
+        description: 'Fill payment card (with confirmation)',
+      },
+    },
     icons: {
       16: '/icons/icon-16.png',
       32: '/icons/icon-32.png',

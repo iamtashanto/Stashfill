@@ -82,12 +82,30 @@ export const CardSchema = z.object({
 
 export type Card = z.infer<typeof CardSchema>;
 
+export const FieldMappingSchema = z.object({
+  id: z.string(),
+  signature: z.object({
+    name: z.string().optional(),
+    id: z.string().optional(),
+    labelHash: z.string().optional(),
+    domPath: z.string().optional(),
+  }),
+  targetKind: z.enum(['fieldKey', 'fieldId', 'snippetId']).default('fieldKey'),
+  targetKey: z.string(),
+  profileId: z.string().optional(),
+  label: z.string().optional(),
+});
+
+export type FieldMapping = z.infer<typeof FieldMappingSchema>;
+
 export const SiteRuleSchema = z.object({
   id: z.string(),
   host: z.string().min(1),
   profileId: z.string().nullable().optional(),
   disabledFields: z.array(z.string()).default([]),
   autoFillRule: z.enum(['ask', 'always', 'never']).default('ask'),
+  snippetsDisabled: z.boolean().optional(),
+  fieldMappings: z.array(FieldMappingSchema).optional(),
 });
 
 export type SiteRule = z.infer<typeof SiteRuleSchema>;
@@ -102,6 +120,9 @@ export const SettingsSchema = z.object({
   defaultProfileId: z.string().optional(),
   onboardingCompleted: z.boolean().optional(),
   customCategories: z.array(z.string()).optional(),
+  showMenuValuePreviews: z.boolean().optional(),
+  enableInlineChips: z.boolean().optional(),
+  snippetTriggerPrefix: z.string().optional(),
 });
 
 export type Settings = z.infer<typeof SettingsSchema>;

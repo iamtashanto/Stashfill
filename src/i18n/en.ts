@@ -142,9 +142,9 @@ export const en = {
   siteRules: {
     title: 'Site Rules',
     description:
-      'Configure per-domain profile defaults and autofill behavior. (Advanced rule matching coming soon)',
+      'Configure per-domain profile defaults, autofill behavior, and custom field mappings.',
     placeholderNote:
-      'Site rules let you bind a specific profile or block autofill on selected domains.',
+      'Site rules let you bind a specific profile, disable snippets, or manage saved field mappings on selected domains.',
     addRule: 'Add Site Rule',
     host: 'Domain / Hostname',
     hostPlaceholder: 'e.g. github.com or checkout.example.com',
@@ -152,6 +152,11 @@ export const en = {
     behaviorAsk: 'Only on click (Default)',
     behaviorAlways: 'Highlight matching fields',
     behaviorNever: 'Never fill on this site',
+    defaultProfile: 'Site Default Profile',
+    useGlobalDefault: 'Use Global Default',
+    disableSnippets: 'Disable text snippets on this site',
+    mappingsTitle: 'Saved Field Mappings',
+    removeMapping: 'Remove mapping',
     emptyState: 'No site-specific rules configured.',
     saved: 'Site rule saved.',
     deleted: 'Site rule removed.',
@@ -254,6 +259,13 @@ export const en = {
     vaultTimeout: 'Vault Auto-Lock Timeout',
     vaultTimeoutMinutes: '{minutes} minutes',
     confirmPaymentFill: 'Require confirmation before filling payment cards',
+    showMenuPreviews:
+      'Show field value previews in right-click menu (never shown for sensitive fields)',
+    enableInlineChips:
+      'Enable inline autofill chip next to recognized inputs (requests host permission)',
+    inlineChipsExplanation:
+      'Enabling inline chips requests optional host access so Stashfill can display a quick-fill icon next to focused inputs.',
+    snippetPrefix: 'Snippet Trigger Prefix',
     exportImportTitle: 'Backup & Restore',
     exportDesc: 'Download your saved profiles and snippets as an offline JSON backup file.',
     exportWithVault: 'Include encrypted vault in export (requires master passphrase to restore)',

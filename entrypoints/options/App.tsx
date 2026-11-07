@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo } from 'preact/hooks';
+import { browser } from 'wxt/browser';
 import { LocalStorageAdapter } from '../../src/storage/LocalStorageAdapter';
 import { StashRepository } from '../../src/storage/StashRepository';
 import { VaultManager } from '../../src/vault/vaultManager';
@@ -68,6 +69,7 @@ export function App({ repository, vaultMgr, defaultOpenOnboarding = false }: Opt
   const [ruleHost, setRuleHost] = useState('');
   const [ruleBehavior, setRuleBehavior] = useState<'ask' | 'always' | 'never'>('ask');
   const [ruleProfileId, setRuleProfileId] = useState<string>('');
+  const [ruleDisableSnippets, setRuleDisableSnippets] = useState(false);
 
   // Vault state
   const [vaultInitialized, setVaultInitialized] = useState(false);
@@ -376,17 +378,34 @@ export function App({ repository, vaultMgr, defaultOpenOnboarding = false }: Opt
   const handleSaveSiteRule = async (e: Event) => {
     e.preventDefault();
     if (!ruleHost.trim()) return;
+    const hostClean = ruleHost.trim().toLowerCase();
+    const existing = siteRules.find((r) => r.host.toLowerCase() === hostClean);
     const rule: SiteRule = {
-      id: `rule_${Date.now()}`,
-      host: ruleHost.trim().toLowerCase(),
+      id: existing?.id ?? `rule_${Date.now()}`,
+      host: hostClean,
       autoFillRule: ruleBehavior,
       profileId: ruleProfileId || null,
-      disabledFields: [],
+      disabledFields: existing?.disabledFields ?? [],
+      snippetsDisabled: ruleDisableSnippets,
+      fieldMappings: existing?.fieldMappings ?? [],
     };
     await repo.upsertSiteRule(rule);
     const updated = await repo.getSiteRules();
     setSiteRules(updated);
     setRuleHost('');
+    setRuleProfileId('');
+    setRuleDisableSnippets(false);
+    showToast(t.siteRules.saved, 'success');
+  };
+
+  const handleRemoveFieldMapping = async (rule: SiteRule, mappingId: string) => {
+    const updatedRule: SiteRule = {
+      ...rule,
+      fieldMappings: (rule.fieldMappings || []).filter((m) => m.id !== mappingId),
+    };
+    await repo.upsertSiteRule(updatedRule);
+    const updated = await repo.getSiteRules();
+    setSiteRules(updated);
     showToast(t.siteRules.saved, 'success');
   };
 
@@ -1450,51 +1469,85 @@ export function App({ repository, vaultMgr, defaultOpenOnboarding = false }: Opt
               <form
                 onSubmit={handleSaveSiteRule}
                 aria-label={t.siteRules.addRule}
-                class="grid grid-cols-1 gap-3 rounded-lg border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-800/40 sm:grid-cols-4"
+                class="space-y-3 rounded-lg border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-800/40"
               >
-                <div class="sm:col-span-2">
-                  <label
-                    for="rule-host-input"
-                    class="mb-1 block text-xs font-medium text-slate-700 dark:text-slate-200"
-                  >
-                    {t.siteRules.host} *
-                  </label>
-                  <input
-                    id="rule-host-input"
-                    type="text"
-                    required
-                    value={ruleHost}
-                    onInput={(e) => setRuleHost((e.target as HTMLInputElement).value)}
-                    placeholder={t.siteRules.hostPlaceholder}
-                    class="w-full rounded-md border border-slate-300 bg-white p-2 text-xs text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
-                  />
+                <div class="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                  <div>
+                    <label
+                      for="rule-host-input"
+                      class="mb-1 block text-xs font-medium text-slate-700 dark:text-slate-200"
+                    >
+                      {t.siteRules.host} *
+                    </label>
+                    <input
+                      id="rule-host-input"
+                      type="text"
+                      required
+                      value={ruleHost}
+                      onInput={(e) => setRuleHost((e.target as HTMLInputElement).value)}
+                      placeholder={t.siteRules.hostPlaceholder}
+                      class="w-full rounded-md border border-slate-300 bg-white p-2 text-xs text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                    />
+                  </div>
+                  <div>
+                    <label
+                      for="rule-profile-select"
+                      class="mb-1 block text-xs font-medium text-slate-700 dark:text-slate-200"
+                    >
+                      {t.siteRules.defaultProfile}
+                    </label>
+                    <select
+                      id="rule-profile-select"
+                      value={ruleProfileId}
+                      onChange={(e) => setRuleProfileId((e.target as HTMLSelectElement).value)}
+                      class="w-full rounded-md border border-slate-300 bg-white p-2 text-xs text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                    >
+                      <option value="">{t.siteRules.useGlobalDefault}</option>
+                      {profiles.map((p) => (
+                        <option key={p.id} value={p.id}>
+                          {p.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label
+                      for="rule-behavior-select"
+                      class="mb-1 block text-xs font-medium text-slate-700 dark:text-slate-200"
+                    >
+                      {t.siteRules.behavior}
+                    </label>
+                    <select
+                      id="rule-behavior-select"
+                      value={ruleBehavior}
+                      onChange={(e) =>
+                        setRuleBehavior(
+                          (e.target as HTMLSelectElement).value as 'ask' | 'always' | 'never',
+                        )
+                      }
+                      class="w-full rounded-md border border-slate-300 bg-white p-2 text-xs text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                    >
+                      <option value="ask">{t.siteRules.behaviorAsk}</option>
+                      <option value="always">{t.siteRules.behaviorAlways}</option>
+                      <option value="never">{t.siteRules.behaviorNever}</option>
+                    </select>
+                  </div>
                 </div>
-                <div>
-                  <label
-                    for="rule-behavior-select"
-                    class="mb-1 block text-xs font-medium text-slate-700 dark:text-slate-200"
-                  >
-                    {t.siteRules.behavior}
+                <div class="flex items-center justify-between pt-1">
+                  <label class="flex cursor-pointer items-center gap-2 text-xs font-medium text-slate-700 dark:text-slate-200">
+                    <input
+                      type="checkbox"
+                      checked={ruleDisableSnippets}
+                      onChange={(e) =>
+                        setRuleDisableSnippets((e.target as HTMLInputElement).checked)
+                      }
+                      class="rounded border-slate-300 text-brand-600"
+                    />
+                    <span>{t.siteRules.disableSnippets}</span>
                   </label>
-                  <select
-                    id="rule-behavior-select"
-                    value={ruleBehavior}
-                    onChange={(e) =>
-                      setRuleBehavior(
-                        (e.target as HTMLSelectElement).value as 'ask' | 'always' | 'never',
-                      )
-                    }
-                    class="w-full rounded-md border border-slate-300 bg-white p-2 text-xs text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
-                  >
-                    <option value="ask">{t.siteRules.behaviorAsk}</option>
-                    <option value="always">{t.siteRules.behaviorAlways}</option>
-                    <option value="never">{t.siteRules.behaviorNever}</option>
-                  </select>
-                </div>
-                <div class="flex items-end">
                   <button
                     type="submit"
-                    class="w-full rounded-md bg-brand-600 px-3 py-2 text-xs font-semibold text-white hover:bg-brand-700"
+                    class="rounded-md bg-brand-600 px-4 py-1.5 text-xs font-semibold text-white hover:bg-brand-700"
                   >
                     + {t.siteRules.addRule}
                   </button>
@@ -1511,23 +1564,59 @@ export function App({ repository, vaultMgr, defaultOpenOnboarding = false }: Opt
                     <div
                       key={rule.id}
                       role="listitem"
-                      class="flex items-center justify-between rounded-lg border border-slate-200 p-3 dark:border-slate-800"
+                      class="space-y-2 rounded-lg border border-slate-200 p-3 dark:border-slate-800"
                     >
-                      <div>
-                        <span class="font-mono text-xs font-bold text-slate-900 dark:text-slate-100">
-                          {rule.host}
-                        </span>
-                        <span class="ms-2 rounded bg-slate-100 px-2 py-0.5 text-[11px] text-slate-700 dark:bg-slate-800 dark:text-slate-300">
-                          {rule.autoFillRule}
-                        </span>
+                      <div class="flex items-center justify-between">
+                        <div>
+                          <span class="font-mono text-xs font-bold text-slate-900 dark:text-slate-100">
+                            {rule.host}
+                          </span>
+                          <span class="ms-2 rounded bg-slate-100 px-2 py-0.5 text-[11px] text-slate-700 dark:bg-slate-800 dark:text-slate-300">
+                            {rule.autoFillRule}
+                          </span>
+                          {rule.snippetsDisabled && (
+                            <span class="ms-2 rounded bg-amber-100 px-2 py-0.5 text-[10px] font-medium text-amber-900 dark:bg-amber-950 dark:text-amber-200">
+                              {t.siteRules.disableSnippets}
+                            </span>
+                          )}
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteSiteRule(rule.id)}
+                          class="rounded px-2 py-1 text-xs font-medium text-rose-700 hover:bg-rose-50 dark:text-rose-400"
+                        >
+                          {t.actions.delete}
+                        </button>
                       </div>
-                      <button
-                        type="button"
-                        onClick={() => handleDeleteSiteRule(rule.id)}
-                        class="rounded px-2 py-1 text-xs font-medium text-rose-700 hover:bg-rose-50 dark:text-rose-400"
-                      >
-                        {t.actions.delete}
-                      </button>
+                      {rule.fieldMappings && rule.fieldMappings.length > 0 && (
+                        <div class="space-y-1 border-t border-slate-200 pt-2 dark:border-slate-800">
+                          <span class="block text-[10px] font-bold uppercase text-slate-600 dark:text-slate-400">
+                            {t.siteRules.mappingsTitle}
+                          </span>
+                          {rule.fieldMappings.map((m) => (
+                            <div
+                              key={m.id}
+                              class="flex items-center justify-between rounded bg-slate-50 px-2 py-1 text-xs dark:bg-slate-800/50"
+                            >
+                              <span class="font-mono text-[11px] text-slate-800 dark:text-slate-200">
+                                {m.signature.name ||
+                                  m.signature.id ||
+                                  m.signature.domPath ||
+                                  'field'}{' '}
+                                → {m.label || m.targetKey}
+                              </span>
+                              <button
+                                type="button"
+                                onClick={() => handleRemoveFieldMapping(rule, m.id)}
+                                aria-label={`${t.siteRules.removeMapping}: ${m.targetKey}`}
+                                class="text-xs font-bold text-rose-700 hover:underline dark:text-rose-400"
+                              >
+                                ×
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      )}
                     </div>
                   ))}
                 </div>
@@ -1688,7 +1777,7 @@ export function App({ repository, vaultMgr, defaultOpenOnboarding = false }: Opt
                 </div>
 
                 {/* Payment Confirmation Toggle */}
-                <div class="pt-2">
+                <div class="space-y-3 pt-2">
                   <label class="flex cursor-pointer items-center gap-2.5 text-xs font-medium text-slate-700 dark:text-slate-200">
                     <input
                       type="checkbox"
@@ -1704,6 +1793,52 @@ export function App({ repository, vaultMgr, defaultOpenOnboarding = false }: Opt
                     />
                     <span>{t.settings.confirmPaymentFill}</span>
                   </label>
+
+                  <label class="flex cursor-pointer items-center gap-2.5 text-xs font-medium text-slate-700 dark:text-slate-200">
+                    <input
+                      type="checkbox"
+                      checked={Boolean(settings.showMenuValuePreviews)}
+                      onChange={async (e) => {
+                        const checked = (e.target as HTMLInputElement).checked;
+                        const updated = await repo.updateSettings({
+                          showMenuValuePreviews: checked,
+                        });
+                        setSettings(updated);
+                      }}
+                      class="rounded border-slate-300 text-brand-600"
+                    />
+                    <span>{t.settings.showMenuPreviews}</span>
+                  </label>
+
+                  <div>
+                    <label class="flex cursor-pointer items-center gap-2.5 text-xs font-medium text-slate-700 dark:text-slate-200">
+                      <input
+                        type="checkbox"
+                        checked={Boolean(settings.enableInlineChips)}
+                        onChange={async (e) => {
+                          const checked = (e.target as HTMLInputElement).checked;
+                          if (checked && browser?.permissions?.request) {
+                            try {
+                              await browser.permissions.request({
+                                origins: ['https://*/*', 'http://*/*'],
+                              });
+                            } catch {
+                              // continue in test environment
+                            }
+                          }
+                          const updated = await repo.updateSettings({
+                            enableInlineChips: checked,
+                          });
+                          setSettings(updated);
+                        }}
+                        class="rounded border-slate-300 text-brand-600"
+                      />
+                      <span>{t.settings.enableInlineChips}</span>
+                    </label>
+                    <p class="ms-6 mt-1 text-[11px] text-slate-600 dark:text-slate-300">
+                      {t.settings.inlineChipsExplanation}
+                    </p>
+                  </div>
                 </div>
 
                 {/* Re-open 3-Step Onboarding Wizard */}

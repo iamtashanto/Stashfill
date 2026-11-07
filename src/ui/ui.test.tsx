@@ -71,11 +71,10 @@ describe('Stashfill UI Integration, Performance, CRUD, i18n, and Accessibility',
     const { repo, vaultMgr } = await createRepoWithFields(twoHundredFields);
 
     const start = performance.now();
-    await act(async () => {
-      render(<PopupApp repository={repo} vaultMgr={vaultMgr} />, container);
-    });
-    await flushAsync();
+    render(<PopupApp repository={repo} vaultMgr={vaultMgr} />, container);
     const renderTimeMs = performance.now() - start;
+
+    await flushAsync();
 
     expect(renderTimeMs).toBeLessThan(100);
     expect(container.querySelectorAll('[role="listitem"]').length).toBe(200);

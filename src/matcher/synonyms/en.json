@@ -1,0 +1,396 @@
+{
+  "first_name": {
+    "autocomplete": ["given-name", "fname"],
+    "exact": [
+      "fname",
+      "firstname",
+      "first_name",
+      "first-name",
+      "givenname",
+      "given_name",
+      "given-name",
+      "forename"
+    ],
+    "keywords": ["first name", "given name", "forename", "your first name", "applicant first name"]
+  },
+  "last_name": {
+    "autocomplete": ["family-name", "lname"],
+    "exact": [
+      "lname",
+      "lastname",
+      "last_name",
+      "last-name",
+      "familyname",
+      "family_name",
+      "family-name",
+      "surname"
+    ],
+    "keywords": ["last name", "family name", "surname", "your last name", "applicant last name"]
+  },
+  "full_name": {
+    "autocomplete": ["name"],
+    "exact": [
+      "name",
+      "author",
+      "fullname",
+      "full_name",
+      "full-name",
+      "yourname",
+      "your_name",
+      "contactname",
+      "contact_name",
+      "applicant_name",
+      "customer_name"
+    ],
+    "keywords": [
+      "full name",
+      "your name",
+      "contact name",
+      "complete name",
+      "legal name",
+      "applicant name",
+      "customer name",
+      "name (required)",
+      "name"
+    ]
+  },
+  "email": {
+    "autocomplete": ["email"],
+    "exact": [
+      "email",
+      "e-mail",
+      "e_mail",
+      "emailaddress",
+      "email_address",
+      "user_email",
+      "contact_email",
+      "work_email"
+    ],
+    "keywords": ["email", "e-mail", "email address", "your email", "contact email", "work email"]
+  },
+  "phone": {
+    "autocomplete": ["tel", "tel-national", "tel-local", "phone"],
+    "exact": [
+      "phone",
+      "tel",
+      "telephone",
+      "phonenumber",
+      "phone_number",
+      "phone-number",
+      "contact_phone",
+      "primary_phone"
+    ],
+    "keywords": [
+      "phone",
+      "phone number",
+      "telephone",
+      "telephone number",
+      "contact number",
+      "contact no",
+      "daytime phone"
+    ]
+  },
+  "mobile": {
+    "autocomplete": ["mobile"],
+    "exact": [
+      "mobile",
+      "cell",
+      "cellphone",
+      "cell_phone",
+      "mobile_phone",
+      "mobilephone",
+      "alt_phone",
+      "secondary_phone"
+    ],
+    "keywords": [
+      "mobile",
+      "mobile number",
+      "mobile phone",
+      "cell phone",
+      "cell number",
+      "alternate phone",
+      "secondary phone",
+      "whatsapp number"
+    ]
+  },
+  "address_line1": {
+    "autocomplete": ["street-address", "address-line1"],
+    "exact": [
+      "address",
+      "addr",
+      "address1",
+      "address_1",
+      "address-1",
+      "address_line1",
+      "address-line1",
+      "addressline1",
+      "street",
+      "street_address",
+      "street-address",
+      "billing_address_1",
+      "shipping_address_1"
+    ],
+    "keywords": [
+      "street address",
+      "address line 1",
+      "mailing address",
+      "shipping address",
+      "billing address",
+      "residential address",
+      "house and street",
+      "p.o. box"
+    ]
+  },
+  "address_line2": {
+    "autocomplete": ["address-line2"],
+    "exact": [
+      "address2",
+      "address_2",
+      "address-2",
+      "address_line2",
+      "address-line2",
+      "addressline2",
+      "apt",
+      "suite",
+      "unit",
+      "apartment",
+      "building",
+      "billing_address_2",
+      "shipping_address_2"
+    ],
+    "keywords": [
+      "address line 2",
+      "apartment",
+      "suite",
+      "unit",
+      "building",
+      "floor",
+      "apt, suite, etc",
+      "apartment, suite, unit"
+    ]
+  },
+  "city": {
+    "autocomplete": ["address-level2"],
+    "exact": [
+      "city",
+      "town",
+      "suburb",
+      "locality",
+      "municipality",
+      "upazila",
+      "thana",
+      "billing_city",
+      "shipping_city"
+    ],
+    "keywords": ["city", "town", "municipality", "locality", "suburb", "upazila", "thana"]
+  },
+  "state": {
+    "autocomplete": ["address-level1"],
+    "exact": [
+      "state",
+      "province",
+      "region",
+      "county",
+      "division",
+      "district",
+      "state_province",
+      "billing_state",
+      "shipping_state"
+    ],
+    "keywords": [
+      "state",
+      "province",
+      "state / province",
+      "region",
+      "county",
+      "division",
+      "district"
+    ]
+  },
+  "postal_code": {
+    "autocomplete": ["postal-code"],
+    "exact": [
+      "zip",
+      "zipcode",
+      "zip_code",
+      "zip-code",
+      "postal",
+      "postalcode",
+      "postal_code",
+      "postal-code",
+      "postcode",
+      "post_code",
+      "pincode",
+      "pin_code",
+      "billing_postcode",
+      "shipping_postcode"
+    ],
+    "keywords": [
+      "postal code",
+      "zip code",
+      "postcode",
+      "zip / postal code",
+      "pin code",
+      "postal index"
+    ]
+  },
+  "country": {
+    "autocomplete": ["country", "country-name"],
+    "exact": [
+      "country",
+      "country_code",
+      "country-code",
+      "countryname",
+      "country_name",
+      "nation",
+      "nationality",
+      "billing_country",
+      "shipping_country"
+    ],
+    "keywords": ["country", "country / region", "nation", "nationality"]
+  },
+  "company": {
+    "autocomplete": ["organization"],
+    "exact": [
+      "company",
+      "organization",
+      "organisation",
+      "org",
+      "employer",
+      "company_name",
+      "company-name",
+      "business_name"
+    ],
+    "keywords": [
+      "company",
+      "company name",
+      "organization",
+      "organisation",
+      "employer",
+      "current employer",
+      "business name",
+      "institution",
+      "university"
+    ]
+  },
+  "job_title": {
+    "autocomplete": ["organization-title", "honorific-prefix"],
+    "exact": [
+      "job_title",
+      "job-title",
+      "jobtitle",
+      "title",
+      "position",
+      "role",
+      "designation",
+      "occupation",
+      "prefix",
+      "salutation"
+    ],
+    "keywords": [
+      "job title",
+      "current title",
+      "role",
+      "position",
+      "designation",
+      "occupation",
+      "title / prefix"
+    ]
+  },
+  "website": {
+    "autocomplete": ["url"],
+    "exact": [
+      "website",
+      "url",
+      "webpage",
+      "homepage",
+      "site",
+      "portfolio",
+      "personal_website",
+      "blog"
+    ],
+    "keywords": [
+      "website",
+      "personal website",
+      "portfolio",
+      "portfolio url",
+      "web page",
+      "homepage",
+      "blog url"
+    ]
+  },
+  "linkedin": {
+    "autocomplete": [],
+    "exact": ["linkedin", "linkedin_url", "linkedin-url", "linkedin_profile", "linkedinprofile"],
+    "keywords": ["linkedin", "linkedin profile", "linkedin url"]
+  },
+  "github": {
+    "autocomplete": [],
+    "exact": [
+      "github",
+      "github_url",
+      "github-url",
+      "github_username",
+      "github_handle",
+      "github_profile"
+    ],
+    "keywords": ["github", "github profile", "github url", "github username", "github handle"]
+  },
+  "twitter": {
+    "autocomplete": [],
+    "exact": ["twitter", "twitter_url", "twitter_handle", "x_handle", "x_profile"],
+    "keywords": ["twitter", "twitter handle", "twitter / x", "x profile", "x handle"]
+  },
+  "date_of_birth": {
+    "autocomplete": ["bday"],
+    "exact": [
+      "dob",
+      "date_of_birth",
+      "date-of-birth",
+      "dateofbirth",
+      "birthdate",
+      "birth_date",
+      "birthday"
+    ],
+    "keywords": ["date of birth", "birth date", "birthday", "dob"]
+  },
+  "username": {
+    "autocomplete": ["username"],
+    "exact": [
+      "username",
+      "user_name",
+      "user-name",
+      "handle",
+      "login",
+      "screen_name",
+      "userid",
+      "user_id"
+    ],
+    "keywords": ["username", "user name", "handle", "screen name", "user id"]
+  },
+  "bio": {
+    "autocomplete": [],
+    "exact": [
+      "bio",
+      "biography",
+      "about",
+      "about_me",
+      "aboutme",
+      "summary",
+      "profile_summary",
+      "cover_letter",
+      "message",
+      "comments"
+    ],
+    "keywords": [
+      "bio",
+      "short bio",
+      "biography",
+      "about you",
+      "about me",
+      "professional summary",
+      "cover letter",
+      "tell us about yourself"
+    ]
+  }
+}
