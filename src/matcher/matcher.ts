@@ -311,31 +311,32 @@ const CANONICAL_MAPPING: Record<ProfileFieldKey, string[]> = {
  * and legacy profile shape.
  */
 export function resolveProfileValue(
-  profile: VaultProfile | LegacyProfile | any,
+  profile: VaultProfile | LegacyProfile | Record<string, unknown>,
   key: ProfileFieldKey,
 ): string {
   if (!profile) return '';
 
-  if (Array.isArray(profile.fields)) {
+  if ('fields' in profile && Array.isArray(profile.fields)) {
+    const fields = profile.fields as { key?: string; id?: string; value?: string }[];
     const keysToCheck = CANONICAL_MAPPING[key] || [key];
     for (const k of keysToCheck) {
-      const match = profile.fields.find((f: any) => f.key === k);
+      const match = fields.find((f) => f.key === k);
       if (match && match.value) return match.value;
     }
-    const directMatch = profile.fields.find((f: any) => f.key === key || f.id === key);
+    const directMatch = fields.find((f) => f.key === key || f.id === key);
     if (directMatch && directMatch.value) return directMatch.value;
 
     if (key === 'fullName') {
-      const fn = profile.fields.find((f: any) => f.key === 'first_name')?.value || '';
-      const ln = profile.fields.find((f: any) => f.key === 'last_name')?.value || '';
+      const fn = fields.find((f) => f.key === 'first_name')?.value || '';
+      const ln = fields.find((f) => f.key === 'last_name')?.value || '';
       if (fn || ln) return `${fn} ${ln}`.trim();
     }
     if (key === 'firstName') {
-      const full = profile.fields.find((f: any) => f.key === 'full_name')?.value || '';
+      const full = fields.find((f) => f.key === 'full_name')?.value || '';
       if (full) return full.split(/\s+/)[0] || '';
     }
     if (key === 'lastName') {
-      const full = profile.fields.find((f: any) => f.key === 'full_name')?.value || '';
+      const full = fields.find((f) => f.key === 'full_name')?.value || '';
       if (full) {
         const parts = full.split(/\s+/);
         return parts.length > 1 ? parts.slice(1).join(' ') : '';
@@ -344,25 +345,30 @@ export function resolveProfileValue(
     return '';
   }
 
+  const legacy = profile as Record<string, unknown>;
+  const fullName = typeof legacy.fullName === 'string' ? legacy.fullName : '';
+  const firstName = typeof legacy.firstName === 'string' ? legacy.firstName : '';
+  const lastName = typeof legacy.lastName === 'string' ? legacy.lastName : '';
+
   switch (key) {
     case 'fullName':
-      if (profile.fullName) return profile.fullName;
-      if (profile.firstName || profile.lastName) {
-        return `${profile.firstName || ''} ${profile.lastName || ''}`.trim();
+      if (fullName) return fullName;
+      if (firstName || lastName) {
+        return `${firstName} ${lastName}`.trim();
       }
       return '';
     case 'firstName':
-      if (profile.firstName) return profile.firstName;
-      if (profile.fullName) return profile.fullName.split(/\s+/)[0] ?? '';
+      if (firstName) return firstName;
+      if (fullName) return fullName.split(/\s+/)[0] ?? '';
       return '';
     case 'lastName':
-      if (profile.lastName) return profile.lastName;
-      if (profile.fullName) {
-        const parts = profile.fullName.split(/\s+/);
+      if (lastName) return lastName;
+      if (fullName) {
+        const parts = fullName.split(/\s+/);
         return parts.length > 1 ? parts.slice(1).join(' ') : '';
       }
       return '';
     default:
-      return (profile[key] as string) ?? '';
+      return typeof legacy[key] === 'string' ? (legacy[key] as string) : '';
   }
 }

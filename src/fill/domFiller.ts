@@ -324,8 +324,18 @@ export function fillPaymentCard(
   const elements = collectFillableElements(root);
   let filledCount = 0;
 
-  const cardNumber = (card as any).number || (card as any).cardNumber || '';
-  const cardholderName = (card as any).cardholder || (card as any).cardholderName || '';
+  const cardNumber =
+    'number' in card && typeof card.number === 'string'
+      ? card.number
+      : 'cardNumber' in card && typeof card.cardNumber === 'string'
+        ? card.cardNumber
+        : '';
+  const cardholderName =
+    'cardholder' in card && typeof card.cardholder === 'string'
+      ? card.cardholder
+      : 'cardholderName' in card && typeof card.cardholderName === 'string'
+        ? card.cardholderName
+        : '';
   const cvv = card.cvv || '';
   const expMonth = card.expMonth || '';
   const expYear = card.expYear || '';

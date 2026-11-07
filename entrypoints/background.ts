@@ -67,6 +67,8 @@ export default defineBackground(() => {
     const profile = await repo.getActiveProfile();
     if (!profile) return;
 
+    const getVal = (key: string) => profile.fields.find((f) => f.key === key)?.value || '';
+
     switch (info.menuItemId) {
       case 'stashfill-fill-form': {
         await browser.tabs.sendMessage(tab.id, {
@@ -76,10 +78,7 @@ export default defineBackground(() => {
         break;
       }
       case 'stashfill-fill-name': {
-        const val =
-          (profile as any).fullName ||
-          (profile as any).fields?.find((f: any) => f.key === 'full_name')?.value ||
-          '';
+        const val = getVal('full_name') || `${getVal('first_name')} ${getVal('last_name')}`.trim();
         if (val) {
           await browser.tabs.sendMessage(tab.id, {
             type: 'FILL_ACTIVE_FIELD',
@@ -89,10 +88,7 @@ export default defineBackground(() => {
         break;
       }
       case 'stashfill-fill-email': {
-        const val =
-          (profile as any).email ||
-          (profile as any).fields?.find((f: any) => f.key === 'email')?.value ||
-          '';
+        const val = getVal('email');
         if (val) {
           await browser.tabs.sendMessage(tab.id, {
             type: 'FILL_ACTIVE_FIELD',
@@ -102,10 +98,7 @@ export default defineBackground(() => {
         break;
       }
       case 'stashfill-fill-phone': {
-        const val =
-          (profile as any).phone ||
-          (profile as any).fields?.find((f: any) => f.key === 'phone')?.value ||
-          '';
+        const val = getVal('phone') || getVal('mobile');
         if (val) {
           await browser.tabs.sendMessage(tab.id, {
             type: 'FILL_ACTIVE_FIELD',
@@ -115,10 +108,7 @@ export default defineBackground(() => {
         break;
       }
       case 'stashfill-fill-address': {
-        const val =
-          (profile as any).address1 ||
-          (profile as any).fields?.find((f: any) => f.key === 'address_line1')?.value ||
-          '';
+        const val = getVal('address_line1');
         if (val) {
           await browser.tabs.sendMessage(tab.id, {
             type: 'FILL_ACTIVE_FIELD',

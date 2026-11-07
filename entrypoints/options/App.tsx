@@ -2,14 +2,81 @@ import { useState, useEffect, useMemo } from 'preact/hooks';
 import { LocalStorageAdapter } from '../../src/storage/LocalStorageAdapter';
 import { StashRepository } from '../../src/storage/StashRepository';
 import { VaultManager } from '../../src/vault/vaultManager';
-import { type Profile, createDefaultProfile } from '../../src/types/profile';
-import { type Settings, DEFAULT_SETTINGS } from '../../src/types/settings';
-import { type PaymentCard, maskCardNumber, detectCardBrand } from '../../src/types/vault';
+import {
+  type Profile,
+  type Field,
+  type Settings,
+  DEFAULT_SETTINGS,
+} from '../../src/core/schemas/vault';
+import { createPersonalTemplate, TEMPLATE_REGISTRY } from '../../src/core/templates';
+import { validateLuhn, detectCardBrand, maskCardNumber } from '../../src/core/luhn';
+import { type PaymentCard } from '../../src/types/vault';
 import { getTranslations, formatString, type Language } from '../../src/i18n';
 import { Toast, type ToastMessage } from '../../src/components/Toast';
 import { ConfirmModal } from '../../src/components/ConfirmModal';
 
 type Tab = 'profiles' | 'vault' | 'backup' | 'settings';
+
+function getFieldValue(profile: Profile | null, key: string): string {
+  if (!profile || !profile.fields) return '';
+  const f = profile.fields.find((field) => field.key === key);
+  return f ? f.value : '';
+}
+
+function updateFieldValue(
+  profile: Profile,
+  key: string,
+  value: string,
+  defaultLabel: string,
+  category = 'general',
+): Profile {
+  const fields = [...profile.fields];
+  const idx = fields.findIndex((f) => f.key === key);
+  const now = Date.now();
+  const existing = fields[idx];
+  if (idx >= 0 && existing) {
+    fields[idx] = {
+      ...existing,
+      value,
+      updatedAt: now,
+    };
+  } else {
+    fields.push({
+      id: `f_${now}_${Math.random().toString(36).substring(2, 7)}`,
+      key,
+      label: defaultLabel,
+      value,
+      type: 'text',
+      category,
+      tags: [category],
+      sensitive: false,
+      createdAt: now,
+      updatedAt: now,
+      useCount: 0,
+      lastUsedAt: null,
+    });
+  }
+  return { ...profile, fields };
+}
+
+const CANONICAL_KEYS_SET = new Set([
+  'full_name',
+  'first_name',
+  'last_name',
+  'email',
+  'phone',
+  'mobile',
+  'address_line1',
+  'address_line2',
+  'city',
+  'state',
+  'postal_code',
+  'country',
+  'website',
+  'github',
+  'linkedin',
+  'twitter',
+]);
 
 export function App() {
   const [repo] = useState(() => new StashRepository(new LocalStorageAdapter()));
@@ -57,16 +124,23 @@ export function App() {
   // Load initial data
   useEffect(() => {
     async function init() {
-      const [allProfiles, activeId, curSettings, isInit] = await Promise.all([
-        repo.getProfiles(),
+      let allProfiles = await repo.getProfiles();
+      if (allProfiles.length === 0) {
+        const initial = createPersonalTemplate('Personal');
+        await repo.upsertProfile(initial);
+        allProfiles = [initial];
+      }
+
+      const [activeId, curSettings, isInit] = await Promise.all([
         repo.getActiveProfileId(),
         repo.getSettings(),
         vaultManager.isInitialized(),
       ]);
 
       setProfiles(allProfiles);
-      setSelectedProfileId(activeId);
-      const sel = allProfiles.find((p) => p.id === activeId) ?? allProfiles[0]!;
+      const chosenId = activeId || allProfiles[0]?.id || '';
+      setSelectedProfileId(chosenId);
+      const sel = allProfiles.find((p) => p.id === chosenId) ?? allProfiles[0]!;
       setProfileForm({ ...sel });
       setSettings(curSettings);
       setVaultInitialized(isInit);
@@ -109,9 +183,10 @@ export function App() {
     }
   };
 
-  const handleCreateProfile = async () => {
-    const newProf = createDefaultProfile(`Profile ${profiles.length + 1}`);
-    newProf.isDefault = false;
+  const handleCreateProfile = async (templateKey = 'personal') => {
+    const foundTemplate = TEMPLATE_REGISTRY.find((t) => t.id === templateKey);
+    const createFn = foundTemplate?.create || createPersonalTemplate;
+    const newProf = createFn(`Profile ${profiles.length + 1}`);
     const saved = await repo.upsertProfile(newProf);
     const updated = await repo.getProfiles();
     setProfiles(updated);
@@ -133,17 +208,27 @@ export function App() {
     showToast(t.messages.profileDeleted, 'success');
   };
 
-  // Custom snippet field handler
+  // Custom field handlers
   const handleAddCustomField = () => {
     if (!profileForm) return;
-    const newField = {
-      id: `cf_${Date.now()}`,
+    const now = Date.now();
+    const newField: Field = {
+      id: `cf_${now}_${Math.random().toString(36).substring(2, 7)}`,
       label: 'Custom Field',
+      key: `custom_${now}`,
       value: '',
+      type: 'text',
+      category: 'custom',
+      tags: ['custom'],
+      sensitive: false,
+      createdAt: now,
+      updatedAt: now,
+      useCount: 0,
+      lastUsedAt: null,
     };
     setProfileForm({
       ...profileForm,
-      customFields: [...profileForm.customFields, newField],
+      fields: [...profileForm.fields, newField],
     });
   };
 
@@ -151,7 +236,17 @@ export function App() {
     if (!profileForm) return;
     setProfileForm({
       ...profileForm,
-      customFields: profileForm.customFields.filter((cf) => cf.id !== id),
+      fields: profileForm.fields.filter((cf) => cf.id !== id),
+    });
+  };
+
+  const handleUpdateCustomField = (id: string, updates: Partial<Field>) => {
+    if (!profileForm) return;
+    setProfileForm({
+      ...profileForm,
+      fields: profileForm.fields.map((f) =>
+        f.id === id ? { ...f, ...updates, updatedAt: Date.now() } : f,
+      ),
     });
   };
 
@@ -205,16 +300,25 @@ export function App() {
       return;
     }
 
-    const brand = detectCardBrand(cardNumber);
+    const cleanedNumber = cardNumber.replace(/\s+/g, '');
+    if (!validateLuhn(cleanedNumber)) {
+      showToast('Card number failed Luhn validation', 'error');
+      return;
+    }
+
+    const brand = detectCardBrand(cleanedNumber);
     const newCard: PaymentCard = {
       id: `card_${Date.now()}`,
       nickname: cardNickname.trim(),
       cardholderName: cardholderName.trim(),
-      cardNumber: cardNumber.replace(/\s+/g, ''),
+      cardNumber: cleanedNumber,
       expMonth,
       expYear,
       cvv: cvv.trim(),
-      brand,
+      brand:
+        brand === 'visa' || brand === 'mastercard' || brand === 'amex' || brand === 'discover'
+          ? brand
+          : 'other',
       createdAt: Date.now(),
     };
 
@@ -429,12 +533,12 @@ export function App() {
                           : 'bg-slate-100 text-slate-700 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700'
                       }`}
                     >
-                      {p.name} {p.isDefault ? '★' : ''}
+                      {p.name} {settings.defaultProfileId === p.id ? '★' : ''}
                     </button>
                   ))}
                   <button
                     type="button"
-                    onClick={handleCreateProfile}
+                    onClick={() => handleCreateProfile('personal')}
                     class="rounded-md border border-dashed border-slate-300 px-2.5 py-1.5 text-xs font-medium text-slate-600 transition-colors hover:border-brand-500 hover:text-brand-600 dark:border-slate-700 dark:text-slate-400"
                   >
                     + {t.actions.add}
@@ -486,13 +590,15 @@ export function App() {
                       <label class="flex cursor-pointer items-center space-x-2 text-xs font-medium text-slate-700 dark:text-slate-300">
                         <input
                           type="checkbox"
-                          checked={profileForm.isDefault}
-                          onChange={(e) =>
-                            setProfileForm({
-                              ...profileForm,
-                              isDefault: (e.target as HTMLInputElement).checked,
-                            })
-                          }
+                          checked={settings.defaultProfileId === profileForm.id}
+                          onChange={async (e) => {
+                            const isChecked = (e.target as HTMLInputElement).checked;
+                            if (isChecked) {
+                              await repo.setActiveProfileId(profileForm.id);
+                              const cur = await repo.getSettings();
+                              setSettings(cur);
+                            }
+                          }}
                           class="rounded border-slate-300 text-brand-600 focus:ring-brand-500"
                         />
                         <span>{t.settings.isDefaultProfile}</span>
@@ -512,12 +618,17 @@ export function App() {
                         </label>
                         <input
                           type="text"
-                          value={profileForm.fullName}
+                          value={getFieldValue(profileForm, 'full_name')}
                           onInput={(e) =>
-                            setProfileForm({
-                              ...profileForm,
-                              fullName: (e.target as HTMLInputElement).value,
-                            })
+                            setProfileForm(
+                              updateFieldValue(
+                                profileForm,
+                                'full_name',
+                                (e.target as HTMLInputElement).value,
+                                t.fields.fullName,
+                                'personal',
+                              ),
+                            )
                           }
                           class="w-full rounded-md border border-slate-300 bg-white p-2 text-xs dark:border-slate-700 dark:bg-slate-800"
                         />
@@ -528,12 +639,17 @@ export function App() {
                         </label>
                         <input
                           type="text"
-                          value={profileForm.firstName}
+                          value={getFieldValue(profileForm, 'first_name')}
                           onInput={(e) =>
-                            setProfileForm({
-                              ...profileForm,
-                              firstName: (e.target as HTMLInputElement).value,
-                            })
+                            setProfileForm(
+                              updateFieldValue(
+                                profileForm,
+                                'first_name',
+                                (e.target as HTMLInputElement).value,
+                                t.fields.firstName,
+                                'personal',
+                              ),
+                            )
                           }
                           class="w-full rounded-md border border-slate-300 bg-white p-2 text-xs dark:border-slate-700 dark:bg-slate-800"
                         />
@@ -544,12 +660,17 @@ export function App() {
                         </label>
                         <input
                           type="text"
-                          value={profileForm.lastName}
+                          value={getFieldValue(profileForm, 'last_name')}
                           onInput={(e) =>
-                            setProfileForm({
-                              ...profileForm,
-                              lastName: (e.target as HTMLInputElement).value,
-                            })
+                            setProfileForm(
+                              updateFieldValue(
+                                profileForm,
+                                'last_name',
+                                (e.target as HTMLInputElement).value,
+                                t.fields.lastName,
+                                'personal',
+                              ),
+                            )
                           }
                           class="w-full rounded-md border border-slate-300 bg-white p-2 text-xs dark:border-slate-700 dark:bg-slate-800"
                         />
@@ -569,12 +690,17 @@ export function App() {
                         </label>
                         <input
                           type="email"
-                          value={profileForm.email}
+                          value={getFieldValue(profileForm, 'email')}
                           onInput={(e) =>
-                            setProfileForm({
-                              ...profileForm,
-                              email: (e.target as HTMLInputElement).value,
-                            })
+                            setProfileForm(
+                              updateFieldValue(
+                                profileForm,
+                                'email',
+                                (e.target as HTMLInputElement).value,
+                                t.fields.email,
+                                'contact',
+                              ),
+                            )
                           }
                           class="w-full rounded-md border border-slate-300 bg-white p-2 text-xs dark:border-slate-700 dark:bg-slate-800"
                         />
@@ -585,12 +711,17 @@ export function App() {
                         </label>
                         <input
                           type="tel"
-                          value={profileForm.phone}
+                          value={getFieldValue(profileForm, 'phone')}
                           onInput={(e) =>
-                            setProfileForm({
-                              ...profileForm,
-                              phone: (e.target as HTMLInputElement).value,
-                            })
+                            setProfileForm(
+                              updateFieldValue(
+                                profileForm,
+                                'phone',
+                                (e.target as HTMLInputElement).value,
+                                t.fields.phone,
+                                'contact',
+                              ),
+                            )
                           }
                           class="w-full rounded-md border border-slate-300 bg-white p-2 text-xs dark:border-slate-700 dark:bg-slate-800"
                         />
@@ -601,12 +732,17 @@ export function App() {
                         </label>
                         <input
                           type="tel"
-                          value={profileForm.altPhone}
+                          value={getFieldValue(profileForm, 'mobile')}
                           onInput={(e) =>
-                            setProfileForm({
-                              ...profileForm,
-                              altPhone: (e.target as HTMLInputElement).value,
-                            })
+                            setProfileForm(
+                              updateFieldValue(
+                                profileForm,
+                                'mobile',
+                                (e.target as HTMLInputElement).value,
+                                t.fields.altPhone,
+                                'contact',
+                              ),
+                            )
                           }
                           class="w-full rounded-md border border-slate-300 bg-white p-2 text-xs dark:border-slate-700 dark:bg-slate-800"
                         />
@@ -626,12 +762,17 @@ export function App() {
                         </label>
                         <input
                           type="text"
-                          value={profileForm.address1}
+                          value={getFieldValue(profileForm, 'address_line1')}
                           onInput={(e) =>
-                            setProfileForm({
-                              ...profileForm,
-                              address1: (e.target as HTMLInputElement).value,
-                            })
+                            setProfileForm(
+                              updateFieldValue(
+                                profileForm,
+                                'address_line1',
+                                (e.target as HTMLInputElement).value,
+                                t.fields.address1,
+                                'address',
+                              ),
+                            )
                           }
                           class="w-full rounded-md border border-slate-300 bg-white p-2 text-xs dark:border-slate-700 dark:bg-slate-800"
                         />
@@ -642,12 +783,17 @@ export function App() {
                         </label>
                         <input
                           type="text"
-                          value={profileForm.address2}
+                          value={getFieldValue(profileForm, 'address_line2')}
                           onInput={(e) =>
-                            setProfileForm({
-                              ...profileForm,
-                              address2: (e.target as HTMLInputElement).value,
-                            })
+                            setProfileForm(
+                              updateFieldValue(
+                                profileForm,
+                                'address_line2',
+                                (e.target as HTMLInputElement).value,
+                                t.fields.address2,
+                                'address',
+                              ),
+                            )
                           }
                           class="w-full rounded-md border border-slate-300 bg-white p-2 text-xs dark:border-slate-700 dark:bg-slate-800"
                         />
@@ -661,12 +807,17 @@ export function App() {
                         </label>
                         <input
                           type="text"
-                          value={profileForm.city}
+                          value={getFieldValue(profileForm, 'city')}
                           onInput={(e) =>
-                            setProfileForm({
-                              ...profileForm,
-                              city: (e.target as HTMLInputElement).value,
-                            })
+                            setProfileForm(
+                              updateFieldValue(
+                                profileForm,
+                                'city',
+                                (e.target as HTMLInputElement).value,
+                                t.fields.city,
+                                'address',
+                              ),
+                            )
                           }
                           class="w-full rounded-md border border-slate-300 bg-white p-2 text-xs dark:border-slate-700 dark:bg-slate-800"
                         />
@@ -677,12 +828,17 @@ export function App() {
                         </label>
                         <input
                           type="text"
-                          value={profileForm.state}
+                          value={getFieldValue(profileForm, 'state')}
                           onInput={(e) =>
-                            setProfileForm({
-                              ...profileForm,
-                              state: (e.target as HTMLInputElement).value,
-                            })
+                            setProfileForm(
+                              updateFieldValue(
+                                profileForm,
+                                'state',
+                                (e.target as HTMLInputElement).value,
+                                t.fields.state,
+                                'address',
+                              ),
+                            )
                           }
                           class="w-full rounded-md border border-slate-300 bg-white p-2 text-xs dark:border-slate-700 dark:bg-slate-800"
                         />
@@ -693,12 +849,17 @@ export function App() {
                         </label>
                         <input
                           type="text"
-                          value={profileForm.postalCode}
+                          value={getFieldValue(profileForm, 'postal_code')}
                           onInput={(e) =>
-                            setProfileForm({
-                              ...profileForm,
-                              postalCode: (e.target as HTMLInputElement).value,
-                            })
+                            setProfileForm(
+                              updateFieldValue(
+                                profileForm,
+                                'postal_code',
+                                (e.target as HTMLInputElement).value,
+                                t.fields.postalCode,
+                                'address',
+                              ),
+                            )
                           }
                           class="w-full rounded-md border border-slate-300 bg-white p-2 text-xs dark:border-slate-700 dark:bg-slate-800"
                         />
@@ -709,12 +870,17 @@ export function App() {
                         </label>
                         <input
                           type="text"
-                          value={profileForm.country}
+                          value={getFieldValue(profileForm, 'country')}
                           onInput={(e) =>
-                            setProfileForm({
-                              ...profileForm,
-                              country: (e.target as HTMLInputElement).value,
-                            })
+                            setProfileForm(
+                              updateFieldValue(
+                                profileForm,
+                                'country',
+                                (e.target as HTMLInputElement).value,
+                                t.fields.country,
+                                'address',
+                              ),
+                            )
                           }
                           class="w-full rounded-md border border-slate-300 bg-white p-2 text-xs dark:border-slate-700 dark:bg-slate-800"
                         />
@@ -734,12 +900,17 @@ export function App() {
                         </label>
                         <input
                           type="url"
-                          value={profileForm.website}
+                          value={getFieldValue(profileForm, 'website')}
                           onInput={(e) =>
-                            setProfileForm({
-                              ...profileForm,
-                              website: (e.target as HTMLInputElement).value,
-                            })
+                            setProfileForm(
+                              updateFieldValue(
+                                profileForm,
+                                'website',
+                                (e.target as HTMLInputElement).value,
+                                t.fields.website,
+                                'links',
+                              ),
+                            )
                           }
                           class="w-full rounded-md border border-slate-300 bg-white p-2 text-xs dark:border-slate-700 dark:bg-slate-800"
                         />
@@ -750,12 +921,17 @@ export function App() {
                         </label>
                         <input
                           type="text"
-                          value={profileForm.github}
+                          value={getFieldValue(profileForm, 'github')}
                           onInput={(e) =>
-                            setProfileForm({
-                              ...profileForm,
-                              github: (e.target as HTMLInputElement).value,
-                            })
+                            setProfileForm(
+                              updateFieldValue(
+                                profileForm,
+                                'github',
+                                (e.target as HTMLInputElement).value,
+                                t.fields.github,
+                                'links',
+                              ),
+                            )
                           }
                           class="w-full rounded-md border border-slate-300 bg-white p-2 text-xs dark:border-slate-700 dark:bg-slate-800"
                         />
@@ -766,12 +942,17 @@ export function App() {
                         </label>
                         <input
                           type="text"
-                          value={profileForm.linkedin}
+                          value={getFieldValue(profileForm, 'linkedin')}
                           onInput={(e) =>
-                            setProfileForm({
-                              ...profileForm,
-                              linkedin: (e.target as HTMLInputElement).value,
-                            })
+                            setProfileForm(
+                              updateFieldValue(
+                                profileForm,
+                                'linkedin',
+                                (e.target as HTMLInputElement).value,
+                                t.fields.linkedin,
+                                'links',
+                              ),
+                            )
                           }
                           class="w-full rounded-md border border-slate-300 bg-white p-2 text-xs dark:border-slate-700 dark:bg-slate-800"
                         />
@@ -782,12 +963,17 @@ export function App() {
                         </label>
                         <input
                           type="text"
-                          value={profileForm.twitter}
+                          value={getFieldValue(profileForm, 'twitter')}
                           onInput={(e) =>
-                            setProfileForm({
-                              ...profileForm,
-                              twitter: (e.target as HTMLInputElement).value,
-                            })
+                            setProfileForm(
+                              updateFieldValue(
+                                profileForm,
+                                'twitter',
+                                (e.target as HTMLInputElement).value,
+                                t.fields.twitter,
+                                'links',
+                              ),
+                            )
                           }
                           class="w-full rounded-md border border-slate-300 bg-white p-2 text-xs dark:border-slate-700 dark:bg-slate-800"
                         />
@@ -795,7 +981,7 @@ export function App() {
                     </div>
                   </div>
 
-                  {/* Section: Custom Fields */}
+                  {/* Section: Custom / Additional Fields */}
                   <div>
                     <div class="mb-3 flex items-center justify-between">
                       <h3 class="text-xs font-bold uppercase tracking-wider text-slate-400">
@@ -811,46 +997,42 @@ export function App() {
                     </div>
 
                     <div class="space-y-2">
-                      {profileForm.customFields.map((cf) => (
-                        <div key={cf.id} class="flex items-center space-x-2">
-                          <input
-                            type="text"
-                            value={cf.label}
-                            onInput={(e) => {
-                              const updated = profileForm.customFields.map((f) =>
-                                f.id === cf.id
-                                  ? { ...f, label: (e.target as HTMLInputElement).value }
-                                  : f,
-                              );
-                              setProfileForm({ ...profileForm, customFields: updated });
-                            }}
-                            placeholder="Label"
-                            class="w-1/3 rounded-md border border-slate-300 bg-white p-2 text-xs dark:border-slate-700 dark:bg-slate-800"
-                          />
-                          <input
-                            type="text"
-                            value={cf.value}
-                            onInput={(e) => {
-                              const updated = profileForm.customFields.map((f) =>
-                                f.id === cf.id
-                                  ? { ...f, value: (e.target as HTMLInputElement).value }
-                                  : f,
-                              );
-                              setProfileForm({ ...profileForm, customFields: updated });
-                            }}
-                            placeholder="Value"
-                            class="flex-1 rounded-md border border-slate-300 bg-white p-2 text-xs dark:border-slate-700 dark:bg-slate-800"
-                          />
-                          <button
-                            type="button"
-                            onClick={() => handleRemoveCustomField(cf.id)}
-                            class="p-2 text-rose-500 hover:text-rose-700"
-                            aria-label="Remove field"
-                          >
-                            ×
-                          </button>
-                        </div>
-                      ))}
+                      {profileForm.fields
+                        .filter((f) => !CANONICAL_KEYS_SET.has(f.key))
+                        .map((cf) => (
+                          <div key={cf.id} class="flex items-center space-x-2">
+                            <input
+                              type="text"
+                              value={cf.label}
+                              onInput={(e) =>
+                                handleUpdateCustomField(cf.id, {
+                                  label: (e.target as HTMLInputElement).value,
+                                })
+                              }
+                              placeholder="Label"
+                              class="w-1/3 rounded-md border border-slate-300 bg-white p-2 text-xs dark:border-slate-700 dark:bg-slate-800"
+                            />
+                            <input
+                              type="text"
+                              value={cf.value}
+                              onInput={(e) =>
+                                handleUpdateCustomField(cf.id, {
+                                  value: (e.target as HTMLInputElement).value,
+                                })
+                              }
+                              placeholder="Value"
+                              class="flex-1 rounded-md border border-slate-300 bg-white p-2 text-xs dark:border-slate-700 dark:bg-slate-800"
+                            />
+                            <button
+                              type="button"
+                              onClick={() => handleRemoveCustomField(cf.id)}
+                              class="p-2 text-rose-500 hover:text-rose-700"
+                              aria-label="Remove field"
+                            >
+                              ×
+                            </button>
+                          </div>
+                        ))}
                     </div>
                   </div>
                 </div>

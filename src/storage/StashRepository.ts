@@ -399,17 +399,18 @@ export class StashRepository {
     };
   }
 
-  async importData(data: any): Promise<{ profileCount: number; hasVault: boolean }> {
+  async importData(data: unknown): Promise<{ profileCount: number; hasVault: boolean }> {
     if (!data || typeof data !== 'object') {
       throw new Error('Invalid backup file');
     }
 
+    const payload = data as Record<string, unknown>;
     let vaultToImport: Vault;
-    if (data.vault) {
-      const { vault } = MigrationRunner.run(data.vault);
+    if (payload.vault) {
+      const { vault } = MigrationRunner.run(payload.vault);
       vaultToImport = vault;
     } else {
-      const { vault } = MigrationRunner.run(data);
+      const { vault } = MigrationRunner.run(payload);
       vaultToImport = vault;
     }
 
@@ -417,8 +418,8 @@ export class StashRepository {
     await this.flush();
 
     let hasVault = false;
-    if (data.encryptedPayload) {
-      await this.saveEncryptedVault(data.encryptedPayload);
+    if (payload.encryptedPayload) {
+      await this.saveEncryptedVault(payload.encryptedPayload as EncryptedPayload);
       hasVault = true;
     }
 

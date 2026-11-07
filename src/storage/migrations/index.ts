@@ -1,9 +1,4 @@
-import {
-  type Vault,
-  VaultSchema,
-  CURRENT_VAULT_VERSION,
-  createEmptyVault,
-} from '../../core/schemas/vault';
+import { type Vault, VaultSchema, CURRENT_VAULT_VERSION } from '../../core/schemas/vault';
 
 export interface Migration {
   fromVersion: number;
