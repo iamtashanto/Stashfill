@@ -109,6 +109,29 @@ export function App({ repository, vaultMgr, defaultOpenOnboarding = false }: Opt
 
   const [toast, setToast] = useState<ToastMessage | null>(null);
 
+  const [isEmbedded, setIsEmbedded] = useState(false);
+
+  useEffect(() => {
+    const checkEmbedded = () => {
+      const inIframe = typeof window !== 'undefined' && window.self !== window.top;
+      const isNarrow = typeof window !== 'undefined' && window.innerWidth < 768;
+      setIsEmbedded(inIframe || isNarrow);
+    };
+    checkEmbedded();
+    window.addEventListener('resize', checkEmbedded);
+    return () => window.removeEventListener('resize', checkEmbedded);
+  }, []);
+
+  const handleOpenInTab = () => {
+    const optionsUrl =
+      browser?.runtime?.getURL ? browser.runtime.getURL('/options.html') : '/options.html';
+    if (browser?.tabs?.create) {
+      void browser.tabs.create({ url: optionsUrl });
+    } else {
+      window.open(optionsUrl, '_blank');
+    }
+  };
+
   const t = useMemo(() => getTranslations(settings.language as Language), [settings.language]);
 
   const showToast = (text: string, type: 'success' | 'info' | 'error' = 'success') => {
@@ -753,35 +776,68 @@ export function App({ repository, vaultMgr, defaultOpenOnboarding = false }: Opt
       dir="auto"
       class="flex min-h-screen flex-col bg-slate-50 font-sans text-slate-900 dark:bg-slate-950 dark:text-slate-100"
     >
+      {/* Embedded View Alert / Shortcut Banner */}
+      {isEmbedded && (
+        <aside
+          aria-label="Embedded dialog notice"
+          class="sticky top-0 z-40 flex items-center justify-between border-b border-indigo-500/20 bg-gradient-to-r from-brand-600 via-indigo-600 to-purple-600 px-4 py-2 text-white shadow-xs"
+        >
+          <div class="flex items-center gap-2">
+            <span class="flex h-5 w-5 items-center justify-center rounded-md bg-white/20 text-xs font-bold">
+              ⚡
+            </span>
+            <span class="text-xs font-semibold">Stashfill Full Dashboard</span>
+            <span class="hidden sm:inline text-[11px] text-white/80">
+              — For the best experience, open as a full browser tab
+            </span>
+          </div>
+          <button
+            type="button"
+            onClick={handleOpenInTab}
+            class="inline-flex cursor-pointer items-center gap-1.5 rounded-lg bg-white px-2.5 py-1 text-xs font-bold text-brand-700 shadow-xs transition hover:bg-brand-50 hover:shadow"
+          >
+            <span>Open Full Tab</span>
+            <svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2.5"
+                d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"
+              />
+            </svg>
+          </button>
+        </aside>
+      )}
+
       {/* Top Bar */}
       <header class="sticky top-0 z-30 border-b border-slate-200/80 bg-white/95 backdrop-blur-md dark:border-slate-800 dark:bg-slate-900/90">
-        <div class="mx-auto flex h-16 max-w-6xl items-center justify-between px-4 sm:px-6">
-          <div class="flex items-center gap-3">
+        <div class="mx-auto flex h-14 md:h-16 max-w-6xl items-center justify-between px-3 sm:px-6">
+          <div class="flex items-center gap-2.5 sm:gap-3">
             <div
               aria-hidden="true"
-              class="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-brand-600 to-indigo-600 text-sm font-black tracking-tight text-white shadow-xs"
+              class="flex h-8 w-8 sm:h-9 sm:w-9 items-center justify-center rounded-xl bg-gradient-to-br from-brand-600 to-indigo-600 text-xs sm:text-sm font-black tracking-tight text-white shadow-xs"
             >
               SF
             </div>
             <div>
-              <div class="flex items-center gap-2">
-                <h1 class="text-base font-bold leading-none text-slate-900 dark:text-white">
+              <div class="flex items-center gap-1.5 sm:gap-2">
+                <h1 class="text-sm sm:text-base font-bold leading-none text-slate-900 dark:text-white">
                   {t.appName}
                 </h1>
                 <span class="rounded-full bg-brand-50 px-2 py-0.5 text-[10px] font-semibold text-brand-700 dark:bg-brand-950/60 dark:text-brand-300">
                   v1.0.0
                 </span>
               </div>
-              <p class="mt-0.5 text-xs text-slate-500 dark:text-slate-400">{t.tagline}</p>
+              <p class="hidden sm:block mt-0.5 text-xs text-slate-500 dark:text-slate-400">{t.tagline}</p>
             </div>
           </div>
 
-          <div class="flex items-center gap-2.5">
+          <div class="flex items-center gap-1.5 sm:gap-2.5">
             {!settings.onboardingCompleted && (
               <button
                 type="button"
                 onClick={() => setIsOnboardingOpen(true)}
-                class="cursor-pointer rounded-lg border border-brand-300 bg-brand-50 px-2.5 py-1 text-xs font-semibold text-brand-800 transition-colors hover:bg-brand-100 dark:border-brand-700 dark:bg-brand-950 dark:text-brand-200"
+                class="hidden md:inline-flex cursor-pointer rounded-lg border border-brand-300 bg-brand-50 px-2.5 py-1 text-xs font-semibold text-brand-800 transition-colors hover:bg-brand-100 dark:border-brand-700 dark:bg-brand-950 dark:text-brand-200"
               >
                 {t.settings.reopenOnboarding}
               </button>
@@ -840,21 +896,39 @@ export function App({ repository, vaultMgr, defaultOpenOnboarding = false }: Opt
             </button>
 
             {/* Offline Assurance Badge */}
-            <span class="inline-flex items-center gap-1.5 rounded-full border border-emerald-200/80 bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-800 dark:border-emerald-800/40 dark:bg-emerald-950/40 dark:text-emerald-300">
+            <span class="inline-flex items-center gap-1.5 rounded-full border border-emerald-200/80 bg-emerald-50 px-2 sm:px-2.5 py-1 text-[11px] sm:text-xs font-semibold text-emerald-800 dark:border-emerald-800/40 dark:bg-emerald-950/40 dark:text-emerald-300">
               <span class="relative flex h-2 w-2">
                 <span class="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75"></span>
                 <span class="relative inline-flex h-2 w-2 rounded-full bg-emerald-500"></span>
               </span>
-              {t.settings.privacyNote.split('.')[0]}
+              <span class="hidden sm:inline">{t.settings.privacyNote.split('.')[0]}</span>
+              <span class="sm:hidden">Offline</span>
             </span>
+
+            {/* Open In Tab icon button */}
+            <button
+              type="button"
+              onClick={handleOpenInTab}
+              title="Open Dashboard in New Tab"
+              class="cursor-pointer rounded-lg border border-slate-200 bg-slate-50 p-1.5 text-slate-700 transition-colors hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700"
+            >
+              <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="2"
+                  d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"
+                />
+              </svg>
+            </button>
           </div>
         </div>
       </header>
 
       {/* Main Container */}
-      <div class="mx-auto w-full max-w-6xl flex-1 px-4 py-6 sm:px-6">
-        {/* Top Stats Overview */}
-        <div class="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
+      <div class="mx-auto w-full max-w-6xl flex-1 px-3 py-4 sm:px-6 sm:py-6">
+        {/* Top Stats Overview: Shown on desktop tabs, hidden on narrow/modal to preserve space */}
+        <div class="mb-6 hidden md:grid md:grid-cols-4 gap-3">
           <div class="rounded-xl border border-slate-200/80 bg-white p-3.5 shadow-2xs dark:border-slate-800 dark:bg-slate-900">
             <span class="text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
               {t.settings.activeProfile}
@@ -923,27 +997,30 @@ export function App({ repository, vaultMgr, defaultOpenOnboarding = false }: Opt
           </div>
         </div>
 
-        <div class="grid grid-cols-1 gap-6 md:grid-cols-4">
-          {/* Navigation Sidebar */}
-          <nav aria-label={t.settings.title} class="space-y-1.5 md:col-span-1">
+        <div class="grid grid-cols-1 gap-4 sm:gap-6 md:grid-cols-4">
+          {/* Navigation: Horizontal scroll on narrow/modal, vertical sidebar on desktop */}
+          <nav
+            aria-label={t.settings.title}
+            class="flex md:flex-col overflow-x-auto no-scrollbar gap-1.5 pb-2 md:pb-0 md:col-span-1 border-b md:border-b-0 border-slate-200 dark:border-slate-800"
+          >
             <button
               type="button"
               onClick={() => setActiveTab('profiles')}
               aria-current={activeTab === 'profiles' ? 'page' : undefined}
-              class={`flex w-full cursor-pointer items-center justify-between rounded-xl px-3.5 py-2.5 text-start text-sm font-medium transition-all ${
+              class={`flex shrink-0 cursor-pointer items-center justify-between rounded-xl px-3 py-1.5 md:px-3.5 md:py-2.5 text-start text-xs md:text-sm font-medium transition-all ${
                 activeTab === 'profiles'
                   ? 'bg-brand-600 text-white shadow-xs'
                   : 'text-slate-700 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-900'
               }`}
             >
-              <div class="flex items-center gap-2.5">
+              <div class="flex items-center gap-2 md:gap-2.5">
                 <svg class="h-4 w-4 opacity-80" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
                 </svg>
                 <span>{t.settings.profilesTitle}</span>
               </div>
               <span
-                class={`rounded-full px-2 py-0.5 text-[10px] font-bold ${
+                class={`ms-1.5 rounded-full px-1.5 md:px-2 py-0.5 text-[10px] font-bold ${
                   activeTab === 'profiles'
                     ? 'bg-white/20 text-white'
                     : 'bg-slate-200/70 text-slate-700 dark:bg-slate-800 dark:text-slate-300'
@@ -957,20 +1034,20 @@ export function App({ repository, vaultMgr, defaultOpenOnboarding = false }: Opt
               type="button"
               onClick={() => setActiveTab('snippets')}
               aria-current={activeTab === 'snippets' ? 'page' : undefined}
-              class={`flex w-full cursor-pointer items-center justify-between rounded-xl px-3.5 py-2.5 text-start text-sm font-medium transition-all ${
+              class={`flex shrink-0 cursor-pointer items-center justify-between rounded-xl px-3 py-1.5 md:px-3.5 md:py-2.5 text-start text-xs md:text-sm font-medium transition-all ${
                 activeTab === 'snippets'
                   ? 'bg-brand-600 text-white shadow-xs'
                   : 'text-slate-700 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-900'
               }`}
             >
-              <div class="flex items-center gap-2.5">
+              <div class="flex items-center gap-2 md:gap-2.5">
                 <svg class="h-4 w-4 opacity-80" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
                 </svg>
                 <span>{t.snippets.title}</span>
               </div>
               <span
-                class={`rounded-full px-2 py-0.5 text-[10px] font-bold ${
+                class={`ms-1.5 rounded-full px-1.5 md:px-2 py-0.5 text-[10px] font-bold ${
                   activeTab === 'snippets'
                     ? 'bg-white/20 text-white'
                     : 'bg-slate-200/70 text-slate-700 dark:bg-slate-800 dark:text-slate-300'
@@ -984,20 +1061,20 @@ export function App({ repository, vaultMgr, defaultOpenOnboarding = false }: Opt
               type="button"
               onClick={() => setActiveTab('vault')}
               aria-current={activeTab === 'vault' ? 'page' : undefined}
-              class={`flex w-full cursor-pointer items-center justify-between rounded-xl px-3.5 py-2.5 text-start text-sm font-medium transition-all ${
+              class={`flex shrink-0 cursor-pointer items-center justify-between rounded-xl px-3 py-1.5 md:px-3.5 md:py-2.5 text-start text-xs md:text-sm font-medium transition-all ${
                 activeTab === 'vault'
                   ? 'bg-brand-600 text-white shadow-xs'
                   : 'text-slate-700 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-900'
               }`}
             >
-              <div class="flex items-center gap-2.5">
+              <div class="flex items-center gap-2 md:gap-2.5">
                 <svg class="h-4 w-4 opacity-80" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
                 </svg>
                 <span>{t.vault.title}</span>
               </div>
               <span
-                class={`rounded-full px-2 py-0.5 text-[10px] font-bold ${
+                class={`ms-1.5 rounded-full px-1.5 md:px-2 py-0.5 text-[10px] font-bold ${
                   activeTab === 'vault'
                     ? 'bg-white/20 text-white'
                     : 'bg-slate-200/70 text-slate-700 dark:bg-slate-800 dark:text-slate-300'
@@ -1011,20 +1088,20 @@ export function App({ repository, vaultMgr, defaultOpenOnboarding = false }: Opt
               type="button"
               onClick={() => setActiveTab('siteRules')}
               aria-current={activeTab === 'siteRules' ? 'page' : undefined}
-              class={`flex w-full cursor-pointer items-center justify-between rounded-xl px-3.5 py-2.5 text-start text-sm font-medium transition-all ${
+              class={`flex shrink-0 cursor-pointer items-center justify-between rounded-xl px-3 py-1.5 md:px-3.5 md:py-2.5 text-start text-xs md:text-sm font-medium transition-all ${
                 activeTab === 'siteRules'
                   ? 'bg-brand-600 text-white shadow-xs'
                   : 'text-slate-700 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-900'
               }`}
             >
-              <div class="flex items-center gap-2.5">
+              <div class="flex items-center gap-2 md:gap-2.5">
                 <svg class="h-4 w-4 opacity-80" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9" />
                 </svg>
                 <span>{t.siteRules.title}</span>
               </div>
               <span
-                class={`rounded-full px-2 py-0.5 text-[10px] font-bold ${
+                class={`ms-1.5 rounded-full px-1.5 md:px-2 py-0.5 text-[10px] font-bold ${
                   activeTab === 'siteRules'
                     ? 'bg-white/20 text-white'
                     : 'bg-slate-200/70 text-slate-700 dark:bg-slate-800 dark:text-slate-300'
@@ -1038,7 +1115,7 @@ export function App({ repository, vaultMgr, defaultOpenOnboarding = false }: Opt
               type="button"
               onClick={() => setActiveTab('backup')}
               aria-current={activeTab === 'backup' ? 'page' : undefined}
-              class={`flex w-full cursor-pointer items-center gap-2.5 rounded-xl px-3.5 py-2.5 text-start text-sm font-medium transition-all ${
+              class={`flex shrink-0 cursor-pointer items-center gap-2 md:gap-2.5 rounded-xl px-3 py-1.5 md:px-3.5 md:py-2.5 text-start text-xs md:text-sm font-medium transition-all ${
                 activeTab === 'backup'
                   ? 'bg-brand-600 text-white shadow-xs'
                   : 'text-slate-700 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-900'
@@ -1054,7 +1131,7 @@ export function App({ repository, vaultMgr, defaultOpenOnboarding = false }: Opt
               type="button"
               onClick={() => setActiveTab('settings')}
               aria-current={activeTab === 'settings' ? 'page' : undefined}
-              class={`flex w-full cursor-pointer items-center gap-2.5 rounded-xl px-3.5 py-2.5 text-start text-sm font-medium transition-all ${
+              class={`flex shrink-0 cursor-pointer items-center gap-2 md:gap-2.5 rounded-xl px-3 py-1.5 md:px-3.5 md:py-2.5 text-start text-xs md:text-sm font-medium transition-all ${
                 activeTab === 'settings'
                   ? 'bg-brand-600 text-white shadow-xs'
                   : 'text-slate-700 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-900'
@@ -1069,7 +1146,7 @@ export function App({ repository, vaultMgr, defaultOpenOnboarding = false }: Opt
           </nav>
 
           {/* Content Pane */}
-          <main class="rounded-2xl border border-slate-200/80 bg-white p-6 shadow-2xs dark:border-slate-800 dark:bg-slate-900 md:col-span-3">
+          <main class="rounded-2xl border border-slate-200/80 bg-white p-4 sm:p-6 shadow-2xs dark:border-slate-800 dark:bg-slate-900 md:col-span-3">
           {/* TAB 1: PROFILES & FIELDS */}
           {activeTab === 'profiles' && (
             <div class="space-y-6">
