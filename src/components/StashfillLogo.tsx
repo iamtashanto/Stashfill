@@ -89,3 +89,4 @@ export function StashfillLogo({ size = 32, class: className = '', hasGlow = fals
     </svg>
   );
 }
+

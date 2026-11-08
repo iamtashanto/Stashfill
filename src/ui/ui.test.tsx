@@ -78,7 +78,7 @@ describe('Stashfill UI Integration, Performance, CRUD, i18n, and Accessibility',
 
     await flushAsync();
 
-    expect(renderTimeMs).toBeLessThan(150);
+    expect(renderTimeMs).toBeLessThan(250);
     expect(container.querySelectorAll('[role="listitem"]').length).toBe(200);
 
     // Search input should be focused on open

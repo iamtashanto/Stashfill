@@ -901,22 +901,24 @@ export function App({ repository, vaultMgr, defaultOpenOnboarding = false }: Opt
               <span class="sm:hidden">Offline</span>
             </span>
 
-            {/* Open In Tab icon button */}
-            <button
-              type="button"
-              onClick={handleOpenInTab}
-              title="Open Dashboard in New Tab"
-              class="cursor-pointer rounded-lg border border-slate-200 bg-slate-50 p-1.5 text-slate-700 transition-colors hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700"
-            >
-              <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                  stroke-width="2"
-                  d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"
-                />
-              </svg>
-            </button>
+            {/* Open In Tab icon button: shown only when embedded in modal */}
+            {isEmbedded && (
+              <button
+                type="button"
+                onClick={handleOpenInTab}
+                title="Open Dashboard in New Tab"
+                class="cursor-pointer rounded-lg border border-slate-200 bg-slate-50 p-1.5 text-slate-700 transition-colors hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700"
+              >
+                <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    stroke-width="2"
+                    d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"
+                  />
+                </svg>
+              </button>
+            )}
           </div>
         </div>
       </header>
@@ -924,32 +926,46 @@ export function App({ repository, vaultMgr, defaultOpenOnboarding = false }: Opt
       {/* Main Container */}
       <div class="mx-auto w-full max-w-6xl flex-1 px-3 py-4 sm:px-6 sm:py-6">
         {/* Top Stats Overview: Shown on desktop tabs, hidden on narrow/modal to preserve space */}
-        <div class="mb-6 hidden md:grid md:grid-cols-4 gap-3">
-          <div class="rounded-xl border border-slate-200/80 bg-white p-3.5 shadow-2xs dark:border-slate-800 dark:bg-slate-900">
-            <span class="text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-              {t.settings.activeProfile}
-            </span>
-            <div class="mt-1 flex items-center gap-1.5 text-sm font-bold text-slate-900 dark:text-white">
-              <span>{profileForm?.name || 'Personal'}</span>
-              <span class="text-amber-500">★</span>
+        <div class="mb-6 hidden md:grid md:grid-cols-4 gap-3.5">
+          <div class="group relative overflow-hidden rounded-2xl border border-slate-200/80 bg-gradient-to-b from-white to-slate-50/60 p-4 shadow-2xs transition-all hover:border-slate-300 dark:border-slate-800 dark:from-slate-900 dark:to-slate-900/60 dark:hover:border-slate-700">
+            <div class="flex items-center justify-between">
+              <span class="text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                {t.settings.activeProfile}
+              </span>
+              <div class="flex h-7 w-7 items-center justify-center rounded-lg bg-brand-50 text-brand-600 dark:bg-brand-950/60 dark:text-brand-300">
+                <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                </svg>
+              </div>
             </div>
-            <p class="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
+            <div class="mt-2 flex items-center gap-1.5 text-base font-bold text-slate-900 dark:text-white">
+              <span class="truncate">{profileForm?.name || 'Personal'}</span>
+              <span class="text-amber-500 text-sm">★</span>
+            </div>
+            <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">
               {profileForm?.fields?.length || 0} fields configured
             </p>
           </div>
 
-          <div class="rounded-xl border border-slate-200/80 bg-white p-3.5 shadow-2xs dark:border-slate-800 dark:bg-slate-900">
-            <span class="text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-              {t.vault.title}
-            </span>
-            <div class="mt-1 flex items-center gap-1.5 text-sm font-bold text-slate-900 dark:text-white">
+          <div class="group relative overflow-hidden rounded-2xl border border-slate-200/80 bg-gradient-to-b from-white to-slate-50/60 p-4 shadow-2xs transition-all hover:border-slate-300 dark:border-slate-800 dark:from-slate-900 dark:to-slate-900/60 dark:hover:border-slate-700">
+            <div class="flex items-center justify-between">
+              <span class="text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                {t.vault.title}
+              </span>
+              <div class="flex h-7 w-7 items-center justify-center rounded-lg bg-indigo-50 text-indigo-600 dark:bg-indigo-950/60 dark:text-indigo-300">
+                <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                </svg>
+              </div>
+            </div>
+            <div class="mt-2 flex items-center gap-2 text-base font-bold text-slate-900 dark:text-white">
               <span
-                class={`h-2 w-2 rounded-full ${
+                class={`h-2.5 w-2.5 rounded-full ${
                   vaultInitialized
                     ? vaultUnlocked
-                      ? 'bg-emerald-500'
-                      : 'bg-amber-500'
-                    : 'bg-slate-400'
+                      ? 'bg-emerald-500 ring-2 ring-emerald-400/30'
+                      : 'bg-amber-500 ring-2 ring-amber-400/30'
+                    : 'bg-slate-400 ring-2 ring-slate-300/30'
                 }`}
               ></span>
               <span>
@@ -960,34 +976,49 @@ export function App({ repository, vaultMgr, defaultOpenOnboarding = false }: Opt
                   : 'Unconfigured'}
               </span>
             </div>
-            <p class="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
+            <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">
               {cards.length} cards protected
             </p>
           </div>
 
-          <div class="rounded-xl border border-slate-200/80 bg-white p-3.5 shadow-2xs dark:border-slate-800 dark:bg-slate-900">
-            <span class="text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-              {t.snippets.title}
-            </span>
-            <div class="mt-1 text-sm font-bold text-slate-900 dark:text-white">
+          <div class="group relative overflow-hidden rounded-2xl border border-slate-200/80 bg-gradient-to-b from-white to-slate-50/60 p-4 shadow-2xs transition-all hover:border-slate-300 dark:border-slate-800 dark:from-slate-900 dark:to-slate-900/60 dark:hover:border-slate-700">
+            <div class="flex items-center justify-between">
+              <span class="text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                {t.snippets.title}
+              </span>
+              <div class="flex h-7 w-7 items-center justify-center rounded-lg bg-amber-50 text-amber-600 dark:bg-amber-950/60 dark:text-amber-300">
+                <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
+                </svg>
+              </div>
+            </div>
+            <div class="mt-2 text-base font-bold text-slate-900 dark:text-white">
               {snippets.length} Triggers
             </div>
-            <p class="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
-              Prefix: <span class="font-mono font-semibold">{settings.snippetTriggerPrefix || ';'}</span>
+            <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">
+              Prefix: <span class="rounded bg-slate-100 px-1.5 py-0.5 font-mono text-[11px] font-semibold text-slate-700 dark:bg-slate-800 dark:text-slate-300">{settings.snippetTriggerPrefix || ';'}</span>
             </p>
           </div>
 
-          <div class="rounded-xl border border-slate-200/80 bg-white p-3.5 shadow-2xs dark:border-slate-800 dark:bg-slate-900">
-            <span class="text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-              Privacy Mode
-            </span>
-            <div class="mt-1 flex items-center gap-1 text-sm font-bold text-emerald-600 dark:text-emerald-400">
-              <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
-              </svg>
+          <div class="group relative overflow-hidden rounded-2xl border border-slate-200/80 bg-gradient-to-b from-white to-slate-50/60 p-4 shadow-2xs transition-all hover:border-slate-300 dark:border-slate-800 dark:from-slate-900 dark:to-slate-900/60 dark:hover:border-slate-700">
+            <div class="flex items-center justify-between">
+              <span class="text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                Privacy Mode
+              </span>
+              <div class="flex h-7 w-7 items-center justify-center rounded-lg bg-emerald-50 text-emerald-600 dark:bg-emerald-950/60 dark:text-emerald-300">
+                <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+                </svg>
+              </div>
+            </div>
+            <div class="mt-2 flex items-center gap-1.5 text-base font-bold text-emerald-600 dark:text-emerald-400">
+              <span class="relative flex h-2 w-2">
+                <span class="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75"></span>
+                <span class="relative inline-flex h-2 w-2 rounded-full bg-emerald-500"></span>
+              </span>
               <span>100% Offline</span>
             </div>
-            <p class="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
+            <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">
               Zero network requests
             </p>
           </div>
@@ -1003,23 +1034,23 @@ export function App({ repository, vaultMgr, defaultOpenOnboarding = false }: Opt
               type="button"
               onClick={() => setActiveTab('profiles')}
               aria-current={activeTab === 'profiles' ? 'page' : undefined}
-              class={`flex shrink-0 cursor-pointer items-center justify-between rounded-xl px-3 py-1.5 md:px-3.5 md:py-2.5 text-start text-xs md:text-sm font-medium transition-all ${
+              class={`flex shrink-0 cursor-pointer items-center justify-between rounded-xl px-3.5 py-2.5 text-start text-xs md:text-sm font-semibold transition-all ${
                 activeTab === 'profiles'
-                  ? 'bg-brand-600 text-white shadow-xs'
-                  : 'text-slate-700 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-900'
+                  ? 'bg-gradient-to-r from-brand-600 to-indigo-600 text-white shadow-xs'
+                  : 'text-slate-600 hover:bg-slate-100/80 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800/60 dark:hover:text-slate-200'
               }`}
             >
-              <div class="flex items-center gap-2 md:gap-2.5">
-                <svg class="h-4 w-4 opacity-80" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <div class="flex items-center gap-2.5">
+                <svg class="h-4 w-4 opacity-90" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
                 </svg>
                 <span>{t.settings.profilesTitle}</span>
               </div>
               <span
-                class={`ms-1.5 rounded-full px-1.5 md:px-2 py-0.5 text-[10px] font-bold ${
+                class={`ms-1.5 rounded-full px-2 py-0.5 text-[10px] font-bold ${
                   activeTab === 'profiles'
                     ? 'bg-white/20 text-white'
-                    : 'bg-slate-200/70 text-slate-700 dark:bg-slate-800 dark:text-slate-300'
+                    : 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400'
                 }`}
               >
                 {profiles.length}
@@ -1030,23 +1061,23 @@ export function App({ repository, vaultMgr, defaultOpenOnboarding = false }: Opt
               type="button"
               onClick={() => setActiveTab('snippets')}
               aria-current={activeTab === 'snippets' ? 'page' : undefined}
-              class={`flex shrink-0 cursor-pointer items-center justify-between rounded-xl px-3 py-1.5 md:px-3.5 md:py-2.5 text-start text-xs md:text-sm font-medium transition-all ${
+              class={`flex shrink-0 cursor-pointer items-center justify-between rounded-xl px-3.5 py-2.5 text-start text-xs md:text-sm font-semibold transition-all ${
                 activeTab === 'snippets'
-                  ? 'bg-brand-600 text-white shadow-xs'
-                  : 'text-slate-700 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-900'
+                  ? 'bg-gradient-to-r from-brand-600 to-indigo-600 text-white shadow-xs'
+                  : 'text-slate-600 hover:bg-slate-100/80 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800/60 dark:hover:text-slate-200'
               }`}
             >
-              <div class="flex items-center gap-2 md:gap-2.5">
-                <svg class="h-4 w-4 opacity-80" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <div class="flex items-center gap-2.5">
+                <svg class="h-4 w-4 opacity-90" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
                 </svg>
                 <span>{t.snippets.title}</span>
               </div>
               <span
-                class={`ms-1.5 rounded-full px-1.5 md:px-2 py-0.5 text-[10px] font-bold ${
+                class={`ms-1.5 rounded-full px-2 py-0.5 text-[10px] font-bold ${
                   activeTab === 'snippets'
                     ? 'bg-white/20 text-white'
-                    : 'bg-slate-200/70 text-slate-700 dark:bg-slate-800 dark:text-slate-300'
+                    : 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400'
                 }`}
               >
                 {snippets.length}
@@ -1057,23 +1088,23 @@ export function App({ repository, vaultMgr, defaultOpenOnboarding = false }: Opt
               type="button"
               onClick={() => setActiveTab('vault')}
               aria-current={activeTab === 'vault' ? 'page' : undefined}
-              class={`flex shrink-0 cursor-pointer items-center justify-between rounded-xl px-3 py-1.5 md:px-3.5 md:py-2.5 text-start text-xs md:text-sm font-medium transition-all ${
+              class={`flex shrink-0 cursor-pointer items-center justify-between rounded-xl px-3.5 py-2.5 text-start text-xs md:text-sm font-semibold transition-all ${
                 activeTab === 'vault'
-                  ? 'bg-brand-600 text-white shadow-xs'
-                  : 'text-slate-700 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-900'
+                  ? 'bg-gradient-to-r from-brand-600 to-indigo-600 text-white shadow-xs'
+                  : 'text-slate-600 hover:bg-slate-100/80 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800/60 dark:hover:text-slate-200'
               }`}
             >
-              <div class="flex items-center gap-2 md:gap-2.5">
-                <svg class="h-4 w-4 opacity-80" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <div class="flex items-center gap-2.5">
+                <svg class="h-4 w-4 opacity-90" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
                 </svg>
                 <span>{t.vault.title}</span>
               </div>
               <span
-                class={`ms-1.5 rounded-full px-1.5 md:px-2 py-0.5 text-[10px] font-bold ${
+                class={`ms-1.5 rounded-full px-2 py-0.5 text-[10px] font-bold ${
                   activeTab === 'vault'
                     ? 'bg-white/20 text-white'
-                    : 'bg-slate-200/70 text-slate-700 dark:bg-slate-800 dark:text-slate-300'
+                    : 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400'
                 }`}
               >
                 {cards.length}
@@ -1084,23 +1115,23 @@ export function App({ repository, vaultMgr, defaultOpenOnboarding = false }: Opt
               type="button"
               onClick={() => setActiveTab('siteRules')}
               aria-current={activeTab === 'siteRules' ? 'page' : undefined}
-              class={`flex shrink-0 cursor-pointer items-center justify-between rounded-xl px-3 py-1.5 md:px-3.5 md:py-2.5 text-start text-xs md:text-sm font-medium transition-all ${
+              class={`flex shrink-0 cursor-pointer items-center justify-between rounded-xl px-3.5 py-2.5 text-start text-xs md:text-sm font-semibold transition-all ${
                 activeTab === 'siteRules'
-                  ? 'bg-brand-600 text-white shadow-xs'
-                  : 'text-slate-700 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-900'
+                  ? 'bg-gradient-to-r from-brand-600 to-indigo-600 text-white shadow-xs'
+                  : 'text-slate-600 hover:bg-slate-100/80 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800/60 dark:hover:text-slate-200'
               }`}
             >
-              <div class="flex items-center gap-2 md:gap-2.5">
-                <svg class="h-4 w-4 opacity-80" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <div class="flex items-center gap-2.5">
+                <svg class="h-4 w-4 opacity-90" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9" />
                 </svg>
                 <span>{t.siteRules.title}</span>
               </div>
               <span
-                class={`ms-1.5 rounded-full px-1.5 md:px-2 py-0.5 text-[10px] font-bold ${
+                class={`ms-1.5 rounded-full px-2 py-0.5 text-[10px] font-bold ${
                   activeTab === 'siteRules'
                     ? 'bg-white/20 text-white'
-                    : 'bg-slate-200/70 text-slate-700 dark:bg-slate-800 dark:text-slate-300'
+                    : 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400'
                 }`}
               >
                 {siteRules.length}
@@ -1111,13 +1142,13 @@ export function App({ repository, vaultMgr, defaultOpenOnboarding = false }: Opt
               type="button"
               onClick={() => setActiveTab('backup')}
               aria-current={activeTab === 'backup' ? 'page' : undefined}
-              class={`flex shrink-0 cursor-pointer items-center gap-2 md:gap-2.5 rounded-xl px-3 py-1.5 md:px-3.5 md:py-2.5 text-start text-xs md:text-sm font-medium transition-all ${
+              class={`flex shrink-0 cursor-pointer items-center gap-2.5 rounded-xl px-3.5 py-2.5 text-start text-xs md:text-sm font-semibold transition-all ${
                 activeTab === 'backup'
-                  ? 'bg-brand-600 text-white shadow-xs'
-                  : 'text-slate-700 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-900'
+                  ? 'bg-gradient-to-r from-brand-600 to-indigo-600 text-white shadow-xs'
+                  : 'text-slate-600 hover:bg-slate-100/80 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800/60 dark:hover:text-slate-200'
               }`}
             >
-              <svg class="h-4 w-4 opacity-80" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg class="h-4 w-4 opacity-90" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
               </svg>
               <span>{t.settings.exportImportTitle}</span>
@@ -1127,13 +1158,13 @@ export function App({ repository, vaultMgr, defaultOpenOnboarding = false }: Opt
               type="button"
               onClick={() => setActiveTab('settings')}
               aria-current={activeTab === 'settings' ? 'page' : undefined}
-              class={`flex shrink-0 cursor-pointer items-center gap-2 md:gap-2.5 rounded-xl px-3 py-1.5 md:px-3.5 md:py-2.5 text-start text-xs md:text-sm font-medium transition-all ${
+              class={`flex shrink-0 cursor-pointer items-center gap-2.5 rounded-xl px-3.5 py-2.5 text-start text-xs md:text-sm font-semibold transition-all ${
                 activeTab === 'settings'
-                  ? 'bg-brand-600 text-white shadow-xs'
-                  : 'text-slate-700 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-900'
+                  ? 'bg-gradient-to-r from-brand-600 to-indigo-600 text-white shadow-xs'
+                  : 'text-slate-600 hover:bg-slate-100/80 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800/60 dark:hover:text-slate-200'
               }`}
             >
-              <svg class="h-4 w-4 opacity-80" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg class="h-4 w-4 opacity-90" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
               </svg>
@@ -1142,37 +1173,45 @@ export function App({ repository, vaultMgr, defaultOpenOnboarding = false }: Opt
           </nav>
 
           {/* Content Pane */}
-          <main class="rounded-2xl border border-slate-200/80 bg-white p-4 sm:p-6 shadow-2xs dark:border-slate-800 dark:bg-slate-900 md:col-span-3">
+          <main class="rounded-2xl border border-slate-200/80 bg-white p-5 sm:p-7 shadow-xs dark:border-slate-800 dark:bg-slate-900 md:col-span-3">
           {/* TAB 1: PROFILES & FIELDS */}
           {activeTab === 'profiles' && (
             <div class="space-y-6">
               {/* Profile Selector & Template Picker Bar */}
-              <div class="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 pb-4 dark:border-slate-800">
-                <div class="flex flex-wrap items-center gap-2">
-                  {profiles.map((p) => (
-                    <button
-                      key={p.id}
-                      type="button"
-                      onClick={() => handleSelectProfile(p.id)}
-                      class={`rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
-                        selectedProfileId === p.id
-                          ? 'bg-brand-600 text-white'
-                          : 'bg-slate-100 text-slate-800 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700'
-                      }`}
-                    >
-                      {p.name} {isProfileDefault(p) ? '★' : ''}
-                    </button>
-                  ))}
+              <div class="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200/80 pb-4 dark:border-slate-800">
+                {/* Profile Tabs */}
+                <div class="flex flex-wrap items-center gap-2.5">
+                  <div class="flex items-center gap-1 rounded-xl bg-slate-100 p-1 dark:bg-slate-800/80">
+                    {profiles.map((p) => (
+                      <button
+                        key={p.id}
+                        type="button"
+                        onClick={() => handleSelectProfile(p.id)}
+                        class={`cursor-pointer rounded-lg px-3 py-1.5 text-xs font-semibold transition-all ${
+                          selectedProfileId === p.id
+                            ? 'bg-white text-slate-900 shadow-2xs dark:bg-slate-900 dark:text-white'
+                            : 'text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-200'
+                        }`}
+                      >
+                        <span>{p.name}</span>
+                        {isProfileDefault(p) && <span class="ms-1 text-amber-500">★</span>}
+                      </button>
+                    ))}
+                  </div>
 
-                  <div class="flex items-center gap-1">
-                    <label for="new-profile-template" class="sr-only">
-                      {t.templates.createFromTemplate}
+                  {/* Create Profile with Template */}
+                  <div class="flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-2 py-1 dark:border-slate-700 dark:bg-slate-800">
+                    <label
+                      for="new-profile-template"
+                      class="text-[11px] font-medium text-slate-500 dark:text-slate-400"
+                    >
+                      Template:
                     </label>
                     <select
                       id="new-profile-template"
                       value={selectedTemplateId}
                       onChange={(e) => setSelectedTemplateId((e.target as HTMLSelectElement).value)}
-                      class="rounded-md border border-slate-300 bg-white px-2 py-1.5 text-xs text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                      class="cursor-pointer bg-transparent text-xs font-medium text-slate-800 focus:outline-none dark:text-slate-200"
                     >
                       {TEMPLATE_REGISTRY.map((tpl) => (
                         <option key={tpl.id} value={tpl.id}>
@@ -1183,29 +1222,36 @@ export function App({ repository, vaultMgr, defaultOpenOnboarding = false }: Opt
                     <button
                       type="button"
                       onClick={() => handleCreateProfile(selectedTemplateId)}
-                      class="rounded-md border border-dashed border-slate-300 px-2.5 py-1.5 text-xs font-medium text-slate-700 transition-colors hover:border-brand-500 hover:text-brand-700 dark:border-slate-600 dark:text-slate-200"
+                      class="cursor-pointer rounded-md bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-700 transition-colors hover:bg-slate-200 dark:bg-slate-700 dark:text-slate-200 dark:hover:bg-slate-600"
                     >
                       + {t.actions.add}
                     </button>
                   </div>
                 </div>
 
+                {/* Profile Actions: Delete & Save */}
                 <div class="flex items-center gap-2">
                   {profiles.length > 1 && profileForm && (
                     <button
                       type="button"
                       onClick={() => setProfileToDelete(profileForm)}
-                      class="rounded-md px-2.5 py-1.5 text-xs font-medium text-rose-700 transition-colors hover:bg-rose-50 dark:text-rose-400 dark:hover:bg-rose-950/40"
+                      class="inline-flex cursor-pointer items-center gap-1.5 rounded-lg border border-rose-200 bg-rose-50/80 px-3 py-1.5 text-xs font-semibold text-rose-700 transition-colors hover:bg-rose-100 dark:border-rose-900/60 dark:bg-rose-950/30 dark:text-rose-400 dark:hover:bg-rose-900/50"
                     >
-                      {t.actions.delete}
+                      <svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                      </svg>
+                      <span>{t.actions.delete}</span>
                     </button>
                   )}
                   <button
                     type="button"
                     onClick={handleSaveProfile}
-                    class="rounded-md bg-brand-600 px-4 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-brand-700"
+                    class="inline-flex cursor-pointer items-center gap-1.5 rounded-lg bg-brand-600 px-4 py-1.5 text-xs font-semibold text-white shadow-2xs transition-colors hover:bg-brand-700"
                   >
-                    {t.actions.save}
+                    <svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7" />
+                    </svg>
+                    <span>{t.actions.save}</span>
                   </button>
                 </div>
               </div>
@@ -1213,84 +1259,90 @@ export function App({ repository, vaultMgr, defaultOpenOnboarding = false }: Opt
               {profileForm && (
                 <div class="space-y-6">
                   {/* Profile Header Fields */}
-                  <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                    <div>
-                      <label
-                        for="profile-name-input"
-                        class="mb-1 block text-xs font-semibold text-slate-700 dark:text-slate-200"
-                      >
-                        {t.settings.profileName}
-                      </label>
-                      <input
-                        id="profile-name-input"
-                        type="text"
-                        value={profileForm.name}
-                        onInput={(e) =>
-                          setProfileForm({
-                            ...profileForm,
-                            name: (e.target as HTMLInputElement).value,
-                          })
-                        }
-                        class="w-full rounded-md border border-slate-300 bg-white p-2 text-xs text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
-                      />
-                    </div>
-
-                    <div class="mt-6 flex items-center">
-                      <label class="flex cursor-pointer items-center gap-2 text-xs font-medium text-slate-700 dark:text-slate-200">
+                  <div class="rounded-xl border border-slate-200/80 bg-slate-50/60 p-4 dark:border-slate-800 dark:bg-slate-800/40">
+                    <div class="grid grid-cols-1 items-center gap-4 sm:grid-cols-2">
+                      <div>
+                        <label
+                          for="profile-name-input"
+                          class="mb-1 block text-xs font-semibold text-slate-700 dark:text-slate-200"
+                        >
+                          {t.settings.profileName}
+                        </label>
                         <input
-                          type="checkbox"
-                          checked={isProfileDefault(profileForm)}
-                          onChange={async (e) => {
-                            const isChecked = (e.target as HTMLInputElement).checked;
-                            if (isChecked) {
-                              await repo.setActiveProfileId(profileForm.id);
-                              const cur = await repo.getSettings();
-                              setSettings(cur);
-                            }
-                          }}
-                          class="rounded border-slate-300 text-brand-600"
+                          id="profile-name-input"
+                          type="text"
+                          value={profileForm.name}
+                          onInput={(e) =>
+                            setProfileForm({
+                              ...profileForm,
+                              name: (e.target as HTMLInputElement).value,
+                            })
+                          }
+                          class="w-full rounded-lg border border-slate-200 bg-white p-2 text-xs font-semibold text-slate-900 transition-colors focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
                         />
-                        <span>{t.settings.isDefaultProfile}</span>
-                      </label>
+                      </div>
+
+                      <div class="flex items-center sm:pt-4">
+                        <label class="flex cursor-pointer items-center gap-2.5 rounded-lg border border-slate-200/80 bg-white px-3.5 py-2 text-xs font-medium text-slate-700 shadow-2xs transition-colors hover:border-slate-300 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200">
+                          <input
+                            type="checkbox"
+                            checked={isProfileDefault(profileForm)}
+                            onChange={async (e) => {
+                              const isChecked = (e.target as HTMLInputElement).checked;
+                              if (isChecked) {
+                                await repo.setActiveProfileId(profileForm.id);
+                                const cur = await repo.getSettings();
+                                setSettings(cur);
+                              }
+                            }}
+                            class="rounded border-slate-300 text-brand-600 focus:ring-brand-500/20"
+                          />
+                          <span>{t.settings.isDefaultProfile}</span>
+                        </label>
+                      </div>
                     </div>
                   </div>
 
                   {/* Category Filter & Management Bar */}
-                  <div class="space-y-2 rounded-lg border border-slate-200 bg-slate-50/70 p-3 dark:border-slate-800 dark:bg-slate-800/40">
-                    <div class="flex flex-wrap items-center justify-between gap-2">
+                  <div class="space-y-2 rounded-xl border border-slate-200/80 bg-slate-50/60 p-3.5 dark:border-slate-800 dark:bg-slate-800/40">
+                    <div class="flex flex-wrap items-center justify-between gap-2.5">
                       <div
                         role="group"
                         aria-label={t.categories.filterByCategory}
-                        class="flex flex-wrap items-center gap-1"
+                        class="flex flex-wrap items-center gap-1.5"
                       >
                         <button
                           type="button"
                           onClick={() => setSelectedCategory('all')}
-                          class={`rounded px-2.5 py-1 text-xs font-medium ${
+                          class={`cursor-pointer rounded-lg px-3 py-1.5 text-xs font-semibold transition-all ${
                             selectedCategory === 'all'
-                              ? 'bg-brand-600 text-white'
-                              : 'bg-white text-slate-700 hover:bg-slate-100 dark:bg-slate-800 dark:text-slate-300'
+                              ? 'bg-slate-900 text-white shadow-2xs dark:bg-brand-600'
+                              : 'bg-white text-slate-700 hover:bg-slate-100 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700'
                           }`}
                         >
-                          {t.sections.allCategories}
+                          {t.sections.allCategories} ({profileForm.fields.length})
                         </button>
-                        {allCategories.map((cat) => (
-                          <button
-                            key={cat}
-                            type="button"
-                            onClick={() => setSelectedCategory(cat)}
-                            class={`rounded px-2.5 py-1 text-xs font-medium ${
-                              selectedCategory === cat
-                                ? 'bg-brand-600 text-white'
-                                : 'bg-white text-slate-700 hover:bg-slate-100 dark:bg-slate-800 dark:text-slate-300'
-                            }`}
-                          >
-                            {getCategoryLabel(cat)}
-                          </button>
-                        ))}
+                        {allCategories.map((cat) => {
+                          const count = profileForm.fields.filter((f) => f.category === cat).length;
+                          return (
+                            <button
+                              key={cat}
+                              type="button"
+                              onClick={() => setSelectedCategory(cat)}
+                              class={`cursor-pointer rounded-lg px-3 py-1.5 text-xs font-semibold transition-all ${
+                                selectedCategory === cat
+                                  ? 'bg-slate-900 text-white shadow-2xs dark:bg-brand-600'
+                                  : 'bg-white text-slate-700 hover:bg-slate-100 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700'
+                              }`}
+                            >
+                              <span>{getCategoryLabel(cat)}</span>
+                              {count > 0 && <span class="ms-1.5 opacity-60">({count})</span>}
+                            </button>
+                          );
+                        })}
                       </div>
 
-                      <form onSubmit={handleAddCategory} class="flex items-center gap-1">
+                      <form onSubmit={handleAddCategory} class="flex items-center gap-1.5">
                         <label for="new-category-input" class="sr-only">
                           {t.categories.categoryNamePlaceholder}
                         </label>
@@ -1300,11 +1352,11 @@ export function App({ repository, vaultMgr, defaultOpenOnboarding = false }: Opt
                           value={newCategoryName}
                           onInput={(e) => setNewCategoryName((e.target as HTMLInputElement).value)}
                           placeholder={t.categories.categoryNamePlaceholder}
-                          class="rounded border border-slate-300 bg-white px-2 py-1 text-xs text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                          class="rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-xs text-slate-900 transition-colors focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
                         />
                         <button
                           type="submit"
-                          class="rounded border border-slate-300 bg-white px-2 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200"
+                          class="cursor-pointer rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-xs font-semibold text-slate-700 transition-colors hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700"
                         >
                           + {t.categories.addCategory}
                         </button>
@@ -1315,26 +1367,31 @@ export function App({ repository, vaultMgr, defaultOpenOnboarding = false }: Opt
                   {/* Fields List with Full CRUD & Drag-and-Drop / Keyboard Reorder */}
                   <div class="space-y-3">
                     <div class="flex items-center justify-between">
-                      <h2 class="text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300">
-                        {selectedCategory === 'all'
-                          ? t.sections.allCategories
-                          : getCategoryLabel(selectedCategory)}
-                      </h2>
+                      <div class="flex items-center gap-2">
+                        <h2 class="text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300">
+                          {selectedCategory === 'all'
+                            ? t.sections.allCategories
+                            : getCategoryLabel(selectedCategory)}
+                        </h2>
+                        <span class="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-bold text-slate-600 dark:bg-slate-800 dark:text-slate-400">
+                          {filteredFields.length}
+                        </span>
+                      </div>
                       <button
                         type="button"
                         onClick={handleAddField}
-                        class="rounded-md bg-brand-50 px-3 py-1.5 text-xs font-semibold text-brand-800 hover:bg-brand-100 dark:bg-brand-950 dark:text-brand-200"
+                        class="inline-flex cursor-pointer items-center gap-1.5 rounded-lg bg-brand-50 px-3 py-1.5 text-xs font-semibold text-brand-700 transition-colors hover:bg-brand-100 dark:bg-brand-950/60 dark:text-brand-300 dark:hover:bg-brand-900/60"
                       >
-                        + {t.actions.quickAdd}
+                        <span>+ {t.actions.quickAdd}</span>
                       </button>
                     </div>
 
                     {filteredFields.length === 0 ? (
-                      <p class="py-4 text-center text-xs text-slate-600 dark:text-slate-300">
+                      <p class="py-6 text-center text-xs text-slate-500 dark:text-slate-400">
                         {t.emptyStates.noFieldsInProfile}
                       </p>
                     ) : (
-                      <div role="list" class="space-y-2">
+                      <div role="list" class="space-y-3">
                         {filteredFields.map((field) => {
                           const realIndex = profileForm.fields.findIndex(
                             (item) => item.id === field.id,
@@ -1347,98 +1404,142 @@ export function App({ repository, vaultMgr, defaultOpenOnboarding = false }: Opt
                               onDragStart={() => handleDragStart(realIndex)}
                               onDragOver={handleDragOver}
                               onDrop={() => handleDrop(realIndex)}
-                              class="grid grid-cols-1 items-center gap-2 rounded-lg border border-slate-200 bg-slate-50/50 p-3 dark:border-slate-800 dark:bg-slate-800/40 sm:grid-cols-12"
+                              class="group rounded-xl border border-slate-200/90 bg-white p-3.5 shadow-2xs transition-all hover:border-slate-300 dark:border-slate-800 dark:bg-slate-900/90 dark:hover:border-slate-700"
                             >
-                              {/* Reorder controls */}
-                              <div class="flex items-center gap-1 sm:col-span-1">
-                                <button
-                                  type="button"
-                                  onClick={() => handleMoveField(realIndex, -1)}
-                                  disabled={realIndex <= 0}
-                                  aria-label={`${t.actions.moveUp}: ${field.label}`}
-                                  title={t.actions.moveUp}
-                                  class="rounded p-1 text-xs text-slate-600 hover:bg-slate-200 disabled:opacity-30 dark:text-slate-300 dark:hover:bg-slate-700"
-                                >
-                                  ↑
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={() => handleMoveField(realIndex, 1)}
-                                  disabled={realIndex >= profileForm.fields.length - 1}
-                                  aria-label={`${t.actions.moveDown}: ${field.label}`}
-                                  title={t.actions.moveDown}
-                                  class="rounded p-1 text-xs text-slate-600 hover:bg-slate-200 disabled:opacity-30 dark:text-slate-300 dark:hover:bg-slate-700"
-                                >
-                                  ↓
-                                </button>
+                              {/* Top Bar: Reorder buttons, Badges, Sensitive toggle, Delete */}
+                              <div class="mb-2.5 flex items-center justify-between border-b border-slate-100 pb-2 dark:border-slate-800/80">
+                                <div class="flex items-center gap-1.5">
+                                  {/* Reorder controls */}
+                                  <div class="flex items-center rounded-lg border border-slate-200 bg-slate-50 p-0.5 dark:border-slate-700 dark:bg-slate-800">
+                                    <button
+                                      type="button"
+                                      onClick={() => handleMoveField(realIndex, -1)}
+                                      disabled={realIndex <= 0}
+                                      aria-label={`${t.actions.moveUp}: ${field.label}`}
+                                      title={t.actions.moveUp}
+                                      class="cursor-pointer rounded px-1.5 py-0.5 text-xs text-slate-600 hover:bg-slate-200 disabled:cursor-not-allowed disabled:opacity-30 dark:text-slate-300 dark:hover:bg-slate-700"
+                                    >
+                                      ↑
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => handleMoveField(realIndex, 1)}
+                                      disabled={realIndex >= profileForm.fields.length - 1}
+                                      aria-label={`${t.actions.moveDown}: ${field.label}`}
+                                      title={t.actions.moveDown}
+                                      class="cursor-pointer rounded px-1.5 py-0.5 text-xs text-slate-600 hover:bg-slate-200 disabled:cursor-not-allowed disabled:opacity-30 dark:text-slate-300 dark:hover:bg-slate-700"
+                                    >
+                                      ↓
+                                    </button>
+                                  </div>
+
+                                  <span class="rounded-md border border-brand-200/80 bg-brand-50/80 px-2 py-0.5 font-mono text-[11px] font-semibold text-brand-700 dark:border-brand-800/60 dark:bg-brand-950/60 dark:text-brand-300">
+                                    {field.key}
+                                  </span>
+
+                                  <span class="rounded-md bg-slate-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-slate-600 dark:bg-slate-800 dark:text-slate-300">
+                                    {field.type}
+                                  </span>
+                                </div>
+
+                                <div class="flex items-center gap-3">
+                                  <label class="flex cursor-pointer items-center gap-1.5 text-xs font-medium text-slate-600 dark:text-slate-300">
+                                    <input
+                                      type="checkbox"
+                                      checked={field.sensitive}
+                                      onChange={(e) =>
+                                        handleUpdateField(field.id, {
+                                          sensitive: (e.target as HTMLInputElement).checked,
+                                        })
+                                      }
+                                      class="rounded border-slate-300 text-brand-600 focus:ring-brand-500/20"
+                                    />
+                                    <span>{t.fields.sensitiveField.split(' ')[0]}</span>
+                                  </label>
+
+                                  <button
+                                    type="button"
+                                    onClick={() => handleRemoveField(field.id)}
+                                    aria-label={`${t.fields.removeField}: ${field.label}`}
+                                    title={t.fields.removeField}
+                                    class="cursor-pointer rounded-lg p-1 text-slate-400 transition-colors hover:bg-rose-50 hover:text-rose-600 dark:hover:bg-rose-950/40 dark:hover:text-rose-400"
+                                  >
+                                    <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                    </svg>
+                                  </button>
+                                </div>
                               </div>
 
-                              {/* Label */}
-                              <div class="sm:col-span-3">
-                                <label
-                                  for={`field-label-${field.id}`}
-                                  class="mb-0.5 block text-[10px] font-semibold text-slate-600 dark:text-slate-300"
-                                >
-                                  {t.fields.fieldLabel}
-                                </label>
-                                <input
-                                  id={`field-label-${field.id}`}
-                                  type="text"
-                                  value={field.label}
-                                  onInput={(e) =>
-                                    handleUpdateField(field.id, {
-                                      label: (e.target as HTMLInputElement).value,
-                                    })
-                                  }
-                                  class="w-full rounded border border-slate-300 bg-white px-2 py-1 text-xs text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
-                                />
-                              </div>
-
-                              {/* Value */}
-                              <div class="sm:col-span-4">
-                                <label
-                                  for={`field-value-${field.id}`}
-                                  class="mb-0.5 block text-[10px] font-semibold text-slate-600 dark:text-slate-300"
-                                >
-                                  {t.fields.fieldValue}
-                                </label>
-                                {field.type === 'multiline' ? (
-                                  <textarea
-                                    id={`field-value-${field.id}`}
-                                    rows={2}
-                                    value={field.value}
-                                    onInput={(e) =>
-                                      handleUpdateField(field.id, {
-                                        value: (e.target as HTMLTextAreaElement).value,
-                                      })
-                                    }
-                                    placeholder={t.fields.valuePlaceholder}
-                                    class="w-full rounded border border-slate-300 bg-white px-2 py-1 text-xs text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
-                                  />
-                                ) : (
+                              {/* Middle: Inputs Grid */}
+                              <div class="grid grid-cols-1 gap-3 sm:grid-cols-12">
+                                {/* Label */}
+                                <div class="sm:col-span-5">
+                                  <label
+                                    for={`field-label-${field.id}`}
+                                    class="mb-1 block text-[11px] font-semibold text-slate-700 dark:text-slate-200"
+                                  >
+                                    {t.fields.fieldLabel}
+                                  </label>
                                   <input
-                                    id={`field-value-${field.id}`}
-                                    type={field.sensitive ? 'password' : 'text'}
-                                    value={field.value}
+                                    id={`field-label-${field.id}`}
+                                    type="text"
+                                    value={field.label}
                                     onInput={(e) =>
                                       handleUpdateField(field.id, {
-                                        value: (e.target as HTMLInputElement).value,
+                                        label: (e.target as HTMLInputElement).value,
                                       })
                                     }
-                                    placeholder={t.fields.valuePlaceholder}
-                                    class="w-full rounded border border-slate-300 bg-white px-2 py-1 text-xs text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                                    class="w-full rounded-lg border border-slate-200 bg-slate-50/70 px-3 py-1.5 text-xs font-semibold text-slate-900 transition-colors focus:border-brand-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-brand-500/20 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
                                   />
-                                )}
+                                </div>
+
+                                {/* Value */}
+                                <div class="sm:col-span-7">
+                                  <label
+                                    for={`field-value-${field.id}`}
+                                    class="mb-1 block text-[11px] font-semibold text-slate-700 dark:text-slate-200"
+                                  >
+                                    {t.fields.fieldValue}
+                                  </label>
+                                  {field.type === 'multiline' ? (
+                                    <textarea
+                                      id={`field-value-${field.id}`}
+                                      rows={2}
+                                      value={field.value}
+                                      onInput={(e) =>
+                                        handleUpdateField(field.id, {
+                                          value: (e.target as HTMLTextAreaElement).value,
+                                        })
+                                      }
+                                      placeholder={t.fields.valuePlaceholder}
+                                      class="w-full rounded-lg border border-slate-200 bg-slate-50/70 px-3 py-1.5 font-mono text-xs text-slate-900 transition-colors focus:border-brand-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-brand-500/20 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                                    />
+                                  ) : (
+                                    <input
+                                      id={`field-value-${field.id}`}
+                                      type={field.sensitive ? 'password' : 'text'}
+                                      value={field.value}
+                                      onInput={(e) =>
+                                        handleUpdateField(field.id, {
+                                          value: (e.target as HTMLInputElement).value,
+                                        })
+                                      }
+                                      placeholder={t.fields.valuePlaceholder}
+                                      class="w-full rounded-lg border border-slate-200 bg-slate-50/70 px-3 py-1.5 font-mono text-xs text-slate-900 transition-colors focus:border-brand-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-brand-500/20 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                                    />
+                                  )}
+                                </div>
                               </div>
 
-                              {/* Key & Category & Type */}
-                              <div class="grid grid-cols-2 gap-1 sm:col-span-3">
-                                <div>
+                              {/* Bottom: Settings Dropdowns */}
+                              <div class="mt-3 flex flex-wrap items-center gap-3 border-t border-slate-100 pt-2.5 dark:border-slate-800/80">
+                                <div class="flex items-center gap-1.5">
                                   <label
                                     for={`field-cat-${field.id}`}
-                                    class="mb-0.5 block text-[10px] font-semibold text-slate-600 dark:text-slate-300"
+                                    class="text-[11px] font-medium text-slate-500 dark:text-slate-400"
                                   >
-                                    {t.fields.fieldCategory}
+                                    {t.fields.fieldCategory}:
                                   </label>
                                   <select
                                     id={`field-cat-${field.id}`}
@@ -1448,7 +1549,7 @@ export function App({ repository, vaultMgr, defaultOpenOnboarding = false }: Opt
                                         category: (e.target as HTMLSelectElement).value,
                                       })
                                     }
-                                    class="w-full rounded border border-slate-300 bg-white px-1.5 py-1 text-xs text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                                    class="rounded-md border border-slate-200 bg-slate-50 px-2 py-1 text-xs text-slate-800 transition-colors hover:border-slate-300 focus:border-brand-500 focus:bg-white focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200"
                                   >
                                     {allCategories.map((c) => (
                                       <option key={c} value={c}>
@@ -1458,12 +1559,12 @@ export function App({ repository, vaultMgr, defaultOpenOnboarding = false }: Opt
                                   </select>
                                 </div>
 
-                                <div>
+                                <div class="flex items-center gap-1.5">
                                   <label
                                     for={`field-type-${field.id}`}
-                                    class="mb-0.5 block text-[10px] font-semibold text-slate-600 dark:text-slate-300"
+                                    class="text-[11px] font-medium text-slate-500 dark:text-slate-400"
                                   >
-                                    {t.fields.fieldType}
+                                    {t.fields.fieldType}:
                                   </label>
                                   <select
                                     id={`field-type-${field.id}`}
@@ -1473,7 +1574,7 @@ export function App({ repository, vaultMgr, defaultOpenOnboarding = false }: Opt
                                         type: (e.target as HTMLSelectElement).value as FieldType,
                                       })
                                     }
-                                    class="w-full rounded border border-slate-300 bg-white px-1.5 py-1 text-xs text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                                    class="rounded-md border border-slate-200 bg-slate-50 px-2 py-1 text-xs text-slate-800 transition-colors hover:border-slate-300 focus:border-brand-500 focus:bg-white focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200"
                                   >
                                     {FIELD_TYPES.map((ft) => (
                                       <option key={ft} value={ft}>
@@ -1483,23 +1584,12 @@ export function App({ repository, vaultMgr, defaultOpenOnboarding = false }: Opt
                                   </select>
                                 </div>
 
-                                <div class="col-span-2 flex items-center justify-between pt-0.5">
-                                  <label class="flex cursor-pointer items-center gap-1 text-[10px] font-medium text-slate-700 dark:text-slate-300">
-                                    <input
-                                      type="checkbox"
-                                      checked={field.sensitive}
-                                      onChange={(e) =>
-                                        handleUpdateField(field.id, {
-                                          sensitive: (e.target as HTMLInputElement).checked,
-                                        })
-                                      }
-                                      class="rounded border-slate-300 text-brand-600"
-                                    />
-                                    <span>{t.fields.sensitiveField.split(' ')[0]}</span>
-                                  </label>
-
-                                  <label for={`field-key-${field.id}`} class="sr-only">
-                                    {t.fields.fieldKey}
+                                <div class="flex items-center gap-1.5">
+                                  <label
+                                    for={`field-key-${field.id}`}
+                                    class="text-[11px] font-medium text-slate-500 dark:text-slate-400"
+                                  >
+                                    {t.fields.fieldKey}:
                                   </label>
                                   <select
                                     id={`field-key-${field.id}`}
@@ -1516,7 +1606,7 @@ export function App({ repository, vaultMgr, defaultOpenOnboarding = false }: Opt
                                         key: val === 'custom' ? `custom_${Date.now()}` : val,
                                       });
                                     }}
-                                    class="max-w-[95px] rounded border border-slate-200 bg-white px-1 py-0.5 text-[10px] text-slate-700 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300"
+                                    class="rounded-md border border-slate-200 bg-slate-50 px-2 py-1 text-xs text-slate-800 transition-colors hover:border-slate-300 focus:border-brand-500 focus:bg-white focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200"
                                   >
                                     {CANONICAL_KEYS.map((k) => (
                                       <option key={k} value={k}>
@@ -1526,19 +1616,6 @@ export function App({ repository, vaultMgr, defaultOpenOnboarding = false }: Opt
                                     <option value="custom">custom</option>
                                   </select>
                                 </div>
-                              </div>
-
-                              {/* Delete field button */}
-                              <div class="flex justify-end sm:col-span-1">
-                                <button
-                                  type="button"
-                                  onClick={() => handleRemoveField(field.id)}
-                                  aria-label={`${t.fields.removeField}: ${field.label}`}
-                                  title={t.fields.removeField}
-                                  class="rounded p-1.5 text-rose-700 hover:bg-rose-50 dark:text-rose-400 dark:hover:bg-rose-950/40"
-                                >
-                                  ×
-                                </button>
                               </div>
                             </div>
                           );
@@ -1554,11 +1631,11 @@ export function App({ repository, vaultMgr, defaultOpenOnboarding = false }: Opt
           {/* TAB 2: SNIPPETS */}
           {activeTab === 'snippets' && (
             <div class="space-y-6">
-              <div class="border-b border-slate-200 pb-4 dark:border-slate-800">
+              <div class="border-b border-slate-200/80 pb-4 dark:border-slate-800">
                 <h2 class="text-base font-bold text-slate-900 dark:text-white">
                   {t.snippets.title}
                 </h2>
-                <p class="mt-1 text-xs text-slate-600 dark:text-slate-300">
+                <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">
                   {t.snippets.description}
                 </p>
               </div>
@@ -1566,30 +1643,39 @@ export function App({ repository, vaultMgr, defaultOpenOnboarding = false }: Opt
               <form
                 onSubmit={handleSaveSnippet}
                 aria-label={t.snippets.addSnippet}
-                class="space-y-3 rounded-lg border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-800/40"
+                class="space-y-4 rounded-2xl border border-slate-200/80 bg-slate-50/60 p-5 dark:border-slate-800 dark:bg-slate-800/40"
               >
-                <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <div class="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300">
+                  <svg class="h-4 w-4 text-brand-600 dark:text-brand-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+                  </svg>
+                  <span>{editingSnippetId ? t.actions.edit : t.snippets.addSnippet}</span>
+                </div>
+
+                <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
                   <div>
                     <label
                       for="snippet-trigger-input"
-                      class="mb-1 block text-xs font-medium text-slate-700 dark:text-slate-200"
+                      class="mb-1.5 block text-xs font-semibold text-slate-700 dark:text-slate-200"
                     >
                       {t.snippets.trigger} *
                     </label>
-                    <input
-                      id="snippet-trigger-input"
-                      type="text"
-                      required
-                      value={snippetTrigger}
-                      onInput={(e) => setSnippetTrigger((e.target as HTMLInputElement).value)}
-                      placeholder={t.snippets.triggerPlaceholder}
-                      class="w-full rounded-md border border-slate-300 bg-white p-2 font-mono text-xs text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
-                    />
+                    <div class="relative">
+                      <input
+                        id="snippet-trigger-input"
+                        type="text"
+                        required
+                        value={snippetTrigger}
+                        onInput={(e) => setSnippetTrigger((e.target as HTMLInputElement).value)}
+                        placeholder={t.snippets.triggerPlaceholder}
+                        class="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2 font-mono text-xs font-semibold text-slate-900 transition-colors focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                      />
+                    </div>
                   </div>
                   <div>
                     <label
                       for="snippet-folder-input"
-                      class="mb-1 block text-xs font-medium text-slate-700 dark:text-slate-200"
+                      class="mb-1.5 block text-xs font-semibold text-slate-700 dark:text-slate-200"
                     >
                       {t.snippets.folder}
                     </label>
@@ -1599,14 +1685,14 @@ export function App({ repository, vaultMgr, defaultOpenOnboarding = false }: Opt
                       value={snippetFolder}
                       onInput={(e) => setSnippetFolder((e.target as HTMLInputElement).value)}
                       placeholder={t.snippets.folderPlaceholder}
-                      class="w-full rounded-md border border-slate-300 bg-white p-2 text-xs text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                      class="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-xs font-medium text-slate-900 transition-colors focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
                     />
                   </div>
                 </div>
                 <div>
                   <label
                     for="snippet-content-input"
-                    class="mb-1 block text-xs font-medium text-slate-700 dark:text-slate-200"
+                    class="mb-1.5 block text-xs font-semibold text-slate-700 dark:text-slate-200"
                   >
                     {t.snippets.content} *
                   </label>
@@ -1617,10 +1703,10 @@ export function App({ repository, vaultMgr, defaultOpenOnboarding = false }: Opt
                     value={snippetContent}
                     onInput={(e) => setSnippetContent((e.target as HTMLTextAreaElement).value)}
                     placeholder={t.snippets.contentPlaceholder}
-                    class="w-full rounded-md border border-slate-300 bg-white p-2 text-xs text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                    class="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-xs font-medium text-slate-900 transition-colors focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
                   />
                 </div>
-                <div class="flex justify-end gap-2">
+                <div class="flex items-center justify-end gap-2.5 pt-1">
                   {editingSnippetId && (
                     <button
                       type="button"
@@ -1630,57 +1716,62 @@ export function App({ repository, vaultMgr, defaultOpenOnboarding = false }: Opt
                         setSnippetContent('');
                         setSnippetFolder('');
                       }}
-                      class="rounded-md border border-slate-300 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200"
+                      class="cursor-pointer rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-xs font-semibold text-slate-700 transition-colors hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700"
                     >
                       {t.actions.cancel}
                     </button>
                   )}
                   <button
                     type="submit"
-                    class="rounded-md bg-brand-600 px-4 py-1.5 text-xs font-semibold text-white hover:bg-brand-700"
+                    class="inline-flex cursor-pointer items-center gap-1.5 rounded-xl bg-brand-600 px-4 py-2 text-xs font-semibold text-white shadow-2xs transition-colors hover:bg-brand-700"
                   >
-                    {t.actions.save}
+                    <svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7" />
+                    </svg>
+                    <span>{t.actions.save}</span>
                   </button>
                 </div>
               </form>
 
               {snippets.length === 0 ? (
-                <p class="py-6 text-center text-xs text-slate-600 dark:text-slate-300">
+                <div class="rounded-2xl border border-dashed border-slate-200 p-8 text-center text-xs text-slate-500 dark:border-slate-800 dark:text-slate-400">
                   {t.snippets.emptyState}
-                </p>
+                </div>
               ) : (
-                <div role="list" class="space-y-2">
+                <div role="list" class="space-y-3">
                   {snippets.map((snip) => (
                     <div
                       key={snip.id}
                       role="listitem"
-                      class="flex items-center justify-between rounded-lg border border-slate-200 p-3 dark:border-slate-800"
+                      class="group flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded-xl border border-slate-200/90 bg-white p-4 shadow-2xs transition-all hover:border-slate-300 dark:border-slate-800 dark:bg-slate-900/90 dark:hover:border-slate-700"
                     >
-                      <div>
+                      <div class="space-y-1.5">
                         <div class="flex items-center gap-2">
-                          <span class="rounded bg-brand-100 px-2 py-0.5 font-mono text-xs font-bold text-brand-900 dark:bg-brand-950 dark:text-brand-200">
+                          <span class="rounded-md border border-brand-200/80 bg-brand-50 px-2 py-0.5 font-mono text-xs font-bold text-brand-700 dark:border-brand-800/60 dark:bg-brand-950/60 dark:text-brand-300">
                             {snip.trigger}
                           </span>
-                          <span class="text-[11px] text-slate-600 dark:text-slate-400">
-                            {snip.folder}
-                          </span>
+                          {snip.folder && (
+                            <span class="rounded-md bg-slate-100 px-2 py-0.5 text-[11px] font-medium text-slate-600 dark:bg-slate-800 dark:text-slate-300">
+                              📁 {snip.folder}
+                            </span>
+                          )}
                         </div>
-                        <p class="mt-1 text-xs text-slate-800 dark:text-slate-200">
+                        <p class="text-xs text-slate-800 dark:text-slate-200 font-mono whitespace-pre-wrap">
                           {snip.content}
                         </p>
                       </div>
-                      <div class="flex items-center gap-1">
+                      <div class="flex items-center gap-1.5 shrink-0">
                         <button
                           type="button"
                           onClick={() => handleEditSnippet(snip)}
-                          class="rounded px-2 py-1 text-xs font-medium text-brand-700 hover:bg-brand-50 dark:text-brand-300"
+                          class="cursor-pointer rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-xs font-semibold text-slate-700 transition-colors hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700"
                         >
                           {t.actions.edit}
                         </button>
                         <button
                           type="button"
                           onClick={() => handleDeleteSnippet(snip.id)}
-                          class="rounded px-2 py-1 text-xs font-medium text-rose-700 hover:bg-rose-50 dark:text-rose-400"
+                          class="cursor-pointer rounded-lg border border-rose-200 bg-rose-50/60 px-2.5 py-1 text-xs font-semibold text-rose-700 transition-colors hover:bg-rose-100 dark:border-rose-900/60 dark:bg-rose-950/30 dark:text-rose-400 dark:hover:bg-rose-900/50"
                         >
                           {t.actions.delete}
                         </button>
@@ -1695,42 +1786,65 @@ export function App({ repository, vaultMgr, defaultOpenOnboarding = false }: Opt
           {/* TAB 3: ENCRYPTED VAULT (CARDS) */}
           {activeTab === 'vault' && (
             <div class="space-y-6">
-              <div class="flex items-start justify-between border-b border-slate-200 pb-4 dark:border-slate-800">
+              <div class="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200/80 pb-4 dark:border-slate-800">
                 <div>
                   <h2 class="text-base font-bold text-slate-900 dark:text-white">
                     {t.vault.title}
                   </h2>
-                  <p class="mt-1 text-xs text-slate-600 dark:text-slate-300">
+                  <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">
                     {t.vault.description}
                   </p>
                 </div>
 
                 <span
-                  class={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-semibold ${
+                  class={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold ${
                     !vaultInitialized
-                      ? 'bg-amber-100 text-amber-900 dark:bg-amber-950 dark:text-amber-200'
+                      ? 'border border-amber-200 bg-amber-50 text-amber-900 dark:border-amber-800/60 dark:bg-amber-950/40 dark:text-amber-200'
                       : vaultUnlocked
-                        ? 'bg-emerald-100 text-emerald-900 dark:bg-emerald-950 dark:text-emerald-200'
-                        : 'bg-slate-200 text-slate-800 dark:bg-slate-800 dark:text-slate-200'
+                        ? 'border border-emerald-200 bg-emerald-50 text-emerald-900 dark:border-emerald-800/60 dark:bg-emerald-950/40 dark:text-emerald-200'
+                        : 'border border-slate-200 bg-slate-100 text-slate-800 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200'
                   }`}
                 >
-                  {!vaultInitialized
-                    ? t.vault.uninitializedBadge
-                    : vaultUnlocked
-                      ? t.vault.unlockedBadge
-                      : t.vault.lockedBadge}
+                  <span
+                    class={`h-2 w-2 rounded-full ${
+                      !vaultInitialized
+                        ? 'bg-amber-500'
+                        : vaultUnlocked
+                          ? 'bg-emerald-500'
+                          : 'bg-slate-400'
+                    }`}
+                  ></span>
+                  <span>
+                    {!vaultInitialized
+                      ? t.vault.uninitializedBadge
+                      : vaultUnlocked
+                        ? t.vault.unlockedBadge
+                        : t.vault.lockedBadge}
+                  </span>
                 </span>
               </div>
 
               {!vaultInitialized ? (
-                <div class="mx-auto max-w-md space-y-4 rounded-xl border border-slate-200 bg-slate-50 p-6 dark:border-slate-800 dark:bg-slate-800/40">
-                  <h3 class="text-sm font-semibold text-slate-900 dark:text-slate-100">
-                    {t.vault.setupPassphrase}
-                  </h3>
-                  <div class="rounded-lg border border-amber-300 bg-amber-50 p-3 text-xs leading-relaxed text-amber-950 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-200">
-                    {t.vault.passphraseIrrecoverableWarning}
+                <div class="mx-auto max-w-md space-y-5 rounded-2xl border border-slate-200/80 bg-slate-50/60 p-6 shadow-2xs dark:border-slate-800 dark:bg-slate-850/50">
+                  <div class="text-center">
+                    <div class="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-brand-50 text-brand-600 dark:bg-brand-950/60 dark:text-brand-300">
+                      <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                      </svg>
+                    </div>
+                    <h3 class="mt-3 text-sm font-bold text-slate-900 dark:text-slate-100">
+                      {t.vault.setupPassphrase}
+                    </h3>
                   </div>
-                  <div class="space-y-3">
+
+                  <div class="rounded-xl border border-amber-200/90 bg-amber-50/80 p-3.5 text-xs leading-relaxed text-amber-950 dark:border-amber-900/60 dark:bg-amber-950/30 dark:text-amber-200">
+                    <div class="flex items-start gap-2">
+                      <span class="text-amber-600 text-sm">⚠️</span>
+                      <p>{t.vault.passphraseIrrecoverableWarning}</p>
+                    </div>
+                  </div>
+
+                  <div class="space-y-3.5">
                     <div>
                       <label for="new-vault-passphrase" class="sr-only">
                         {t.vault.passphrasePlaceholder}
@@ -1741,7 +1855,7 @@ export function App({ repository, vaultMgr, defaultOpenOnboarding = false }: Opt
                         value={newVaultPassphrase}
                         onInput={(e) => setNewVaultPassphrase((e.target as HTMLInputElement).value)}
                         placeholder={t.vault.passphrasePlaceholder}
-                        class="w-full rounded-md border border-slate-300 bg-white p-2 text-xs text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                        class="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-xs font-medium text-slate-900 transition-colors focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
                       />
                     </div>
                     <div>
@@ -1756,29 +1870,37 @@ export function App({ repository, vaultMgr, defaultOpenOnboarding = false }: Opt
                           setConfirmVaultPassphrase((e.target as HTMLInputElement).value)
                         }
                         placeholder={t.vault.confirmPassphrasePlaceholder}
-                        class="w-full rounded-md border border-slate-300 bg-white p-2 text-xs text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                        class="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-xs font-medium text-slate-900 transition-colors focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
                       />
                     </div>
                     {vaultError && (
-                      <p role="alert" class="text-xs font-medium text-rose-700 dark:text-rose-400">
+                      <p role="alert" class="text-xs font-semibold text-rose-600 dark:text-rose-400">
                         {vaultError}
                       </p>
                     )}
                     <button
                       type="button"
                       onClick={handleSetupVault}
-                      class="w-full rounded-md bg-brand-600 py-2 text-xs font-semibold text-white transition-colors hover:bg-brand-700"
+                      class="w-full cursor-pointer rounded-xl bg-gradient-to-r from-brand-600 to-indigo-600 py-2.5 text-xs font-semibold text-white shadow-xs transition-all hover:from-brand-500 hover:to-indigo-500"
                     >
                       {t.actions.create}
                     </button>
                   </div>
                 </div>
               ) : !vaultUnlocked ? (
-                <div class="mx-auto max-w-md space-y-4 rounded-xl border border-slate-200 bg-slate-50 p-6 dark:border-slate-800 dark:bg-slate-800/40">
-                  <h3 class="text-sm font-semibold text-slate-900 dark:text-slate-100">
-                    {t.vault.enterPassphrase}
-                  </h3>
-                  <div class="space-y-3">
+                <div class="mx-auto max-w-md space-y-5 rounded-2xl border border-slate-200/80 bg-slate-50/60 p-6 shadow-2xs dark:border-slate-800 dark:bg-slate-850/50">
+                  <div class="text-center">
+                    <div class="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-brand-50 text-brand-600 dark:bg-brand-950/60 dark:text-brand-300">
+                      <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                      </svg>
+                    </div>
+                    <h3 class="mt-3 text-sm font-bold text-slate-900 dark:text-slate-100">
+                      {t.vault.enterPassphrase}
+                    </h3>
+                  </div>
+
+                  <div class="space-y-3.5">
                     <div>
                       <label for="unlock-vault-passphrase" class="sr-only">
                         {t.vault.enterPassphrase}
@@ -1790,18 +1912,18 @@ export function App({ repository, vaultMgr, defaultOpenOnboarding = false }: Opt
                         onInput={(e) => setVaultPassphrase((e.target as HTMLInputElement).value)}
                         onKeyDown={(e) => e.key === 'Enter' && handleUnlockVault()}
                         placeholder={t.vault.enterPassphrase}
-                        class="w-full rounded-md border border-slate-300 bg-white p-2 text-xs text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                        class="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-xs font-medium text-slate-900 transition-colors focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
                       />
                     </div>
                     {vaultError && (
-                      <p role="alert" class="text-xs font-medium text-rose-700 dark:text-rose-400">
+                      <p role="alert" class="text-xs font-semibold text-rose-600 dark:text-rose-400">
                         {vaultError}
                       </p>
                     )}
                     <button
                       type="button"
                       onClick={handleUnlockVault}
-                      class="w-full rounded-md bg-brand-600 py-2 text-xs font-semibold text-white transition-colors hover:bg-brand-700"
+                      class="w-full cursor-pointer rounded-xl bg-gradient-to-r from-brand-600 to-indigo-600 py-2.5 text-xs font-semibold text-white shadow-xs transition-all hover:from-brand-500 hover:to-indigo-500"
                     >
                       {t.actions.unlock}
                     </button>
@@ -1809,36 +1931,45 @@ export function App({ repository, vaultMgr, defaultOpenOnboarding = false }: Opt
                 </div>
               ) : (
                 <div class="space-y-6">
-                  <div class="flex flex-wrap items-center justify-between gap-2">
-                    <p class="text-xs text-slate-600 dark:text-slate-300">
-                      {formatString(t.vault.autoLockNote, {
-                        minutes: settings.vaultTimeoutMinutes,
-                      })}
-                    </p>
-                    <div class="flex items-center gap-2">
+                  <div class="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-slate-200/80 bg-slate-50/60 p-3.5 dark:border-slate-800 dark:bg-slate-850/50">
+                    <div class="flex items-center gap-2 text-xs text-slate-600 dark:text-slate-400">
+                      <svg class="h-4 w-4 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
+                      <span>
+                        {formatString(t.vault.autoLockNote, {
+                          minutes: settings.vaultTimeoutMinutes,
+                        })}
+                      </span>
+                    </div>
+
+                    <div class="flex flex-wrap items-center gap-2">
                       <button
                         type="button"
                         onClick={() => {
                           setEditingCard(null);
                           setIsAddingCard(true);
                         }}
-                        class="rounded-md bg-brand-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-brand-700"
+                        class="inline-flex cursor-pointer items-center gap-1.5 rounded-xl bg-brand-600 px-3.5 py-1.5 text-xs font-semibold text-white shadow-2xs transition-colors hover:bg-brand-700"
                       >
-                        + {t.vault.addCard}
+                        <span>+ {t.vault.addCard}</span>
                       </button>
                       <button
                         type="button"
                         onClick={() => setIsChangingPassphrase((prev) => !prev)}
-                        class="rounded-md border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-100 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
+                        class="cursor-pointer rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 transition-colors hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700"
                       >
                         {t.vault.changePassphraseTitle}
                       </button>
                       <button
                         type="button"
                         onClick={handleLockVault}
-                        class="rounded-md border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-100 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
+                        class="inline-flex cursor-pointer items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 transition-colors hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700"
                       >
-                        {t.actions.lock}
+                        <svg class="h-3.5 w-3.5 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                        </svg>
+                        <span>{t.actions.lock}</span>
                       </button>
                     </div>
                   </div>
@@ -1848,12 +1979,12 @@ export function App({ repository, vaultMgr, defaultOpenOnboarding = false }: Opt
                     <form
                       onSubmit={handleChangeMasterPassphrase}
                       aria-label={t.vault.changePassphraseTitle}
-                      class="space-y-3 rounded-lg border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-800/40"
+                      class="space-y-4 rounded-2xl border border-slate-200/80 bg-slate-50/60 p-5 dark:border-slate-800 dark:bg-slate-800/40"
                     >
                       <h3 class="text-xs font-bold uppercase tracking-wider text-slate-800 dark:text-slate-200">
                         {t.vault.changePassphraseTitle}
                       </h3>
-                      <p class="text-xs text-amber-800 dark:text-amber-300">
+                      <p class="text-xs text-amber-700 dark:text-amber-400">
                         {t.vault.passphraseIrrecoverableWarning}
                       </p>
                       <div class="grid grid-cols-1 gap-3 sm:grid-cols-3">
@@ -1866,7 +1997,7 @@ export function App({ repository, vaultMgr, defaultOpenOnboarding = false }: Opt
                           }
                           placeholder={t.vault.currentPassphrasePlaceholder}
                           aria-label={t.vault.currentPassphrasePlaceholder}
-                          class="rounded-md border border-slate-300 bg-white p-2 text-xs text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                          class="rounded-xl border border-slate-200 bg-white p-2.5 text-xs text-slate-900 transition-colors focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
                         />
                         <input
                           type="password"
@@ -1877,7 +2008,7 @@ export function App({ repository, vaultMgr, defaultOpenOnboarding = false }: Opt
                           }
                           placeholder={t.vault.newPassphrasePlaceholder}
                           aria-label={t.vault.newPassphrasePlaceholder}
-                          class="rounded-md border border-slate-300 bg-white p-2 text-xs text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                          class="rounded-xl border border-slate-200 bg-white p-2.5 text-xs text-slate-900 transition-colors focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
                         />
                         <input
                           type="password"
@@ -1888,28 +2019,28 @@ export function App({ repository, vaultMgr, defaultOpenOnboarding = false }: Opt
                           }
                           placeholder={t.vault.confirmPassphrasePlaceholder}
                           aria-label={t.vault.confirmPassphrasePlaceholder}
-                          class="rounded-md border border-slate-300 bg-white p-2 text-xs text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                          class="rounded-xl border border-slate-200 bg-white p-2.5 text-xs text-slate-900 transition-colors focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
                         />
                       </div>
                       {changePassphraseError && (
                         <p
                           role="alert"
-                          class="text-xs font-medium text-rose-700 dark:text-rose-400"
+                          class="text-xs font-semibold text-rose-600 dark:text-rose-400"
                         >
                           {changePassphraseError}
                         </p>
                       )}
-                      <div class="flex justify-end gap-2">
+                      <div class="flex justify-end gap-2.5 pt-1">
                         <button
                           type="button"
                           onClick={() => setIsChangingPassphrase(false)}
-                          class="rounded-md border border-slate-300 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200"
+                          class="cursor-pointer rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-xs font-semibold text-slate-700 transition-colors hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700"
                         >
                           {t.actions.cancel}
                         </button>
                         <button
                           type="submit"
-                          class="rounded-md bg-brand-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-brand-700"
+                          class="cursor-pointer rounded-xl bg-brand-600 px-4 py-2 text-xs font-semibold text-white shadow-2xs transition-colors hover:bg-brand-700"
                         >
                           {t.actions.save}
                         </button>
@@ -1932,7 +2063,7 @@ export function App({ repository, vaultMgr, defaultOpenOnboarding = false }: Opt
 
                   {/* Cards List */}
                   {cards.length === 0 ? (
-                    <div class="rounded-lg border border-dashed border-slate-300 py-10 text-center text-xs text-slate-600 dark:border-slate-800 dark:text-slate-300">
+                    <div class="rounded-2xl border border-dashed border-slate-200 p-10 text-center text-xs text-slate-500 dark:border-slate-800 dark:text-slate-400">
                       {t.vault.noCardsYet}
                     </div>
                   ) : (
@@ -1943,17 +2074,17 @@ export function App({ repository, vaultMgr, defaultOpenOnboarding = false }: Opt
                           <div
                             key={c.id}
                             role="listitem"
-                            class="flex flex-col justify-between rounded-xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-800/50"
+                            class="group relative flex flex-col justify-between overflow-hidden rounded-2xl border border-slate-200/90 bg-gradient-to-br from-white to-slate-50/70 p-5 shadow-2xs transition-all hover:border-slate-300 dark:border-slate-800 dark:from-slate-900 dark:to-slate-900/60 dark:hover:border-slate-700"
                           >
                             <div class="flex items-start justify-between">
-                              <div>
+                              <div class="space-y-1">
                                 <div class="flex items-center gap-2">
                                   <CardBrandIcon brand={c.brand} />
                                   <span class="text-sm font-bold text-slate-900 dark:text-slate-100">
                                     {c.nickname}
                                   </span>
                                 </div>
-                                <div class="mt-2 flex items-center gap-2 font-mono text-xs text-slate-700 dark:text-slate-300">
+                                <div class="mt-2 flex items-center gap-2.5 font-mono text-sm tracking-wider text-slate-800 dark:text-slate-200">
                                   <span>
                                     {isRevealed ? c.cardNumber : maskCardNumber(c.cardNumber)}
                                   </span>
@@ -1968,7 +2099,7 @@ export function App({ repository, vaultMgr, defaultOpenOnboarding = false }: Opt
                                     aria-label={`${
                                       isRevealed ? t.vault.hideCardNumber : t.vault.revealCardNumber
                                     }: ${c.nickname}`}
-                                    class="font-sans text-[11px] font-semibold text-brand-700 hover:underline dark:text-brand-300"
+                                    class="cursor-pointer font-sans text-xs font-semibold text-brand-600 hover:text-brand-700 dark:text-brand-400"
                                   >
                                     {isRevealed
                                       ? t.actions.hide.split(' ')[0]
@@ -1976,29 +2107,29 @@ export function App({ repository, vaultMgr, defaultOpenOnboarding = false }: Opt
                                   </button>
                                 </div>
                               </div>
-                              <div class="flex items-center gap-1">
+                              <div class="flex items-center gap-1.5">
                                 <button
                                   type="button"
                                   onClick={() => {
                                     setEditingCard(c);
                                     setIsAddingCard(false);
                                   }}
-                                  class="rounded px-2 py-1 text-xs font-medium text-brand-700 hover:bg-brand-50 dark:text-brand-300"
+                                  class="cursor-pointer rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-xs font-semibold text-slate-700 transition-colors hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700"
                                 >
                                   {t.actions.edit}
                                 </button>
                                 <button
                                   type="button"
                                   onClick={() => setCardToDelete(c)}
-                                  class="rounded px-2 py-1 text-xs font-medium text-rose-700 hover:bg-rose-50 dark:text-rose-400"
+                                  class="cursor-pointer rounded-lg border border-rose-200 bg-rose-50/60 px-2.5 py-1 text-xs font-semibold text-rose-700 transition-colors hover:bg-rose-100 dark:border-rose-900/60 dark:bg-rose-950/30 dark:text-rose-400 dark:hover:bg-rose-900/50"
                                 >
                                   {t.actions.delete}
                                 </button>
                               </div>
                             </div>
-                            <div class="mt-4 flex items-center justify-between border-t border-slate-200/80 pt-2 text-[11px] text-slate-600 dark:border-slate-700/60 dark:text-slate-300">
-                              <span>{c.cardholderName || '—'}</span>
-                              <span>
+                            <div class="mt-4 flex items-center justify-between border-t border-slate-100 pt-3 text-xs text-slate-500 dark:border-slate-800 dark:text-slate-400">
+                              <span class="font-medium uppercase tracking-wider">{c.cardholderName || '—'}</span>
+                              <span class="font-mono font-semibold">
                                 {c.expMonth}/{c.expYear}
                               </span>
                             </div>
@@ -2010,8 +2141,11 @@ export function App({ repository, vaultMgr, defaultOpenOnboarding = false }: Opt
                 </div>
               )}
 
-              <div class="rounded-lg border border-slate-200 bg-slate-50/70 p-3 text-xs text-slate-600 dark:border-slate-800 dark:bg-slate-800/40 dark:text-slate-300">
-                {t.vault.walletDisclaimer}
+              <div class="rounded-xl border border-slate-200/80 bg-slate-50/60 p-4 text-xs text-slate-500 dark:border-slate-800 dark:bg-slate-850/40 dark:text-slate-400">
+                <div class="flex items-center gap-2">
+                  <span class="text-base">ℹ️</span>
+                  <p>{t.vault.walletDisclaimer}</p>
+                </div>
               </div>
             </div>
           )}
@@ -2019,29 +2153,32 @@ export function App({ repository, vaultMgr, defaultOpenOnboarding = false }: Opt
           {/* TAB 4: SITE RULES */}
           {activeTab === 'siteRules' && (
             <div class="space-y-6">
-              <div class="border-b border-slate-200 pb-4 dark:border-slate-800">
+              <div class="border-b border-slate-200/80 pb-4 dark:border-slate-800">
                 <h2 class="text-base font-bold text-slate-900 dark:text-white">
                   {t.siteRules.title}
                 </h2>
-                <p class="mt-1 text-xs text-slate-600 dark:text-slate-300">
+                <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">
                   {t.siteRules.description}
                 </p>
               </div>
 
-              <div class="rounded-lg border border-brand-200 bg-brand-50/50 p-3 text-xs text-slate-800 dark:border-brand-900 dark:bg-brand-950/30 dark:text-slate-200">
-                {t.siteRules.placeholderNote}
+              <div class="rounded-xl border border-brand-200/80 bg-brand-50/60 p-3.5 text-xs text-slate-700 dark:border-brand-900/60 dark:bg-brand-950/30 dark:text-slate-300">
+                <div class="flex items-center gap-2">
+                  <span class="text-base">💡</span>
+                  <p>{t.siteRules.placeholderNote}</p>
+                </div>
               </div>
 
               <form
                 onSubmit={handleSaveSiteRule}
                 aria-label={t.siteRules.addRule}
-                class="space-y-3 rounded-lg border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-800/40"
+                class="space-y-4 rounded-2xl border border-slate-200/80 bg-slate-50/60 p-5 dark:border-slate-800 dark:bg-slate-800/40"
               >
-                <div class="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                <div class="grid grid-cols-1 gap-4 sm:grid-cols-3">
                   <div>
                     <label
                       for="rule-host-input"
-                      class="mb-1 block text-xs font-medium text-slate-700 dark:text-slate-200"
+                      class="mb-1.5 block text-xs font-semibold text-slate-700 dark:text-slate-200"
                     >
                       {t.siteRules.host} *
                     </label>
@@ -2052,13 +2189,13 @@ export function App({ repository, vaultMgr, defaultOpenOnboarding = false }: Opt
                       value={ruleHost}
                       onInput={(e) => setRuleHost((e.target as HTMLInputElement).value)}
                       placeholder={t.siteRules.hostPlaceholder}
-                      class="w-full rounded-md border border-slate-300 bg-white p-2 text-xs text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                      class="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2 font-mono text-xs font-semibold text-slate-900 transition-colors focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
                     />
                   </div>
                   <div>
                     <label
                       for="rule-profile-select"
-                      class="mb-1 block text-xs font-medium text-slate-700 dark:text-slate-200"
+                      class="mb-1.5 block text-xs font-semibold text-slate-700 dark:text-slate-200"
                     >
                       {t.siteRules.defaultProfile}
                     </label>
@@ -2066,7 +2203,7 @@ export function App({ repository, vaultMgr, defaultOpenOnboarding = false }: Opt
                       id="rule-profile-select"
                       value={ruleProfileId}
                       onChange={(e) => setRuleProfileId((e.target as HTMLSelectElement).value)}
-                      class="w-full rounded-md border border-slate-300 bg-white p-2 text-xs text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                      class="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-800 transition-colors hover:border-slate-300 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200"
                     >
                       <option value="">{t.siteRules.useGlobalDefault}</option>
                       {profiles.map((p) => (
@@ -2079,7 +2216,7 @@ export function App({ repository, vaultMgr, defaultOpenOnboarding = false }: Opt
                   <div>
                     <label
                       for="rule-behavior-select"
-                      class="mb-1 block text-xs font-medium text-slate-700 dark:text-slate-200"
+                      class="mb-1.5 block text-xs font-semibold text-slate-700 dark:text-slate-200"
                     >
                       {t.siteRules.behavior}
                     </label>
@@ -2091,7 +2228,7 @@ export function App({ repository, vaultMgr, defaultOpenOnboarding = false }: Opt
                           (e.target as HTMLSelectElement).value as 'ask' | 'always' | 'never',
                         )
                       }
-                      class="w-full rounded-md border border-slate-300 bg-white p-2 text-xs text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                      class="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-800 transition-colors hover:border-slate-300 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200"
                     >
                       <option value="ask">{t.siteRules.behaviorAsk}</option>
                       <option value="always">{t.siteRules.behaviorAlways}</option>
@@ -2099,7 +2236,7 @@ export function App({ repository, vaultMgr, defaultOpenOnboarding = false }: Opt
                     </select>
                   </div>
                 </div>
-                <div class="flex items-center justify-between pt-1">
+                <div class="flex flex-wrap items-center justify-between gap-3 pt-1">
                   <label class="flex cursor-pointer items-center gap-2 text-xs font-medium text-slate-700 dark:text-slate-200">
                     <input
                       type="checkbox"
@@ -2107,41 +2244,41 @@ export function App({ repository, vaultMgr, defaultOpenOnboarding = false }: Opt
                       onChange={(e) =>
                         setRuleDisableSnippets((e.target as HTMLInputElement).checked)
                       }
-                      class="rounded border-slate-300 text-brand-600"
+                      class="rounded border-slate-300 text-brand-600 focus:ring-brand-500/20"
                     />
                     <span>{t.siteRules.disableSnippets}</span>
                   </label>
                   <button
                     type="submit"
-                    class="rounded-md bg-brand-600 px-4 py-1.5 text-xs font-semibold text-white hover:bg-brand-700"
+                    class="inline-flex cursor-pointer items-center gap-1.5 rounded-xl bg-brand-600 px-4 py-2 text-xs font-semibold text-white shadow-2xs transition-colors hover:bg-brand-700"
                   >
-                    + {t.siteRules.addRule}
+                    <span>+ {t.siteRules.addRule}</span>
                   </button>
                 </div>
               </form>
 
               {siteRules.length === 0 ? (
-                <p class="py-6 text-center text-xs text-slate-600 dark:text-slate-300">
+                <div class="rounded-2xl border border-dashed border-slate-200 p-8 text-center text-xs text-slate-500 dark:border-slate-800 dark:text-slate-400">
                   {t.siteRules.emptyState}
-                </p>
+                </div>
               ) : (
-                <div role="list" class="space-y-2">
+                <div role="list" class="space-y-3">
                   {siteRules.map((rule) => (
                     <div
                       key={rule.id}
                       role="listitem"
-                      class="space-y-2 rounded-lg border border-slate-200 p-3 dark:border-slate-800"
+                      class="space-y-3 rounded-xl border border-slate-200/90 bg-white p-4 shadow-2xs transition-all hover:border-slate-300 dark:border-slate-800 dark:bg-slate-900/90 dark:hover:border-slate-700"
                     >
                       <div class="flex items-center justify-between">
-                        <div>
-                          <span class="font-mono text-xs font-bold text-slate-900 dark:text-slate-100">
-                            {rule.host}
+                        <div class="flex flex-wrap items-center gap-2">
+                          <span class="rounded-md border border-slate-200 bg-slate-50 px-2.5 py-1 font-mono text-xs font-bold text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100">
+                            🌐 {rule.host}
                           </span>
-                          <span class="ms-2 rounded bg-slate-100 px-2 py-0.5 text-[11px] text-slate-700 dark:bg-slate-800 dark:text-slate-300">
+                          <span class="rounded-full bg-slate-100 px-2.5 py-0.5 text-[11px] font-semibold text-slate-700 dark:bg-slate-800 dark:text-slate-300">
                             {rule.autoFillRule}
                           </span>
                           {rule.snippetsDisabled && (
-                            <span class="ms-2 rounded bg-amber-100 px-2 py-0.5 text-[10px] font-medium text-amber-900 dark:bg-amber-950 dark:text-amber-200">
+                            <span class="rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-[10px] font-semibold text-amber-800 dark:border-amber-900/60 dark:bg-amber-950/40 dark:text-amber-300">
                               {t.siteRules.disableSnippets}
                             </span>
                           )}
@@ -2149,38 +2286,40 @@ export function App({ repository, vaultMgr, defaultOpenOnboarding = false }: Opt
                         <button
                           type="button"
                           onClick={() => handleDeleteSiteRule(rule.id)}
-                          class="rounded px-2 py-1 text-xs font-medium text-rose-700 hover:bg-rose-50 dark:text-rose-400"
+                          class="cursor-pointer rounded-lg border border-rose-200 bg-rose-50/60 px-2.5 py-1 text-xs font-semibold text-rose-700 transition-colors hover:bg-rose-100 dark:border-rose-900/60 dark:bg-rose-950/30 dark:text-rose-400 dark:hover:bg-rose-900/50"
                         >
                           {t.actions.delete}
                         </button>
                       </div>
                       {rule.fieldMappings && rule.fieldMappings.length > 0 && (
-                        <div class="space-y-1 border-t border-slate-200 pt-2 dark:border-slate-800">
-                          <span class="block text-[10px] font-bold uppercase text-slate-600 dark:text-slate-400">
+                        <div class="space-y-2 border-t border-slate-100 pt-3 dark:border-slate-800/80">
+                          <span class="block text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
                             {t.siteRules.mappingsTitle}
                           </span>
-                          {rule.fieldMappings.map((m) => (
-                            <div
-                              key={m.id}
-                              class="flex items-center justify-between rounded bg-slate-50 px-2 py-1 text-xs dark:bg-slate-800/50"
-                            >
-                              <span class="font-mono text-[11px] text-slate-800 dark:text-slate-200">
-                                {m.signature.name ||
-                                  m.signature.id ||
-                                  m.signature.domPath ||
-                                  'field'}{' '}
-                                → {m.label || m.targetKey}
-                              </span>
-                              <button
-                                type="button"
-                                onClick={() => handleRemoveFieldMapping(rule, m.id)}
-                                aria-label={`${t.siteRules.removeMapping}: ${m.targetKey}`}
-                                class="text-xs font-bold text-rose-700 hover:underline dark:text-rose-400"
+                          <div class="flex flex-wrap gap-2">
+                            {rule.fieldMappings.map((m) => (
+                              <div
+                                key={m.id}
+                                class="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-50/80 px-2.5 py-1 text-xs dark:border-slate-700 dark:bg-slate-800/60"
                               >
-                                ×
-                              </button>
-                            </div>
-                          ))}
+                                <span class="font-mono text-[11px] text-slate-800 dark:text-slate-200">
+                                  {m.signature.name ||
+                                    m.signature.id ||
+                                    m.signature.domPath ||
+                                    'field'}{' '}
+                                  → <span class="font-bold text-brand-600 dark:text-brand-400">{m.label || m.targetKey}</span>
+                                </span>
+                                <button
+                                  type="button"
+                                  onClick={() => handleRemoveFieldMapping(rule, m.id)}
+                                  aria-label={`${t.siteRules.removeMapping}: ${m.targetKey}`}
+                                  class="cursor-pointer font-bold text-slate-400 hover:text-rose-600 dark:hover:text-rose-400"
+                                >
+                                  ×
+                                </button>
+                              </div>
+                            ))}
+                          </div>
                         </div>
                       )}
                     </div>
@@ -2193,31 +2332,37 @@ export function App({ repository, vaultMgr, defaultOpenOnboarding = false }: Opt
           {/* TAB 5: BACKUP & RESTORE */}
           {activeTab === 'backup' && (
             <div class="space-y-6">
-              <div class="border-b border-slate-200 pb-4 dark:border-slate-800">
+              <div class="border-b border-slate-200/80 pb-4 dark:border-slate-800">
                 <h2 class="text-base font-bold text-slate-900 dark:text-white">
                   {t.settings.exportImportTitle}
                 </h2>
               </div>
 
-              <div class="rounded-lg border border-amber-300 bg-amber-50/70 p-3 text-xs text-amber-950 dark:border-amber-800/60 dark:bg-amber-950/30 dark:text-amber-200">
-                {t.settings.exportPlainExclusionNotice}
+              <div class="rounded-xl border border-amber-200/80 bg-amber-50/70 p-4 text-xs text-amber-950 dark:border-amber-900/60 dark:bg-amber-950/30 dark:text-amber-200">
+                <div class="flex items-center gap-2">
+                  <span class="text-base">🔒</span>
+                  <p>{t.settings.exportPlainExclusionNotice}</p>
+                </div>
               </div>
 
               <div class="grid grid-cols-1 gap-6 sm:grid-cols-2">
                 {/* Export Box */}
-                <div class="flex flex-col justify-between rounded-xl border border-slate-200 p-5 dark:border-slate-800">
-                  <div class="space-y-3">
-                    <h3 class="text-sm font-semibold text-slate-900 dark:text-slate-100">
-                      {t.actions.export}
-                    </h3>
-                    <p class="text-xs leading-relaxed text-slate-600 dark:text-slate-300">
+                <div class="flex flex-col justify-between rounded-2xl border border-slate-200/80 bg-slate-50/60 p-6 dark:border-slate-800 dark:bg-slate-850/50">
+                  <div class="space-y-4">
+                    <div class="flex items-center gap-2 text-sm font-bold text-slate-900 dark:text-slate-100">
+                      <svg class="h-4 w-4 text-brand-600 dark:text-brand-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+                      </svg>
+                      <span>{t.actions.export}</span>
+                    </div>
+                    <p class="text-xs leading-relaxed text-slate-500 dark:text-slate-400">
                       {t.settings.exportDesc}
                     </p>
 
                     <div>
                       <label
                         for="export-format-select"
-                        class="mb-1 block text-xs font-semibold text-slate-700 dark:text-slate-200"
+                        class="mb-1.5 block text-xs font-semibold text-slate-700 dark:text-slate-200"
                       >
                         {t.settings.exportFormatLabel}
                       </label>
@@ -2230,7 +2375,7 @@ export function App({ repository, vaultMgr, defaultOpenOnboarding = false }: Opt
                               'plainJson' | 'csv' | 'encrypted',
                           )
                         }
-                        class="w-full rounded-md border border-slate-300 bg-white p-2 text-xs text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                        class="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-xs font-semibold text-slate-800 transition-colors hover:border-slate-300 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200"
                       >
                         <option value="plainJson">{t.settings.exportFormatPlainJson}</option>
                         <option value="csv">{t.settings.exportFormatCsv}</option>
@@ -2249,7 +2394,7 @@ export function App({ repository, vaultMgr, defaultOpenOnboarding = false }: Opt
                           value={exportPassphrase}
                           onInput={(e) => setExportPassphrase((e.target as HTMLInputElement).value)}
                           placeholder={t.settings.exportPassphrasePlaceholder}
-                          class="w-full rounded-md border border-slate-300 bg-white p-2 text-xs text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                          class="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-xs font-medium text-slate-900 transition-colors focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
                         />
                       </div>
                     )}
@@ -2258,26 +2403,32 @@ export function App({ repository, vaultMgr, defaultOpenOnboarding = false }: Opt
                   <button
                     type="button"
                     onClick={handleExport}
-                    class="mt-6 w-full rounded-md bg-brand-600 py-2 text-xs font-semibold text-white transition-colors hover:bg-brand-700"
+                    class="mt-6 inline-flex w-full cursor-pointer items-center justify-center gap-2 rounded-xl bg-brand-600 py-2.5 text-xs font-semibold text-white shadow-2xs transition-colors hover:bg-brand-700"
                   >
-                    {t.actions.export}
+                    <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                    </svg>
+                    <span>{t.actions.export}</span>
                   </button>
                 </div>
 
                 {/* Import Box with Dry-Run Preview & Merge Strategy */}
-                <div class="flex flex-col justify-between rounded-xl border border-slate-200 p-5 dark:border-slate-800">
-                  <div class="space-y-3">
-                    <h3 class="text-sm font-semibold text-slate-900 dark:text-slate-100">
-                      {t.actions.import}
-                    </h3>
-                    <p class="text-xs leading-relaxed text-slate-600 dark:text-slate-300">
+                <div class="flex flex-col justify-between rounded-2xl border border-slate-200/80 bg-slate-50/60 p-6 dark:border-slate-800 dark:bg-slate-850/50">
+                  <div class="space-y-4">
+                    <div class="flex items-center gap-2 text-sm font-bold text-slate-900 dark:text-slate-100">
+                      <svg class="h-4 w-4 text-emerald-600 dark:text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+                      </svg>
+                      <span>{t.actions.import}</span>
+                    </div>
+                    <p class="text-xs leading-relaxed text-slate-500 dark:text-slate-400">
                       {t.settings.importDesc}
                     </p>
 
                     <div>
                       <label
                         for="import-merge-strategy"
-                        class="mb-1 block text-xs font-semibold text-slate-700 dark:text-slate-200"
+                        class="mb-1.5 block text-xs font-semibold text-slate-700 dark:text-slate-200"
                       >
                         {t.settings.importMergeStrategyLabel}
                       </label>
@@ -2287,7 +2438,7 @@ export function App({ repository, vaultMgr, defaultOpenOnboarding = false }: Opt
                         onChange={(e) =>
                           setImportStrategy((e.target as HTMLSelectElement).value as MergeStrategy)
                         }
-                        class="w-full rounded-md border border-slate-300 bg-white p-2 text-xs text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                        class="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-xs font-semibold text-slate-800 transition-colors hover:border-slate-300 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200"
                       >
                         <option value="skip">{t.settings.mergeSkip}</option>
                         <option value="replace">{t.settings.mergeReplace}</option>
@@ -2296,12 +2447,12 @@ export function App({ repository, vaultMgr, defaultOpenOnboarding = false }: Opt
                     </div>
 
                     {importPreview && (
-                      <div class="space-y-2 rounded-lg border border-brand-200 bg-brand-50/50 p-3 text-xs dark:border-brand-800 dark:bg-brand-950/40">
+                      <div class="space-y-3 rounded-xl border border-brand-200 bg-brand-50/60 p-4 text-xs dark:border-brand-800 dark:bg-brand-950/40">
                         <div class="font-bold text-slate-900 dark:text-slate-100">
                           {t.settings.dryRunTitle} ({importPreview.format.toUpperCase()})
                         </div>
                         {importPreview.valid ? (
-                          <div class="space-y-2">
+                          <div class="space-y-3">
                             <p class="text-slate-700 dark:text-slate-300">
                               {formatString(t.settings.dryRunSummary, {
                                 newCount: importPreview.newCount,
@@ -2318,19 +2469,19 @@ export function App({ repository, vaultMgr, defaultOpenOnboarding = false }: Opt
                                 }
                                 placeholder={t.vault.enterPassphrase}
                                 aria-label={t.vault.enterPassphrase}
-                                class="w-full rounded border border-slate-300 bg-white p-1.5 text-xs text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                                class="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs text-slate-900 focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
                               />
                             )}
                             <button
                               type="button"
                               onClick={handleApplyImport}
-                              class="w-full rounded bg-emerald-700 py-1.5 text-xs font-semibold text-white hover:bg-emerald-800"
+                              class="w-full cursor-pointer rounded-xl bg-emerald-600 py-2 text-xs font-semibold text-white shadow-2xs transition-colors hover:bg-emerald-700"
                             >
                               {t.settings.applyImportBtn}
                             </button>
                           </div>
                         ) : (
-                          <p role="alert" class="font-medium text-rose-700 dark:text-rose-400">
+                          <p role="alert" class="font-semibold text-rose-600 dark:text-rose-400">
                             {importPreview.error}
                           </p>
                         )}
@@ -2338,8 +2489,11 @@ export function App({ repository, vaultMgr, defaultOpenOnboarding = false }: Opt
                     )}
                   </div>
 
-                  <label class="mt-6 block w-full cursor-pointer rounded-md border border-slate-300 bg-slate-100 py-2 text-center text-xs font-semibold text-slate-800 transition-colors hover:bg-slate-200 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:hover:bg-slate-700">
-                    <span>{t.actions.import}</span>
+                  <label class="mt-6 flex w-full cursor-pointer items-center justify-center gap-2 rounded-xl border border-dashed border-slate-300 bg-white py-2.5 text-center text-xs font-semibold text-slate-800 shadow-2xs transition-colors hover:border-brand-400 hover:bg-brand-50/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:hover:border-brand-500">
+                    <svg class="h-4 w-4 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                    </svg>
+                    <span>{t.actions.import} (JSON, CSV, TXT)</span>
                     <input
                       type="file"
                       accept=".json,.csv,.txt,application/json,text/csv,text/plain"
@@ -2351,13 +2505,13 @@ export function App({ repository, vaultMgr, defaultOpenOnboarding = false }: Opt
               </div>
 
               {/* Automatic Local Backups & Restore Screen */}
-              <div class="space-y-4 rounded-xl border border-slate-200 p-5 dark:border-slate-800">
-                <div class="flex flex-wrap items-center justify-between gap-2">
+              <div class="space-y-4 rounded-2xl border border-slate-200/80 bg-white p-6 shadow-2xs dark:border-slate-800 dark:bg-slate-900">
+                <div class="flex flex-wrap items-center justify-between gap-3">
                   <div>
-                    <h3 class="text-sm font-semibold text-slate-900 dark:text-slate-100">
+                    <h3 class="text-sm font-bold text-slate-900 dark:text-slate-100">
                       {t.settings.localBackupsTitle}
                     </h3>
-                    <p class="mt-0.5 text-xs text-slate-600 dark:text-slate-300">
+                    <p class="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
                       {formatString(t.settings.localBackupsDesc, {
                         max: settings.maxLocalBackups ?? 5,
                       })}
@@ -2366,36 +2520,36 @@ export function App({ repository, vaultMgr, defaultOpenOnboarding = false }: Opt
                   <button
                     type="button"
                     onClick={handleCreateLocalSnapshot}
-                    class="rounded-md border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-800 hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                    class="cursor-pointer rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-1.5 text-xs font-semibold text-slate-700 transition-colors hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700"
                   >
                     + {t.settings.createSnapshotBtn}
                   </button>
                 </div>
 
                 {localBackups.length === 0 ? (
-                  <p class="py-4 text-center text-xs text-slate-600 dark:text-slate-300">
+                  <div class="rounded-xl border border-dashed border-slate-200 p-6 text-center text-xs text-slate-500 dark:border-slate-800 dark:text-slate-400">
                     {t.settings.noLocalBackups}
-                  </p>
+                  </div>
                 ) : (
-                  <div role="list" class="space-y-2">
+                  <div role="list" class="space-y-2.5">
                     {localBackups.map((snap) => (
                       <div
                         key={snap.id}
                         role="listitem"
-                        class="flex items-center justify-between rounded-lg border border-slate-200 bg-slate-50/70 p-3 dark:border-slate-800 dark:bg-slate-800/40"
+                        class="flex items-center justify-between rounded-xl border border-slate-100 bg-slate-50/70 p-3.5 transition-colors hover:border-slate-200 dark:border-slate-800/80 dark:bg-slate-800/40"
                       >
-                        <div>
-                          <div class="text-xs font-semibold text-slate-900 dark:text-slate-100">
+                        <div class="space-y-0.5">
+                          <div class="text-xs font-bold text-slate-900 dark:text-slate-100">
                             {new Date(snap.timestamp).toLocaleString()}
                           </div>
-                          <div class="text-[11px] text-slate-600 dark:text-slate-300">
+                          <div class="text-[11px] text-slate-500 dark:text-slate-400">
                             {snap.profileCount} profiles · {snap.fieldCount} fields
                           </div>
                         </div>
                         <button
                           type="button"
                           onClick={() => handleRestoreLocalSnapshot(snap.id)}
-                          class="rounded bg-brand-600 px-3 py-1 text-xs font-semibold text-white hover:bg-brand-700"
+                          class="cursor-pointer rounded-lg bg-brand-600 px-3 py-1.5 text-xs font-semibold text-white shadow-2xs transition-colors hover:bg-brand-700"
                         >
                           {t.settings.restoreSnapshotBtn}
                         </button>
@@ -2410,183 +2564,207 @@ export function App({ repository, vaultMgr, defaultOpenOnboarding = false }: Opt
           {/* TAB 6: SETTINGS */}
           {activeTab === 'settings' && (
             <div class="space-y-6">
-              <div class="border-b border-slate-200 pb-4 dark:border-slate-800">
+              <div class="border-b border-slate-200/80 pb-4 dark:border-slate-800">
                 <h2 class="text-base font-bold text-slate-900 dark:text-white">
                   {t.settings.title}
                 </h2>
               </div>
 
-              <div class="max-w-lg space-y-5">
-                {/* Language */}
-                <div>
-                  <label
-                    for="settings-language-select"
-                    class="mb-1.5 block text-xs font-semibold text-slate-700 dark:text-slate-200"
-                  >
-                    {t.settings.language}
-                  </label>
-                  <select
-                    id="settings-language-select"
-                    value={settings.language}
-                    onChange={async (e) => {
-                      const lang = (e.target as HTMLSelectElement).value as 'en' | 'bn';
-                      const updated = await repo.updateSettings({ language: lang });
-                      setSettings(updated);
-                      document.documentElement.lang = lang;
-                    }}
-                    class="w-full rounded-md border border-slate-300 bg-white p-2 text-xs text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
-                  >
-                    <option value="en">{t.settings.languages.en}</option>
-                    <option value="bn">{t.settings.languages.bn}</option>
-                  </select>
+              <div class="max-w-xl space-y-6">
+                {/* General Section */}
+                <div class="space-y-4 rounded-2xl border border-slate-200/80 bg-slate-50/60 p-5 dark:border-slate-800 dark:bg-slate-850/50">
+                  <h3 class="text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300">
+                    Regional & Appearance
+                  </h3>
+
+                  <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                    {/* Language */}
+                    <div>
+                      <label
+                        for="settings-language-select"
+                        class="mb-1.5 block text-xs font-semibold text-slate-700 dark:text-slate-200"
+                      >
+                        {t.settings.language}
+                      </label>
+                      <select
+                        id="settings-language-select"
+                        value={settings.language}
+                        onChange={async (e) => {
+                          const lang = (e.target as HTMLSelectElement).value as 'en' | 'bn';
+                          const updated = await repo.updateSettings({ language: lang });
+                          setSettings(updated);
+                          document.documentElement.lang = lang;
+                        }}
+                        class="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-800 transition-colors hover:border-slate-300 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200"
+                      >
+                        <option value="en">{t.settings.languages.en}</option>
+                        <option value="bn">{t.settings.languages.bn}</option>
+                      </select>
+                    </div>
+
+                    {/* Theme */}
+                    <div>
+                      <label
+                        for="settings-theme-select"
+                        class="mb-1.5 block text-xs font-semibold text-slate-700 dark:text-slate-200"
+                      >
+                        {t.settings.theme}
+                      </label>
+                      <select
+                        id="settings-theme-select"
+                        value={settings.theme}
+                        onChange={async (e) => {
+                          const theme = (e.target as HTMLSelectElement).value as
+                            'system' | 'light' | 'dark';
+                          const updated = await repo.updateSettings({ theme });
+                          setSettings(updated);
+                          applyTheme(theme);
+                        }}
+                        class="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-800 transition-colors hover:border-slate-300 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200"
+                      >
+                        <option value="system">{t.settings.themes.system}</option>
+                        <option value="light">{t.settings.themes.light}</option>
+                        <option value="dark">{t.settings.themes.dark}</option>
+                      </select>
+                    </div>
+                  </div>
                 </div>
 
-                {/* Theme */}
-                <div>
-                  <label
-                    for="settings-theme-select"
-                    class="mb-1.5 block text-xs font-semibold text-slate-700 dark:text-slate-200"
-                  >
-                    {t.settings.theme}
-                  </label>
-                  <select
-                    id="settings-theme-select"
-                    value={settings.theme}
-                    onChange={async (e) => {
-                      const theme = (e.target as HTMLSelectElement).value as
-                        'system' | 'light' | 'dark';
-                      const updated = await repo.updateSettings({ theme });
-                      setSettings(updated);
-                      applyTheme(theme);
-                    }}
-                    class="w-full rounded-md border border-slate-300 bg-white p-2 text-xs text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
-                  >
-                    <option value="system">{t.settings.themes.system}</option>
-                    <option value="light">{t.settings.themes.light}</option>
-                    <option value="dark">{t.settings.themes.dark}</option>
-                  </select>
-                </div>
-
-                {/* Vault Auto-Lock Timeout */}
-                <div>
-                  <label
-                    for="settings-timeout-select"
-                    class="mb-1.5 block text-xs font-semibold text-slate-700 dark:text-slate-200"
-                  >
-                    {t.settings.vaultTimeout}
-                  </label>
-                  <select
-                    id="settings-timeout-select"
-                    value={settings.vaultTimeoutMinutes}
-                    onChange={async (e) => {
-                      const mins = Number((e.target as HTMLSelectElement).value);
-                      const updated = await repo.updateSettings({ vaultTimeoutMinutes: mins });
-                      setSettings(updated);
-                    }}
-                    class="w-full rounded-md border border-slate-300 bg-white p-2 text-xs text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
-                  >
-                    {[5, 15, 30, 60].map((m) => (
-                      <option key={m} value={m}>
-                        {formatString(t.settings.vaultTimeoutMinutes, { minutes: m })}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                {/* Payment Confirmation Toggle */}
-                <div class="space-y-3 pt-2">
-                  <label class="flex cursor-pointer items-center gap-2.5 text-xs font-medium text-slate-700 dark:text-slate-200">
-                    <input
-                      type="checkbox"
-                      checked={settings.confirmBeforePaymentFill}
-                      onChange={async (e) => {
-                        const checked = (e.target as HTMLInputElement).checked;
-                        const updated = await repo.updateSettings({
-                          confirmBeforePaymentFill: checked,
-                        });
-                        setSettings(updated);
-                      }}
-                      class="rounded border-slate-300 text-brand-600"
-                    />
-                    <span>{t.settings.confirmPaymentFill}</span>
-                  </label>
-
-                  <label class="flex cursor-pointer items-center gap-2.5 text-xs font-medium text-slate-700 dark:text-slate-200">
-                    <input
-                      type="checkbox"
-                      checked={Boolean(settings.showMenuValuePreviews)}
-                      onChange={async (e) => {
-                        const checked = (e.target as HTMLInputElement).checked;
-                        const updated = await repo.updateSettings({
-                          showMenuValuePreviews: checked,
-                        });
-                        setSettings(updated);
-                      }}
-                      class="rounded border-slate-300 text-brand-600"
-                    />
-                    <span>{t.settings.showMenuPreviews}</span>
-                  </label>
+                {/* Security Section */}
+                <div class="space-y-4 rounded-2xl border border-slate-200/80 bg-slate-50/60 p-5 dark:border-slate-800 dark:bg-slate-850/50">
+                  <h3 class="text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300">
+                    Security & Auto-Lock
+                  </h3>
 
                   <div>
-                    <label class="flex cursor-pointer items-center gap-2.5 text-xs font-medium text-slate-700 dark:text-slate-200">
+                    <label
+                      for="settings-timeout-select"
+                      class="mb-1.5 block text-xs font-semibold text-slate-700 dark:text-slate-200"
+                    >
+                      {t.settings.vaultTimeout}
+                    </label>
+                    <select
+                      id="settings-timeout-select"
+                      value={settings.vaultTimeoutMinutes}
+                      onChange={async (e) => {
+                        const mins = Number((e.target as HTMLSelectElement).value);
+                        const updated = await repo.updateSettings({ vaultTimeoutMinutes: mins });
+                        setSettings(updated);
+                      }}
+                      class="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-800 transition-colors hover:border-slate-300 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200"
+                    >
+                      {[5, 15, 30, 60].map((m) => (
+                        <option key={m} value={m}>
+                          {formatString(t.settings.vaultTimeoutMinutes, { minutes: m })}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+
+                {/* Autofill Safety & Options */}
+                <div class="space-y-3.5 rounded-2xl border border-slate-200/80 bg-slate-50/60 p-5 dark:border-slate-800 dark:bg-slate-850/50">
+                  <h3 class="text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300">
+                    Autofill Behavior
+                  </h3>
+
+                  <div class="space-y-3">
+                    <label class="flex cursor-pointer items-center gap-3 rounded-xl border border-slate-200/70 bg-white p-3 text-xs font-medium text-slate-800 shadow-2xs transition-colors hover:border-slate-300 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200">
                       <input
                         type="checkbox"
-                        checked={Boolean(settings.enableInlineChips)}
+                        checked={settings.confirmBeforePaymentFill}
                         onChange={async (e) => {
                           const checked = (e.target as HTMLInputElement).checked;
-                          if (checked && browser?.permissions?.request) {
-                            try {
-                              await browser.permissions.request({
-                                origins: ['https://*/*', 'http://*/*'],
-                              });
-                            } catch {
-                              // continue in test environment
-                            }
-                          }
                           const updated = await repo.updateSettings({
-                            enableInlineChips: checked,
+                            confirmBeforePaymentFill: checked,
                           });
                           setSettings(updated);
                         }}
-                        class="rounded border-slate-300 text-brand-600"
+                        class="rounded border-slate-300 text-brand-600 focus:ring-brand-500/20"
                       />
-                      <span>{t.settings.enableInlineChips}</span>
+                      <span>{t.settings.confirmPaymentFill}</span>
                     </label>
-                    <p class="ms-6 mt-1 text-[11px] text-slate-600 dark:text-slate-300">
-                      {t.settings.inlineChipsExplanation}
-                    </p>
-                  </div>
 
-                  <label class="flex cursor-pointer items-center gap-2.5 text-xs font-medium text-slate-700 dark:text-slate-200">
-                    <input
-                      type="checkbox"
-                      checked={Boolean(settings.allowSensitiveInInlineChips)}
-                      onChange={async (e) => {
-                        const checked = (e.target as HTMLInputElement).checked;
-                        const updated = await repo.updateSettings({
-                          allowSensitiveInInlineChips: checked,
-                        });
-                        setSettings(updated);
-                      }}
-                      class="rounded border-slate-300 text-brand-600"
-                    />
-                    <span>{t.settings.allowSensitiveInChips}</span>
-                  </label>
+                    <label class="flex cursor-pointer items-center gap-3 rounded-xl border border-slate-200/70 bg-white p-3 text-xs font-medium text-slate-800 shadow-2xs transition-colors hover:border-slate-300 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200">
+                      <input
+                        type="checkbox"
+                        checked={Boolean(settings.showMenuValuePreviews)}
+                        onChange={async (e) => {
+                          const checked = (e.target as HTMLInputElement).checked;
+                          const updated = await repo.updateSettings({
+                            showMenuValuePreviews: checked,
+                          });
+                          setSettings(updated);
+                        }}
+                        class="rounded border-slate-300 text-brand-600 focus:ring-brand-500/20"
+                      />
+                      <span>{t.settings.showMenuPreviews}</span>
+                    </label>
+
+                    <div class="rounded-xl border border-slate-200/70 bg-white p-3 shadow-2xs dark:border-slate-700 dark:bg-slate-800">
+                      <label class="flex cursor-pointer items-center gap-3 text-xs font-medium text-slate-800 dark:text-slate-200">
+                        <input
+                          type="checkbox"
+                          checked={Boolean(settings.enableInlineChips)}
+                          onChange={async (e) => {
+                            const checked = (e.target as HTMLInputElement).checked;
+                            if (checked && browser?.permissions?.request) {
+                              try {
+                                await browser.permissions.request({
+                                  origins: ['https://*/*', 'http://*/*'],
+                                });
+                              } catch {
+                                // continue in test environment
+                              }
+                            }
+                            const updated = await repo.updateSettings({
+                              enableInlineChips: checked,
+                            });
+                            setSettings(updated);
+                          }}
+                          class="rounded border-slate-300 text-brand-600 focus:ring-brand-500/20"
+                        />
+                        <span>{t.settings.enableInlineChips}</span>
+                      </label>
+                      <p class="ms-6 mt-1 text-[11px] text-slate-500 dark:text-slate-400">
+                        {t.settings.inlineChipsExplanation}
+                      </p>
+                    </div>
+
+                    <label class="flex cursor-pointer items-center gap-3 rounded-xl border border-slate-200/70 bg-white p-3 text-xs font-medium text-slate-800 shadow-2xs transition-colors hover:border-slate-300 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200">
+                      <input
+                        type="checkbox"
+                        checked={Boolean(settings.allowSensitiveInInlineChips)}
+                        onChange={async (e) => {
+                          const checked = (e.target as HTMLInputElement).checked;
+                          const updated = await repo.updateSettings({
+                            allowSensitiveInInlineChips: checked,
+                          });
+                          setSettings(updated);
+                        }}
+                        class="rounded border-slate-300 text-brand-600 focus:ring-brand-500/20"
+                      />
+                      <span>{t.settings.allowSensitiveInChips}</span>
+                    </label>
+                  </div>
                 </div>
 
                 {/* Re-open 3-Step Onboarding Wizard */}
-                <div class="pt-2">
+                <div class="pt-1">
                   <button
                     type="button"
                     onClick={() => setIsOnboardingOpen(true)}
-                    class="rounded-md border border-slate-300 bg-white px-3.5 py-2 text-xs font-semibold text-slate-800 hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:hover:bg-slate-700"
+                    class="cursor-pointer rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-xs font-semibold text-slate-800 shadow-2xs transition-colors hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:hover:bg-slate-700"
                   >
                     {t.settings.reopenOnboarding}
                   </button>
                 </div>
 
-                <div class="rounded-lg border border-emerald-200 bg-emerald-50/60 p-4 text-xs leading-relaxed text-emerald-900 dark:border-emerald-900/50 dark:bg-emerald-950/30 dark:text-emerald-200">
-                  {t.settings.privacyNote}
+                <div class="rounded-2xl border border-emerald-200/80 bg-emerald-50/60 p-4 text-xs leading-relaxed text-emerald-950 dark:border-emerald-900/50 dark:bg-emerald-950/30 dark:text-emerald-200">
+                  <div class="flex items-start gap-2.5">
+                    <span class="text-base">🛡️</span>
+                    <p>{t.settings.privacyNote}</p>
+                  </div>
                 </div>
               </div>
             </div>
