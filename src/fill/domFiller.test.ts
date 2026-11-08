@@ -20,7 +20,7 @@ import {
 import { buildContextMenuDescriptors } from '../background/contextMenu';
 import { createDefaultProfile } from '../types/profile';
 import { createPersonalTemplate } from '../core/templates';
-import { DEFAULT_SETTINGS, type SiteRule } from '../core/schemas/vault';
+import { DEFAULT_SETTINGS, type SiteRule, type Profile } from '../core/schemas/vault';
 import type { PaymentCard } from '../types/vault';
 
 describe('DOM Filler Engine, Card Rules, Snippets, and Context Menu Triggers', () => {
@@ -385,6 +385,7 @@ describe('DOM Filler Engine, Card Rules, Snippets, and Context Menu Triggers', (
     const workProf: Profile = {
       id: 'prof_work',
       name: 'Work',
+      icon: 'briefcase',
       fields: [
         {
           id: 'f_w1',
@@ -401,8 +402,6 @@ describe('DOM Filler Engine, Card Rules, Snippets, and Context Menu Triggers', (
           lastUsedAt: 1000,
         },
       ],
-      createdAt: 1000,
-      updatedAt: 1000,
     };
     const multiProfileMenu = buildContextMenuDescriptors({
       profiles: [prof, workProf],
