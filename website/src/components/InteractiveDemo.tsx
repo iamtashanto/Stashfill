@@ -1,15 +1,15 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { 
   Zap, 
   RotateCcw, 
-  CheckCircle2, 
-  Sparkles, 
   Terminal, 
   User, 
   Briefcase, 
-  Languages
+  Languages,
+  Check,
+  Code2
 } from 'lucide-react';
 
 interface ProfileData {
@@ -92,8 +92,8 @@ export default function InteractiveDemo() {
   const [filling, setFilling] = useState(false);
   const [filledFields, setFilledFields] = useState<Set<string>>(new Set());
   const [logs, setLogs] = useState<string[]>([
-    'Stashfill Heuristic Matcher ready. 0 telemetry listeners attached.',
-    'Form inputs indexed in memory. Waiting for user action...',
+    'Stashfill Heuristic Matcher initialized. 0 telemetry listeners attached.',
+    'Form elements registered in DOM walker. Press Alt+Shift+F or click fill button.',
   ]);
 
   const activeProfile = PROFILES[selectedProfileKey];
@@ -105,7 +105,6 @@ export default function InteractiveDemo() {
 
     const keys = Object.keys(activeProfile.fields) as Array<keyof typeof formData>;
     
-    // Animate fill step by step
     keys.forEach((key, index) => {
       setTimeout(() => {
         setFormData((prev) => ({
@@ -116,18 +115,18 @@ export default function InteractiveDemo() {
         setFilledFields((prev) => new Set([...prev, key]));
 
         setLogs((prev) => [
-          `[MATCHED] "${key}" -> Dispatched React _valueTracker sync & change event`,
+          `[RECONCILE] element[name="${key}"] -> invoked prototype setter -> synced React _valueTracker`,
           ...prev.slice(0, 4),
         ]);
 
         if (index === keys.length - 1) {
           setFilling(false);
           setLogs((prev) => [
-            `✓ All 8 fields successfully filled in ${(index + 1) * 35}ms with 0 network calls!`,
+            `✓ Successfully populated ${keys.length} inputs in ${(index + 1) * 35}ms with 0 outbound network requests.`,
             ...prev.slice(0, 4),
           ]);
         }
-      }, (index + 1) * 65);
+      }, (index + 1) * 60);
     });
   };
 
@@ -144,116 +143,126 @@ export default function InteractiveDemo() {
     });
     setFilledFields(new Set());
     setLogs([
-      'Form cleared. Ready for next 1-click test.',
-      'Local storage profile intact.',
+      'Form inputs cleared. Ready for next fill command.',
+      'Local sandbox state intact.',
     ]);
   };
 
+  // Keyboard shortcut listener (Alt+Shift+F)
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.altKey && e.shiftKey && (e.key === 'F' || e.key === 'f')) {
+        e.preventDefault();
+        handleFill();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [activeProfile, filling]);
+
   return (
-    <section id="demo" className="py-24 relative overflow-hidden bg-slate-50 dark:bg-slate-900/40 border-y border-slate-200 dark:border-slate-800">
+    <section id="demo" className="py-24 relative overflow-hidden bg-white dark:bg-zinc-950 border-b border-zinc-200/80 dark:border-white/[0.08]">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         
-        {/* Section Title */}
-        <div className="text-center max-w-3xl mx-auto mb-14">
-          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-brand-500/10 text-brand-600 dark:text-brand-400 border border-brand-500/20 mb-3">
-            <Sparkles className="w-3.5 h-3.5" />
-            <span>Interactive Simulator</span>
+        {/* Header */}
+        <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-12">
+          <div className="max-w-2xl">
+            <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md border border-zinc-200 dark:border-white/[0.1] bg-zinc-50 dark:bg-zinc-900 text-xs font-mono text-zinc-600 dark:text-zinc-400 mb-3">
+              <Code2 className="w-3.5 h-3.5" />
+              <span>Interactive DOM Sandbox</span>
+            </div>
+            <h2 className="text-3xl sm:text-4xl font-extrabold text-zinc-950 dark:text-white tracking-tight">
+              Test Stashfill in real-time.
+            </h2>
+            <p className="text-zinc-600 dark:text-zinc-400 text-sm sm:text-base mt-2">
+              Select an identity profile, then press <kbd className="font-mono text-xs px-1.5 py-0.5 rounded bg-zinc-200 dark:bg-zinc-800 text-zinc-900 dark:text-white font-semibold">Alt + Shift + F</kbd> on your keyboard or trigger via the button below.
+            </p>
           </div>
-          <h2 className="text-3xl sm:text-4xl font-extrabold text-slate-900 dark:text-white tracking-tight mb-4">
-            Test 1-Click Form Filling Right Here
-          </h2>
-          <p className="text-slate-600 dark:text-slate-400 text-base sm:text-lg">
-            Experience how Stashfill detects field names, matches multilingual synonyms (English &amp; Bangla), 
-            and updates React controlled inputs without breaking state.
-          </p>
+
+          <div className="flex items-center gap-2">
+            <button
+              onClick={handleReset}
+              disabled={filling}
+              className="px-3.5 py-2 rounded-lg border border-zinc-200 dark:border-zinc-800 hover:bg-zinc-100 dark:hover:bg-zinc-900 text-xs font-mono font-medium text-zinc-600 dark:text-zinc-400 transition-colors flex items-center gap-1.5"
+            >
+              <RotateCcw className="w-3 h-3" />
+              <span>Reset</span>
+            </button>
+
+            <button
+              onClick={handleFill}
+              disabled={filling}
+              className="px-4 py-2 rounded-lg bg-zinc-950 dark:bg-white text-white dark:text-zinc-950 hover:bg-zinc-800 dark:hover:bg-zinc-100 text-xs font-semibold font-mono flex items-center gap-2 shadow-sm transition-all active:scale-95"
+            >
+              <Zap className={`w-3.5 h-3.5 ${filling ? 'animate-spin' : ''}`} />
+              <span>{filling ? 'Filling...' : 'Trigger Fill (Alt+Shift+F)'}</span>
+            </button>
+          </div>
         </div>
 
-        {/* Demo Playground Box */}
-        <div className="max-w-5xl mx-auto rounded-3xl glass-panel border border-slate-200 dark:border-slate-800 shadow-2xl overflow-hidden">
+        {/* Sandbox Window */}
+        <div className="max-w-5xl mx-auto rounded-xl tech-card shadow-xl overflow-hidden border border-zinc-300 dark:border-zinc-800">
           
-          {/* Controls Bar */}
-          <div className="p-4 sm:p-5 bg-white/90 dark:bg-slate-950/90 border-b border-slate-200 dark:border-slate-800 flex flex-wrap items-center justify-between gap-4">
+          {/* Top Control Bar with Segmented Profiles */}
+          <div className="p-3 bg-zinc-100/90 dark:bg-zinc-900 border-b border-zinc-200 dark:border-zinc-800 flex flex-wrap items-center justify-between gap-3 text-xs font-mono">
             
-            {/* Profile Selector Tabs */}
-            <div className="flex flex-wrap items-center gap-2">
-              <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 mr-1">
-                Select Profile:
-              </span>
+            <div className="flex items-center gap-1 p-1 rounded-lg bg-zinc-200/70 dark:bg-zinc-950 border border-zinc-300/50 dark:border-zinc-800">
               <button
                 onClick={() => { setSelectedProfileKey('personal'); handleReset(); }}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold transition-all ${
+                className={`flex items-center gap-1.5 px-3 py-1 rounded-md text-xs transition-all ${
                   selectedProfileKey === 'personal'
-                    ? 'bg-brand-600 text-white shadow-sm'
-                    : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'
+                    ? 'bg-white dark:bg-zinc-800 text-zinc-950 dark:text-white shadow-sm font-semibold'
+                    : 'text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-300'
                 }`}
               >
-                <User className="w-3.5 h-3.5" />
+                <User className="w-3 h-3" />
                 <span>Personal</span>
               </button>
 
               <button
                 onClick={() => { setSelectedProfileKey('work'); handleReset(); }}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold transition-all ${
+                className={`flex items-center gap-1.5 px-3 py-1 rounded-md text-xs transition-all ${
                   selectedProfileKey === 'work'
-                    ? 'bg-brand-600 text-white shadow-sm'
-                    : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'
+                    ? 'bg-white dark:bg-zinc-800 text-zinc-950 dark:text-white shadow-sm font-semibold'
+                    : 'text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-300'
                 }`}
               >
-                <Briefcase className="w-3.5 h-3.5" />
-                <span>Enterprise / Work</span>
+                <Briefcase className="w-3 h-3" />
+                <span>Enterprise</span>
               </button>
 
               <button
                 onClick={() => { setSelectedProfileKey('bangla'); handleReset(); }}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold transition-all ${
+                className={`flex items-center gap-1.5 px-3 py-1 rounded-md text-xs transition-all ${
                   selectedProfileKey === 'bangla'
-                    ? 'bg-emerald-600 text-white shadow-sm'
-                    : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'
+                    ? 'bg-white dark:bg-zinc-800 text-zinc-950 dark:text-white shadow-sm font-semibold'
+                    : 'text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-300'
                 }`}
               >
-                <Languages className="w-3.5 h-3.5" />
+                <Languages className="w-3 h-3" />
                 <span>বাংলা (Bangla)</span>
               </button>
             </div>
 
-            {/* Action Buttons */}
-            <div className="flex items-center gap-3 ml-auto">
-              <button
-                onClick={handleReset}
-                disabled={filling}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-slate-200 dark:border-slate-800 hover:bg-slate-100 dark:hover:bg-slate-800 text-xs font-semibold text-slate-600 dark:text-slate-400 transition-colors"
-              >
-                <RotateCcw className="w-3.5 h-3.5" />
-                <span>Reset Form</span>
-              </button>
-
-              <button
-                onClick={handleFill}
-                disabled={filling}
-                className="flex items-center gap-2 px-5 py-2 rounded-xl bg-gradient-to-r from-brand-600 to-indigo-600 hover:from-brand-500 hover:to-indigo-500 text-white text-xs sm:text-sm font-bold shadow-md shadow-brand-500/25 active:scale-95 transition-all"
-              >
-                <Zap className={`w-4 h-4 ${filling ? 'animate-spin' : ''}`} />
-                <span>{filling ? 'Filling...' : 'Trigger 1-Click Stashfill'}</span>
-                <kbd className="hidden sm:inline-block px-1.5 py-0.5 text-[10px] bg-black/20 rounded font-mono">
-                  Alt+Shift+F
-                </kbd>
-              </button>
+            <div className="text-[11px] text-zinc-500 flex items-center gap-2">
+              <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
+              <span>Active: {activeProfile.name}</span>
             </div>
           </div>
 
           {/* Form Surface */}
-          <div className="p-6 sm:p-8 bg-white dark:bg-slate-900/60">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+          <div className="p-6 sm:p-8 bg-white dark:bg-[#0c0e14]">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               
               {/* Full Name */}
-              <div className="space-y-1.5">
-                <div className="flex items-center justify-between">
-                  <label className="text-xs font-semibold text-slate-700 dark:text-slate-300">
-                    Full Name / পুরো নাম
+              <div className="space-y-1">
+                <div className="flex items-center justify-between text-xs font-mono">
+                  <label className="text-zinc-700 dark:text-zinc-300 font-medium">
+                    name / পুরো নাম
                   </label>
                   {filledFields.has('fullName') && (
-                    <span className="flex items-center gap-1 text-[11px] font-semibold text-emerald-600 dark:text-emerald-400 animate-fade-in font-mono">
-                      <CheckCircle2 className="w-3.5 h-3.5" /> Synced
+                    <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-semibold flex items-center gap-1">
+                      <Check className="w-3 h-3" /> Reconciled
                     </span>
                   )}
                 </div>
@@ -262,23 +271,23 @@ export default function InteractiveDemo() {
                   placeholder="e.g. John Doe or জন ডো"
                   value={formData.fullName}
                   onChange={(e) => setFormData({ ...formData, fullName: e.target.value })}
-                  className={`w-full px-3.5 py-2.5 rounded-xl text-sm border font-medium transition-all duration-300 outline-none focus:ring-2 focus:ring-brand-500/30 ${
+                  className={`w-full px-3 py-2 rounded-md font-mono text-xs border outline-none transition-all ${
                     filledFields.has('fullName')
-                      ? 'border-emerald-500/50 bg-emerald-500/5 dark:bg-emerald-950/20 text-slate-900 dark:text-slate-100 ring-2 ring-emerald-500/20'
-                      : 'border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 text-slate-800 dark:text-slate-200'
+                      ? 'bg-emerald-500/[0.05] border-emerald-500/40 text-zinc-950 dark:text-white'
+                      : 'bg-zinc-50 dark:bg-zinc-900/60 border-zinc-200 dark:border-zinc-800 text-zinc-800 dark:text-zinc-200'
                   }`}
                 />
               </div>
 
-              {/* Email Address */}
-              <div className="space-y-1.5">
-                <div className="flex items-center justify-between">
-                  <label className="text-xs font-semibold text-slate-700 dark:text-slate-300">
-                    Email Address / ইমেইল
+              {/* Email */}
+              <div className="space-y-1">
+                <div className="flex items-center justify-between text-xs font-mono">
+                  <label className="text-zinc-700 dark:text-zinc-300 font-medium">
+                    email / ইমেইল
                   </label>
                   {filledFields.has('email') && (
-                    <span className="flex items-center gap-1 text-[11px] font-semibold text-emerald-600 dark:text-emerald-400 animate-fade-in font-mono">
-                      <CheckCircle2 className="w-3.5 h-3.5" /> Synced
+                    <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-semibold flex items-center gap-1">
+                      <Check className="w-3 h-3" /> Reconciled
                     </span>
                   )}
                 </div>
@@ -287,23 +296,23 @@ export default function InteractiveDemo() {
                   placeholder="name@company.com"
                   value={formData.email}
                   onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                  className={`w-full px-3.5 py-2.5 rounded-xl text-sm border font-medium transition-all duration-300 outline-none focus:ring-2 focus:ring-brand-500/30 ${
+                  className={`w-full px-3 py-2 rounded-md font-mono text-xs border outline-none transition-all ${
                     filledFields.has('email')
-                      ? 'border-emerald-500/50 bg-emerald-500/5 dark:bg-emerald-950/20 text-slate-900 dark:text-slate-100 ring-2 ring-emerald-500/20'
-                      : 'border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 text-slate-800 dark:text-slate-200'
+                      ? 'bg-emerald-500/[0.05] border-emerald-500/40 text-zinc-950 dark:text-white'
+                      : 'bg-zinc-50 dark:bg-zinc-900/60 border-zinc-200 dark:border-zinc-800 text-zinc-800 dark:text-zinc-200'
                   }`}
                 />
               </div>
 
               {/* Phone */}
-              <div className="space-y-1.5">
-                <div className="flex items-center justify-between">
-                  <label className="text-xs font-semibold text-slate-700 dark:text-slate-300">
-                    Phone Number / মোবাইল নম্বর
+              <div className="space-y-1">
+                <div className="flex items-center justify-between text-xs font-mono">
+                  <label className="text-zinc-700 dark:text-zinc-300 font-medium">
+                    phone / মোবাইল নম্বর
                   </label>
                   {filledFields.has('phone') && (
-                    <span className="flex items-center gap-1 text-[11px] font-semibold text-emerald-600 dark:text-emerald-400 animate-fade-in font-mono">
-                      <CheckCircle2 className="w-3.5 h-3.5" /> Synced
+                    <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-semibold flex items-center gap-1">
+                      <Check className="w-3 h-3" /> Reconciled
                     </span>
                   )}
                 </div>
@@ -312,23 +321,23 @@ export default function InteractiveDemo() {
                   placeholder="+1 (555) 000-0000"
                   value={formData.phone}
                   onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                  className={`w-full px-3.5 py-2.5 rounded-xl text-sm border font-medium transition-all duration-300 outline-none focus:ring-2 focus:ring-brand-500/30 ${
+                  className={`w-full px-3 py-2 rounded-md font-mono text-xs border outline-none transition-all ${
                     filledFields.has('phone')
-                      ? 'border-emerald-500/50 bg-emerald-500/5 dark:bg-emerald-950/20 text-slate-900 dark:text-slate-100 ring-2 ring-emerald-500/20'
-                      : 'border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 text-slate-800 dark:text-slate-200'
+                      ? 'bg-emerald-500/[0.05] border-emerald-500/40 text-zinc-950 dark:text-white'
+                      : 'bg-zinc-50 dark:bg-zinc-900/60 border-zinc-200 dark:border-zinc-800 text-zinc-800 dark:text-zinc-200'
                   }`}
                 />
               </div>
 
-              {/* Company / Organization */}
-              <div className="space-y-1.5">
-                <div className="flex items-center justify-between">
-                  <label className="text-xs font-semibold text-slate-700 dark:text-slate-300">
-                    Company / প্রতিষ্ঠান
+              {/* Organization */}
+              <div className="space-y-1">
+                <div className="flex items-center justify-between text-xs font-mono">
+                  <label className="text-zinc-700 dark:text-zinc-300 font-medium">
+                    company / প্রতিষ্ঠান
                   </label>
                   {filledFields.has('company') && (
-                    <span className="flex items-center gap-1 text-[11px] font-semibold text-emerald-600 dark:text-emerald-400 animate-fade-in font-mono">
-                      <CheckCircle2 className="w-3.5 h-3.5" /> Synced
+                    <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-semibold flex items-center gap-1">
+                      <Check className="w-3 h-3" /> Reconciled
                     </span>
                   )}
                 </div>
@@ -337,48 +346,48 @@ export default function InteractiveDemo() {
                   placeholder="Organization or Studio"
                   value={formData.company}
                   onChange={(e) => setFormData({ ...formData, company: e.target.value })}
-                  className={`w-full px-3.5 py-2.5 rounded-xl text-sm border font-medium transition-all duration-300 outline-none focus:ring-2 focus:ring-brand-500/30 ${
+                  className={`w-full px-3 py-2 rounded-md font-mono text-xs border outline-none transition-all ${
                     filledFields.has('company')
-                      ? 'border-emerald-500/50 bg-emerald-500/5 dark:bg-emerald-950/20 text-slate-900 dark:text-slate-100 ring-2 ring-emerald-500/20'
-                      : 'border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 text-slate-800 dark:text-slate-200'
+                      ? 'bg-emerald-500/[0.05] border-emerald-500/40 text-zinc-950 dark:text-white'
+                      : 'bg-zinc-50 dark:bg-zinc-900/60 border-zinc-200 dark:border-zinc-800 text-zinc-800 dark:text-zinc-200'
                   }`}
                 />
               </div>
 
               {/* Street Address */}
-              <div className="space-y-1.5 md:col-span-2">
-                <div className="flex items-center justify-between">
-                  <label className="text-xs font-semibold text-slate-700 dark:text-slate-300">
-                    Street Address / ঠিকানা
+              <div className="space-y-1 md:col-span-2">
+                <div className="flex items-center justify-between text-xs font-mono">
+                  <label className="text-zinc-700 dark:text-zinc-300 font-medium">
+                    street_address / ঠিকানা
                   </label>
                   {filledFields.has('address') && (
-                    <span className="flex items-center gap-1 text-[11px] font-semibold text-emerald-600 dark:text-emerald-400 animate-fade-in font-mono">
-                      <CheckCircle2 className="w-3.5 h-3.5" /> Synced
+                    <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-semibold flex items-center gap-1">
+                      <Check className="w-3 h-3" /> Reconciled
                     </span>
                   )}
                 </div>
                 <input
                   type="text"
-                  placeholder="Street and house number"
+                  placeholder="Street address line"
                   value={formData.address}
                   onChange={(e) => setFormData({ ...formData, address: e.target.value })}
-                  className={`w-full px-3.5 py-2.5 rounded-xl text-sm border font-medium transition-all duration-300 outline-none focus:ring-2 focus:ring-brand-500/30 ${
+                  className={`w-full px-3 py-2 rounded-md font-mono text-xs border outline-none transition-all ${
                     filledFields.has('address')
-                      ? 'border-emerald-500/50 bg-emerald-500/5 dark:bg-emerald-950/20 text-slate-900 dark:text-slate-100 ring-2 ring-emerald-500/20'
-                      : 'border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 text-slate-800 dark:text-slate-200'
+                      ? 'bg-emerald-500/[0.05] border-emerald-500/40 text-zinc-950 dark:text-white'
+                      : 'bg-zinc-50 dark:bg-zinc-900/60 border-zinc-200 dark:border-zinc-800 text-zinc-800 dark:text-zinc-200'
                   }`}
                 />
               </div>
 
               {/* City */}
-              <div className="space-y-1.5">
-                <div className="flex items-center justify-between">
-                  <label className="text-xs font-semibold text-slate-700 dark:text-slate-300">
-                    City / শহর
+              <div className="space-y-1">
+                <div className="flex items-center justify-between text-xs font-mono">
+                  <label className="text-zinc-700 dark:text-zinc-300 font-medium">
+                    city / শহর
                   </label>
                   {filledFields.has('city') && (
-                    <span className="flex items-center gap-1 text-[11px] font-semibold text-emerald-600 dark:text-emerald-400 animate-fade-in font-mono">
-                      <CheckCircle2 className="w-3.5 h-3.5" /> Synced
+                    <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-semibold flex items-center gap-1">
+                      <Check className="w-3 h-3" /> Reconciled
                     </span>
                   )}
                 </div>
@@ -387,60 +396,35 @@ export default function InteractiveDemo() {
                   placeholder="City"
                   value={formData.city}
                   onChange={(e) => setFormData({ ...formData, city: e.target.value })}
-                  className={`w-full px-3.5 py-2.5 rounded-xl text-sm border font-medium transition-all duration-300 outline-none focus:ring-2 focus:ring-brand-500/30 ${
+                  className={`w-full px-3 py-2 rounded-md font-mono text-xs border outline-none transition-all ${
                     filledFields.has('city')
-                      ? 'border-emerald-500/50 bg-emerald-500/5 dark:bg-emerald-950/20 text-slate-900 dark:text-slate-100 ring-2 ring-emerald-500/20'
-                      : 'border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 text-slate-800 dark:text-slate-200'
+                      ? 'bg-emerald-500/[0.05] border-emerald-500/40 text-zinc-950 dark:text-white'
+                      : 'bg-zinc-50 dark:bg-zinc-900/60 border-zinc-200 dark:border-zinc-800 text-zinc-800 dark:text-zinc-200'
                   }`}
                 />
               </div>
 
               {/* Postal Code */}
-              <div className="space-y-1.5">
-                <div className="flex items-center justify-between">
-                  <label className="text-xs font-semibold text-slate-700 dark:text-slate-300">
-                    Postal Code / পোস্ট কোড
+              <div className="space-y-1">
+                <div className="flex items-center justify-between text-xs font-mono">
+                  <label className="text-zinc-700 dark:text-zinc-300 font-medium">
+                    postal_code / পোস্ট কোড
                   </label>
                   {filledFields.has('postalCode') && (
-                    <span className="flex items-center gap-1 text-[11px] font-semibold text-emerald-600 dark:text-emerald-400 animate-fade-in font-mono">
-                      <CheckCircle2 className="w-3.5 h-3.5" /> Synced
+                    <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-semibold flex items-center gap-1">
+                      <Check className="w-3 h-3" /> Reconciled
                     </span>
                   )}
                 </div>
                 <input
                   type="text"
-                  placeholder="Zip or Postal code"
+                  placeholder="Postal Code"
                   value={formData.postalCode}
                   onChange={(e) => setFormData({ ...formData, postalCode: e.target.value })}
-                  className={`w-full px-3.5 py-2.5 rounded-xl text-sm border font-medium transition-all duration-300 outline-none focus:ring-2 focus:ring-brand-500/30 ${
+                  className={`w-full px-3 py-2 rounded-md font-mono text-xs border outline-none transition-all ${
                     filledFields.has('postalCode')
-                      ? 'border-emerald-500/50 bg-emerald-500/5 dark:bg-emerald-950/20 text-slate-900 dark:text-slate-100 ring-2 ring-emerald-500/20'
-                      : 'border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 text-slate-800 dark:text-slate-200'
-                  }`}
-                />
-              </div>
-
-              {/* Custom Notes / Snippets */}
-              <div className="space-y-1.5 md:col-span-2">
-                <div className="flex items-center justify-between">
-                  <label className="text-xs font-semibold text-slate-700 dark:text-slate-300">
-                    Custom Notes / মন্তব্য (Snippet Expansion Demo)
-                  </label>
-                  {filledFields.has('notes') && (
-                    <span className="flex items-center gap-1 text-[11px] font-semibold text-emerald-600 dark:text-emerald-400 animate-fade-in font-mono">
-                      <CheckCircle2 className="w-3.5 h-3.5" /> Synced
-                    </span>
-                  )}
-                </div>
-                <textarea
-                  rows={2}
-                  placeholder="Notes, instructions or custom snippet..."
-                  value={formData.notes}
-                  onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
-                  className={`w-full px-3.5 py-2.5 rounded-xl text-sm border font-medium transition-all duration-300 outline-none focus:ring-2 focus:ring-brand-500/30 resize-none ${
-                    filledFields.has('notes')
-                      ? 'border-emerald-500/50 bg-emerald-500/5 dark:bg-emerald-950/20 text-slate-900 dark:text-slate-100 ring-2 ring-emerald-500/20'
-                      : 'border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 text-slate-800 dark:text-slate-200'
+                      ? 'bg-emerald-500/[0.05] border-emerald-500/40 text-zinc-950 dark:text-white'
+                      : 'bg-zinc-50 dark:bg-zinc-900/60 border-zinc-200 dark:border-zinc-800 text-zinc-800 dark:text-zinc-200'
                   }`}
                 />
               </div>
@@ -448,20 +432,20 @@ export default function InteractiveDemo() {
             </div>
           </div>
 
-          {/* Real-time Stashfill Engine Diagnostics Log */}
-          <div className="p-4 bg-slate-950 text-slate-300 border-t border-slate-800 font-mono text-xs">
-            <div className="flex items-center justify-between pb-2 mb-2 border-b border-slate-800/80 text-[11px] text-slate-500">
-              <span className="flex items-center gap-1.5 text-slate-400">
-                <Terminal className="w-3.5 h-3.5 text-brand-400" />
-                Stashfill Heuristic Diagnostics &amp; Event Dispatch Log
+          {/* DevTools Event Dispatch Log */}
+          <div className="p-3.5 bg-[#0a0b10] border-t border-zinc-800 font-mono text-xs text-zinc-400">
+            <div className="flex items-center justify-between pb-2 mb-2 border-b border-zinc-800/80 text-[11px]">
+              <span className="flex items-center gap-1.5 text-zinc-300">
+                <Terminal className="w-3.5 h-3.5 text-emerald-400" />
+                <span>Runtime Event Dispatch Console</span>
               </span>
-              <span className="text-emerald-400 font-semibold">Zero-Network Verification: Passed</span>
+              <span className="text-emerald-400 font-semibold text-[10px]">Zero Outbound Packets</span>
             </div>
             <div className="space-y-1 text-[11px]">
               {logs.map((log, idx) => (
                 <div key={idx} className="flex items-start gap-2">
-                  <span className="text-slate-600 select-none">&gt;</span>
-                  <span className={idx === 0 ? 'text-emerald-400 font-semibold' : 'text-slate-400'}>
+                  <span className="text-zinc-600 select-none">&gt;</span>
+                  <span className={idx === 0 ? 'text-zinc-200' : 'text-zinc-500'}>
                     {log}
                   </span>
                 </div>

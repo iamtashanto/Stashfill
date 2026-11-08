@@ -594,7 +594,6 @@ function dispatchInputEvents(el: HTMLElement) {
     new Event('blur', { bubbles: true, composed: true }),
   ];
   events.forEach((ev) => el.dispatchEvent(ev));
-  el.blur();
 }
 
 /**

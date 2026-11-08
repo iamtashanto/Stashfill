@@ -6,8 +6,8 @@
 - **Short Description**:
   Offline, no-login autofill and quick-paste. Save your personal data locally and fill any web form in 1 click. Zero trackers.
 - **Category**: Productivity / Privacy
-- **Support Contact / URL**: https://github.com/stashfill/stashfill
-- **Privacy Policy URL**: https://stashfill.org/privacy.html
+- **Support Contact / URL**: https://stashfill.tashanto.com
+- **Privacy Policy URL**: https://stashfill.tashanto.com/privacy.html
 
 ---
 

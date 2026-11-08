@@ -3,20 +3,34 @@
 @tailwind utilities;
 
 :root {
-  --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-  --bg-primary: #ffffff;
-  --bg-secondary: #f8fafc;
-  --text-primary: #0f172a;
-  --text-secondary: #475569;
-  --border-color: #e2e8f0;
+  --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Inter", "Helvetica Neue", Arial, sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  
+  --bg-base: #ffffff;
+  --bg-surface: #f8fafc;
+  --bg-card: #ffffff;
+  --border-subtle: #e2e8f0;
+  --border-active: #cbd5e1;
+  --text-main: #090d16;
+  --text-muted: #64748b;
+  --text-dim: #94a3b8;
+  --accent: #4f46e5;
+  --accent-light: #eef2ff;
+  --success: #059669;
 }
 
 .dark {
-  --bg-primary: #080c14;
-  --bg-secondary: #0d1322;
-  --text-primary: #f8fafc;
-  --text-secondary: #94a3b8;
-  --border-color: #1e293b;
+  --bg-base: #08090d;
+  --bg-surface: #0e1017;
+  --bg-card: #12141d;
+  --border-subtle: rgba(255, 255, 255, 0.07);
+  --border-active: rgba(255, 255, 255, 0.15);
+  --text-main: #f8fafc;
+  --text-muted: #94a3b8;
+  --text-dim: #64748b;
+  --accent: #6366f1;
+  --accent-light: rgba(99, 102, 241, 0.1);
+  --success: #10b981;
 }
 
 html {
@@ -25,79 +39,91 @@ html {
 }
 
 body {
-  background-color: var(--bg-primary);
-  color: var(--text-primary);
+  background-color: var(--bg-base);
+  color: var(--text-main);
   overflow-x: hidden;
   -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
-/* Glassmorphism helpers */
-.glass-panel {
-  background: rgba(255, 255, 255, 0.75);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
+/* Developer technical background grid */
+.tech-grid {
+  background-size: 32px 32px;
+  background-image: 
+    linear-gradient(to right, rgba(0, 0, 0, 0.04) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(0, 0, 0, 0.04) 1px, transparent 1px);
+}
+
+.dark .tech-grid {
+  background-size: 32px 32px;
+  background-image: 
+    linear-gradient(to right, rgba(255, 255, 255, 0.035) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(255, 255, 255, 0.035) 1px, transparent 1px);
+}
+
+/* Subtle dot matrix pattern */
+.dot-matrix {
+  background-image: radial-gradient(rgba(0, 0, 0, 0.07) 1px, transparent 1px);
+  background-size: 20px 20px;
+}
+
+.dark .dot-matrix {
+  background-image: radial-gradient(rgba(255, 255, 255, 0.06) 1px, transparent 1px);
+  background-size: 20px 20px;
+}
+
+/* Razor-sharp technical cards */
+.tech-card {
+  background-color: var(--bg-card);
+  border: 1px solid var(--border-subtle);
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.tech-card:hover {
+  border-color: var(--border-active);
+}
+
+/* Glassmorphism with crisp hairline border */
+.crisp-glass {
+  background: rgba(255, 255, 255, 0.85);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
   border: 1px solid rgba(226, 232, 240, 0.8);
 }
 
-.dark .glass-panel {
-  background: rgba(15, 23, 42, 0.65);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
-  border: 1px solid rgba(30, 41, 59, 0.7);
+.dark .crisp-glass {
+  background: rgba(14, 16, 23, 0.8);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.07);
 }
 
-.glass-nav {
-  background: rgba(255, 255, 255, 0.85);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
-  border-bottom: 1px solid rgba(226, 232, 240, 0.7);
+/* Monospace command kbd */
+kbd {
+  font-family: var(--font-mono);
+  box-shadow: 0 1px 0 rgba(0, 0, 0, 0.2);
 }
 
-.dark .glass-nav {
-  background: rgba(8, 12, 20, 0.85);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
-  border-bottom: 1px solid rgba(30, 41, 59, 0.6);
+/* Code block scrollbars */
+pre::-webkit-scrollbar {
+  height: 6px;
+}
+pre::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.15);
+  border-radius: 3px;
 }
 
-/* Radiant glow backgrounds */
-.gradient-mesh {
-  background-image: 
-    radial-gradient(at 0% 0%, rgba(99, 102, 241, 0.15) 0px, transparent 50%),
-    radial-gradient(at 100% 0%, rgba(16, 185, 129, 0.12) 0px, transparent 50%),
-    radial-gradient(at 50% 100%, rgba(99, 102, 241, 0.1) 0px, transparent 50%);
-}
-
-.dark .gradient-mesh {
-  background-image: 
-    radial-gradient(at 0% 0%, rgba(99, 102, 241, 0.22) 0px, transparent 50%),
-    radial-gradient(at 100% 0%, rgba(16, 185, 129, 0.16) 0px, transparent 50%),
-    radial-gradient(at 50% 100%, rgba(139, 92, 246, 0.15) 0px, transparent 50%);
-}
-
-/* Custom modern scrollbar */
+/* Custom scrollbars */
 ::-webkit-scrollbar {
-  width: 8px;
+  width: 6px;
 }
-
 ::-webkit-scrollbar-track {
   background: transparent;
 }
-
 ::-webkit-scrollbar-thumb {
-  background: #cbd5e1;
-  border-radius: 4px;
+  background: rgba(150, 150, 150, 0.2);
+  border-radius: 3px;
 }
-
-.dark ::-webkit-scrollbar-thumb {
-  background: #334155;
-  border-radius: 4px;
-}
-
 ::-webkit-scrollbar-thumb:hover {
-  background: #94a3b8;
-}
-
-.dark ::-webkit-scrollbar-thumb:hover {
-  background: #475569;
+  background: rgba(150, 150, 150, 0.4);
 }

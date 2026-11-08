@@ -81,6 +81,9 @@ export default defineBackground(() => {
     void rebuildContextMenus(true);
   });
 
+  // Rebuild context menus immediately on service worker startup
+  void rebuildContextMenus(true);
+
   // Subscribe to storage updates to rebuild context menu (debounced)
   storage.subscribe('stashfill_vault_primary', () => {
     scheduleMenuRebuild();
@@ -129,7 +132,10 @@ export default defineBackground(() => {
           await browser.scripting.executeScript({
             target: typeof frameId === 'number' ? { tabId, frameIds: [frameId] } : { tabId },
             func: (valueToInsert: string) => {
-              const el = document.activeElement as HTMLElement | null;
+              let el = document.activeElement as HTMLElement | null;
+              while (el && el.shadowRoot && el.shadowRoot.activeElement) {
+                el = el.shadowRoot.activeElement as HTMLElement;
+              }
               if (el) {
                 if ('value' in el) {
                   const inputEl = el as HTMLInputElement | HTMLTextAreaElement;
@@ -140,6 +146,8 @@ export default defineBackground(() => {
                   const setter = Object.getOwnPropertyDescriptor(proto, 'value')?.set;
                   if (setter) setter.call(inputEl, valueToInsert);
                   else inputEl.value = valueToInsert;
+                  const tracker = (inputEl as unknown as { _valueTracker?: { setValue: (v: string) => void } })._valueTracker;
+                  if (tracker) tracker.setValue(valueToInsert);
                 } else if (el.isContentEditable) {
                   el.textContent = valueToInsert;
                 }
@@ -211,7 +219,13 @@ export default defineBackground(() => {
           tab.id,
           {
             type: 'FILL_ACTIVE_FIELD',
-            target: { kind: 'profileField', fieldPath: field.key, value: field.value },
+            target: {
+              kind: 'profileField',
+              fieldPath: field.key,
+              value: field.value,
+              label: field.label,
+              sensitive: field.sensitive,
+            },
             targetElementId,
           },
           frameId,
@@ -234,6 +248,24 @@ export default defineBackground(() => {
         },
         frameId,
       );
+      return;
+    }
+
+    if (menuId.startsWith('stashfill-fill-profile:')) {
+      const targetProfId = menuId.replace('stashfill-fill-profile:', '');
+      const targetProf = profiles.find((p) => p.id === targetProfId);
+      if (targetProf) {
+        await sendToTabOrFrame(
+          tab.id,
+          {
+            type: 'FILL_PAGE_FORM',
+            profile: targetProf,
+            mode: 'all',
+            siteRule: matchingRule,
+          },
+          frameId,
+        );
+      }
       return;
     }
 

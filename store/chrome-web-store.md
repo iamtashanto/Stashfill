@@ -5,6 +5,8 @@
 - **Extension Name**: Stashfill — Offline Autofill & Quick Paste
 - **Short Description** (128 characters / max 132):
   Offline, no-login autofill and quick-paste. Save your personal data locally and fill any web form in 1 click. Zero trackers.
+- **Website / Homepage**: https://stashfill.tashanto.com
+- **Privacy Policy URL**: https://stashfill.tashanto.com/privacy.html
 
 ---
 

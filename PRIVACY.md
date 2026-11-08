@@ -56,4 +56,4 @@ We do not collect, buy, sell, share, or monetize your data. Because Stashfill ha
 
 ## 6. Contact
 
-If you have questions regarding this Privacy Policy, please open an issue on our GitHub repository or contact **privacy@stashfill.org**.
+If you have questions regarding this Privacy Policy, please visit **https://stashfill.tashanto.com** or open an issue on our GitHub repository.

@@ -1,315 +1,399 @@
 'use client';
 
+import { useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { 
-  Zap, 
-  ShieldCheck, 
+  Download, 
+  Terminal, 
   Lock, 
-  ArrowRight, 
-  CheckCircle2, 
-  Download
+  Zap, 
+  RotateCcw, 
+  ShieldCheck 
 } from 'lucide-react';
 
 export default function Hero() {
-  return (
-    <section className="relative pt-32 pb-20 md:pt-40 md:pb-28 overflow-hidden gradient-mesh">
-      {/* Background radial glows */}
-      <div className="absolute top-1/4 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] sm:w-[900px] h-[400px] bg-brand-500/10 dark:bg-brand-500/20 blur-[130px] rounded-full pointer-events-none -z-10 animate-glow-pulse" />
-      <div className="absolute top-1/3 left-1/4 w-[350px] h-[350px] bg-emerald-500/10 dark:bg-emerald-500/15 blur-[120px] rounded-full pointer-events-none -z-10" />
+  const [filled, setFilled] = useState(false);
+  const [animating, setAnimating] = useState(false);
 
+  const [form, setForm] = useState({
+    name: '',
+    email: '',
+    phone: '',
+    role: '',
+    address: '',
+  });
+
+  const triggerFill = () => {
+    if (animating) return;
+    setAnimating(true);
+    
+    const target = {
+      name: 'Sarah Connor',
+      email: 'sarah.connor@cyberdyne.io',
+      phone: '+1 (415) 890-3421',
+      role: 'Principal Systems Architect',
+      address: '742 Evergreen Terrace, Sector 4',
+    };
+
+    const keys = Object.keys(target) as Array<keyof typeof target>;
+    keys.forEach((key, i) => {
+      setTimeout(() => {
+        setForm((prev) => ({ ...prev, [key]: target[key] }));
+        if (i === keys.length - 1) {
+          setAnimating(false);
+          setFilled(true);
+        }
+      }, (i + 1) * 70);
+    });
+  };
+
+  const resetForm = () => {
+    setForm({ name: '', email: '', phone: '', role: '', address: '' });
+    setFilled(false);
+  };
+
+  return (
+    <section className="relative pt-28 pb-20 md:pt-36 md:pb-28 overflow-hidden tech-grid border-b border-zinc-200/80 dark:border-white/[0.08]">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex flex-col items-center text-center max-w-4xl mx-auto">
+        
+        {/* Top Technical Classification Tag */}
+        <div className="flex flex-col items-center text-center max-w-4xl mx-auto mb-12">
           
-          {/* Top Privacy Pill */}
-          <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full glass-panel border border-brand-500/30 text-xs sm:text-sm font-medium text-slate-800 dark:text-slate-200 mb-8 shadow-sm hover:border-brand-500/50 transition-colors">
-            <span className="flex h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
-            <span className="font-semibold text-brand-600 dark:text-brand-400">Offline-First:</span>
-            <span>Zero accounts. Zero telemetry. Manifest V3 ready.</span>
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-md border border-zinc-200 dark:border-white/[0.1] bg-zinc-50 dark:bg-zinc-900/80 text-[11px] font-mono text-zinc-600 dark:text-zinc-400 mb-6 shadow-sm">
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+            <span className="font-semibold text-zinc-900 dark:text-white uppercase tracking-wider">
+              Manifest V3
+            </span>
+            <span className="text-zinc-400 dark:text-zinc-600">|</span>
+            <span>100% Offline Sandbox</span>
+            <span className="text-zinc-400 dark:text-zinc-600">|</span>
+            <span className="text-emerald-600 dark:text-emerald-400 font-medium">Zero Telemetry CI-Verified</span>
           </div>
 
-          {/* Main Headline */}
-          <h1 className="text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-extrabold tracking-tight text-slate-900 dark:text-white leading-[1.1] mb-6">
-            1-Click Offline Autofill for Your{' '}
-            <span className="bg-gradient-to-r from-brand-600 via-indigo-500 to-emerald-400 bg-clip-text text-transparent">
-              Real Data
+          {/* Main Headline - Authoritative & Crisp */}
+          <h1 className="text-4xl sm:text-5xl md:text-6xl lg:text-[68px] font-extrabold tracking-tight text-zinc-950 dark:text-white leading-[1.08] mb-6">
+            Your real data. <br className="hidden sm:block" />
+            Autocompleted locally. <br className="hidden sm:block" />
+            <span className="text-zinc-400 dark:text-zinc-500 font-semibold">
+              Zero cloud. Zero telemetry.
             </span>
           </h1>
 
           {/* Subheading */}
-          <p className="text-lg sm:text-xl text-slate-600 dark:text-slate-300 max-w-2xl mx-auto mb-10 leading-relaxed">
-            Stop retyping personal profiles, work addresses, snippets, and payment cards.
-            Stashfill fills any form, React input, or Shadow DOM in under 100 milliseconds — 
-            <strong className="text-slate-900 dark:text-white font-semibold"> 100% locally on your device</strong>, with zero cloud servers.
+          <p className="text-base sm:text-lg text-zinc-600 dark:text-zinc-400 max-w-2xl mx-auto mb-9 leading-relaxed">
+            Stashfill stores your personal identity profiles, work credentials, snippets, and AES-256 
+            encrypted cards strictly in your browser&apos;s local sandbox. Autofill React, Vue, and Shadow DOM 
+            inputs in under 50 milliseconds with a single keystroke.
           </p>
 
-          {/* CTA Buttons */}
-          <div className="flex flex-col sm:flex-row items-center gap-4 w-full sm:w-auto mb-14">
+          {/* Action CTAs */}
+          <div className="flex flex-col sm:flex-row items-center gap-3 w-full sm:w-auto mb-12">
             <Link
               href="/install"
-              className="w-full sm:w-auto flex items-center justify-center gap-2.5 px-7 py-3.5 rounded-2xl bg-gradient-to-r from-brand-600 to-indigo-600 hover:from-brand-500 hover:to-indigo-500 text-white font-semibold text-base shadow-lg shadow-brand-500/25 hover:shadow-xl hover:shadow-brand-500/40 transition-all duration-200 active:scale-95 group"
+              className="w-full sm:w-auto flex items-center justify-center gap-2 px-6 py-3 rounded-lg bg-zinc-950 dark:bg-white text-white dark:text-zinc-950 hover:bg-zinc-800 dark:hover:bg-zinc-100 font-semibold text-sm transition-all duration-150 active:scale-95 shadow-sm"
             >
-              <Download className="w-5 h-5 transition-transform group-hover:-translate-y-0.5" />
-              <span>Add to Browser — It&apos;s Free</span>
-              <ArrowRight className="w-4 h-4 ml-1 opacity-70 group-hover:opacity-100 group-hover:translate-x-1 transition-all" />
+              <Download className="w-4 h-4" />
+              <span>Install for Browser</span>
+              <kbd className="hidden sm:inline-block ml-1 px-1.5 py-0.5 text-[10px] bg-zinc-800 dark:bg-zinc-200 text-zinc-300 dark:text-zinc-700 rounded font-mono">
+                Free • MIT
+              </kbd>
             </Link>
 
             <Link
-              href="#demo"
-              className="w-full sm:w-auto flex items-center justify-center gap-2 px-6 py-3.5 rounded-2xl border border-slate-200 dark:border-slate-800 bg-white/80 dark:bg-slate-900/80 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-800 dark:text-slate-200 font-semibold text-base shadow-sm transition-all duration-200 hover:border-brand-500/40"
+              href="/comparison"
+              className="w-full sm:w-auto flex items-center justify-center gap-2 px-5 py-3 rounded-lg border border-zinc-200 dark:border-white/[0.1] bg-white dark:bg-zinc-900/60 hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-800 dark:text-zinc-200 font-medium text-sm transition-all duration-150"
             >
-              <Zap className="w-4 h-4 text-amber-500" />
-              <span>Try Live Interactive Demo</span>
+              <Terminal className="w-4 h-4 text-zinc-500" />
+              <span>Comparison Matrix</span>
+              <kbd className="hidden sm:inline-block ml-1 px-1.5 py-0.5 text-[10px] bg-zinc-100 dark:bg-zinc-800 text-zinc-500 rounded font-mono">
+                vs Others
+              </kbd>
             </Link>
           </div>
 
-          {/* Quick Browser Compatibility badges */}
-          <div className="flex flex-wrap items-center justify-center gap-3 sm:gap-6 text-xs text-slate-500 dark:text-slate-400 mb-16">
-            <span className="font-semibold text-slate-600 dark:text-slate-300">Supported Platforms:</span>
-            <span className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-100 dark:bg-slate-800/80 border border-slate-200/60 dark:border-slate-700/60">
-              <span className="w-2 h-2 rounded-full bg-emerald-500"></span> Chrome &amp; Chromium
+          {/* Quick Platform Bar */}
+          <div className="flex flex-wrap items-center justify-center gap-4 text-xs font-mono text-zinc-500 dark:text-zinc-400">
+            <span className="flex items-center gap-1.5">
+              <span className="w-1.5 h-1.5 rounded-full bg-zinc-400"></span> Chrome / Chromium
             </span>
-            <span className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-100 dark:bg-slate-800/80 border border-slate-200/60 dark:border-slate-700/60">
-              <span className="w-2 h-2 rounded-full bg-orange-500"></span> Mozilla Firefox
+            <span className="flex items-center gap-1.5">
+              <span className="w-1.5 h-1.5 rounded-full bg-zinc-400"></span> Firefox MV3
             </span>
-            <span className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-100 dark:bg-slate-800/80 border border-slate-200/60 dark:border-slate-700/60">
-              <span className="w-2 h-2 rounded-full bg-blue-500"></span> Microsoft Edge
+            <span className="flex items-center gap-1.5">
+              <span className="w-1.5 h-1.5 rounded-full bg-zinc-400"></span> Microsoft Edge
             </span>
-            <span className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-100 dark:bg-slate-800/80 border border-slate-200/60 dark:border-slate-700/60">
-              <span className="w-2 h-2 rounded-full bg-sky-500"></span> Apple Safari
+            <span className="flex items-center gap-1.5">
+              <span className="w-1.5 h-1.5 rounded-full bg-zinc-400"></span> Apple Safari
             </span>
           </div>
 
         </div>
 
-        {/* Visual Hero Mockup Window */}
-        <div className="relative max-w-5xl mx-auto">
-          {/* Glowing backplate */}
-          <div className="absolute -inset-1 rounded-3xl bg-gradient-to-r from-brand-600 via-indigo-500 to-emerald-400 opacity-20 dark:opacity-30 blur-xl"></div>
+        {/* Real Product Interactive HUD Preview */}
+        <div className="max-w-5xl mx-auto rounded-xl tech-card shadow-2xl overflow-hidden border border-zinc-300 dark:border-zinc-800">
           
-          <div className="relative rounded-2xl glass-panel border border-slate-200/80 dark:border-slate-800 shadow-2xl overflow-hidden">
-            {/* Mockup Browser Header Bar */}
-            <div className="flex items-center justify-between px-4 py-3 bg-slate-100/90 dark:bg-slate-900/90 border-b border-slate-200 dark:border-slate-800">
-              <div className="flex items-center gap-2">
-                <span className="w-3 h-3 rounded-full bg-rose-500/80 inline-block" />
-                <span className="w-3 h-3 rounded-full bg-amber-500/80 inline-block" />
-                <span className="w-3 h-3 rounded-full bg-emerald-500/80 inline-block" />
-              </div>
-              <div className="flex items-center gap-2 px-3 py-1 rounded-lg bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-xs text-slate-500 dark:text-slate-400 w-full max-w-sm justify-center">
-                <Lock className="w-3 h-3 text-emerald-500" />
-                <span>checkout.example.com/onboarding</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <div className="flex items-center gap-1 px-2 py-0.5 rounded bg-brand-500/10 text-brand-600 dark:text-brand-400 text-[11px] font-semibold border border-brand-500/20">
-                  <Zap className="w-3 h-3" />
-                  <span>Alt+Shift+F</span>
-                </div>
-              </div>
+          {/* Mock Browser Header */}
+          <div className="flex items-center justify-between px-4 py-2.5 bg-zinc-100 dark:bg-zinc-900/90 border-b border-zinc-200 dark:border-zinc-800">
+            <div className="flex items-center gap-1.5">
+              <span className="w-2.5 h-2.5 rounded-full bg-zinc-300 dark:bg-zinc-700 inline-block" />
+              <span className="w-2.5 h-2.5 rounded-full bg-zinc-300 dark:bg-zinc-700 inline-block" />
+              <span className="w-2.5 h-2.5 rounded-full bg-zinc-300 dark:bg-zinc-700 inline-block" />
             </div>
 
-            {/* Mockup Page Content & Floating Extension Popup */}
-            <div className="p-6 sm:p-8 grid grid-cols-1 lg:grid-cols-12 gap-8 items-start bg-slate-50/50 dark:bg-slate-950/50">
-              
-              {/* Left Side: Mock Web Form */}
-              <div className="lg:col-span-7 space-y-4">
-                <div className="flex items-center justify-between pb-2 border-b border-slate-200 dark:border-slate-800">
-                  <div>
-                    <h2 className="text-base font-bold text-slate-900 dark:text-white">Applicant Profile Registration</h2>
-                    <p className="text-xs text-slate-500 dark:text-slate-400">Complex dynamic form with React 19 state synchronization</p>
-                  </div>
-                  <span className="inline-flex items-center px-2 py-0.5 text-[10px] font-semibold rounded-md bg-brand-500/10 text-brand-600 dark:text-brand-400 border border-brand-500/20">
-                    Live Form
+            <div className="flex items-center gap-2 px-3 py-1 rounded-md bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 text-xs font-mono text-zinc-500 dark:text-zinc-400 w-full max-w-sm justify-center">
+              <Lock className="w-3 h-3 text-emerald-500" />
+              <span>https://candidate-portal.internal.corp/apply</span>
+            </div>
+
+            <div className="flex items-center gap-2 text-[11px] font-mono text-zinc-500">
+              <span className="hidden sm:inline">Stashfill Active</span>
+              <kbd className="px-1.5 py-0.5 rounded bg-zinc-200 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 font-bold">
+                ⌥⇧F
+              </kbd>
+            </div>
+          </div>
+
+          {/* Browser Workspace */}
+          <div className="p-6 sm:p-8 bg-zinc-50/70 dark:bg-[#0b0d13] grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+            
+            {/* Left Column: Real Form */}
+            <div className="lg:col-span-7 space-y-4">
+              <div className="flex items-center justify-between pb-3 border-b border-zinc-200 dark:border-zinc-800">
+                <div>
+                  <h3 className="text-sm font-bold text-zinc-950 dark:text-white font-mono">
+                    Applicant Information Form
+                  </h3>
+                  <p className="text-xs text-zinc-500">React 19 Controlled Form with valueTracker</p>
+                </div>
+                {filled ? (
+                  <button
+                    onClick={resetForm}
+                    className="flex items-center gap-1 text-[11px] font-mono text-zinc-500 hover:text-zinc-900 dark:hover:text-white"
+                  >
+                    <RotateCcw className="w-3 h-3" />
+                    <span>Reset</span>
+                  </button>
+                ) : (
+                  <span className="text-[11px] font-mono text-amber-600 dark:text-amber-400">
+                    5 empty fields detected
                   </span>
-                </div>
+                )}
+              </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div className="space-y-1 relative">
-                    <label className="text-xs font-semibold text-slate-700 dark:text-slate-300 flex items-center justify-between">
-                      <span>Full Name</span>
-                      <span className="text-[10px] text-emerald-500 font-mono">Matched (100%)</span>
-                    </label>
-                    <div className="relative">
-                      <input 
-                        type="text" 
-                        readOnly 
-                        value="Sarah Connor" 
-                        className="w-full px-3 py-2 text-sm rounded-xl border border-emerald-500/40 bg-emerald-500/5 dark:bg-emerald-950/20 text-slate-900 dark:text-slate-100 font-medium"
-                      />
-                      <CheckCircle2 className="w-4 h-4 text-emerald-500 absolute right-3 top-2.5" />
-                    </div>
-                  </div>
-
-                  <div className="space-y-1 relative">
-                    <label className="text-xs font-semibold text-slate-700 dark:text-slate-300 flex items-center justify-between">
-                      <span>Email Address</span>
-                      <span className="text-[10px] text-emerald-500 font-mono">_valueTracker OK</span>
-                    </label>
-                    <div className="relative">
-                      <input 
-                        type="email" 
-                        readOnly 
-                        value="sarah.connor@cyberdyne.io" 
-                        className="w-full px-3 py-2 text-sm rounded-xl border border-emerald-500/40 bg-emerald-500/5 dark:bg-emerald-950/20 text-slate-900 dark:text-slate-100 font-medium"
-                      />
-                      <CheckCircle2 className="w-4 h-4 text-emerald-500 absolute right-3 top-2.5" />
-                    </div>
-                  </div>
-
-                  <div className="space-y-1 relative">
-                    <label className="text-xs font-semibold text-slate-700 dark:text-slate-300 flex items-center justify-between">
-                      <span>Phone Number</span>
-                      <span className="text-[10px] text-emerald-500 font-mono">Formatted</span>
-                    </label>
-                    <div className="relative">
-                      <input 
-                        type="text" 
-                        readOnly 
-                        value="+1 (555) 019-2834" 
-                        className="w-full px-3 py-2 text-sm rounded-xl border border-emerald-500/40 bg-emerald-500/5 dark:bg-emerald-950/20 text-slate-900 dark:text-slate-100 font-medium"
-                      />
-                      <CheckCircle2 className="w-4 h-4 text-emerald-500 absolute right-3 top-2.5" />
-                    </div>
-                  </div>
-
-                  <div className="space-y-1 relative">
-                    <label className="text-xs font-semibold text-slate-700 dark:text-slate-300 flex items-center justify-between">
-                      <span>Job Title &amp; Role</span>
-                      <span className="text-[10px] text-emerald-500 font-mono">Matched</span>
-                    </label>
-                    <div className="relative">
-                      <input 
-                        type="text" 
-                        readOnly 
-                        value="Principal Systems Architect" 
-                        className="w-full px-3 py-2 text-sm rounded-xl border border-emerald-500/40 bg-emerald-500/5 dark:bg-emerald-950/20 text-slate-900 dark:text-slate-100 font-medium"
-                      />
-                      <CheckCircle2 className="w-4 h-4 text-emerald-500 absolute right-3 top-2.5" />
-                    </div>
-                  </div>
-                </div>
-
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
                 <div className="space-y-1">
-                  <label className="text-xs font-semibold text-slate-700 dark:text-slate-300 flex items-center justify-between">
-                    <span>Shipping / Office Address</span>
-                    <span className="text-[10px] text-brand-500 font-mono">Shadow DOM Traversed</span>
-                  </label>
-                  <input 
-                    type="text" 
-                    readOnly 
-                    value="742 Evergreen Terrace, Sector 4, Springfield" 
-                    className="w-full px-3 py-2 text-sm rounded-xl border border-emerald-500/40 bg-emerald-500/5 dark:bg-emerald-950/20 text-slate-900 dark:text-slate-100 font-medium"
+                  <div className="flex items-center justify-between text-zinc-600 dark:text-zinc-400 font-medium">
+                    <span>Full Legal Name</span>
+                    {form.name && (
+                      <span className="text-[10px] font-mono text-emerald-600 dark:text-emerald-400">
+                        synced
+                      </span>
+                    )}
+                  </div>
+                  <input
+                    type="text"
+                    readOnly
+                    placeholder="e.g. Sarah Connor"
+                    value={form.name}
+                    className={`w-full px-3 py-2 rounded-md font-mono border transition-all ${
+                      form.name 
+                        ? 'bg-emerald-500/[0.06] border-emerald-500/40 text-zinc-900 dark:text-white' 
+                        : 'bg-white dark:bg-zinc-900/60 border-zinc-200 dark:border-zinc-800 text-zinc-500'
+                    }`}
                   />
                 </div>
 
-                <div className="p-3 rounded-xl bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 flex items-center justify-between text-xs text-slate-600 dark:text-slate-400">
-                  <span className="flex items-center gap-1.5 font-medium">
-                    <ShieldCheck className="w-4 h-4 text-emerald-500" />
-                    5 fields matched &amp; filled in 42ms
-                  </span>
-                  <span className="text-[11px] text-emerald-600 dark:text-emerald-400 font-mono font-semibold">
-                    0 telemetry packets
-                  </span>
+                <div className="space-y-1">
+                  <div className="flex items-center justify-between text-zinc-600 dark:text-zinc-400 font-medium">
+                    <span>Email Address</span>
+                    {form.email && (
+                      <span className="text-[10px] font-mono text-emerald-600 dark:text-emerald-400">
+                        _valueTracker OK
+                      </span>
+                    )}
+                  </div>
+                  <input
+                    type="email"
+                    readOnly
+                    placeholder="sarah@example.com"
+                    value={form.email}
+                    className={`w-full px-3 py-2 rounded-md font-mono border transition-all ${
+                      form.email 
+                        ? 'bg-emerald-500/[0.06] border-emerald-500/40 text-zinc-900 dark:text-white' 
+                        : 'bg-white dark:bg-zinc-900/60 border-zinc-200 dark:border-zinc-800 text-zinc-500'
+                    }`}
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <div className="flex items-center justify-between text-zinc-600 dark:text-zinc-400 font-medium">
+                    <span>Phone (E.164)</span>
+                    {form.phone && (
+                      <span className="text-[10px] font-mono text-emerald-600 dark:text-emerald-400">
+                        formatted
+                      </span>
+                    )}
+                  </div>
+                  <input
+                    type="text"
+                    readOnly
+                    placeholder="+1 (555) 000-0000"
+                    value={form.phone}
+                    className={`w-full px-3 py-2 rounded-md font-mono border transition-all ${
+                      form.phone 
+                        ? 'bg-emerald-500/[0.06] border-emerald-500/40 text-zinc-900 dark:text-white' 
+                        : 'bg-white dark:bg-zinc-900/60 border-zinc-200 dark:border-zinc-800 text-zinc-500'
+                    }`}
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <div className="flex items-center justify-between text-zinc-600 dark:text-zinc-400 font-medium">
+                    <span>Engineering Role</span>
+                    {form.role && (
+                      <span className="text-[10px] font-mono text-emerald-600 dark:text-emerald-400">
+                        matched
+                      </span>
+                    )}
+                  </div>
+                  <input
+                    type="text"
+                    readOnly
+                    placeholder="Systems Architect"
+                    value={form.role}
+                    className={`w-full px-3 py-2 rounded-md font-mono border transition-all ${
+                      form.role 
+                        ? 'bg-emerald-500/[0.06] border-emerald-500/40 text-zinc-900 dark:text-white' 
+                        : 'bg-white dark:bg-zinc-900/60 border-zinc-200 dark:border-zinc-800 text-zinc-500'
+                    }`}
+                  />
+                </div>
+
+                <div className="space-y-1 sm:col-span-2">
+                  <div className="flex items-center justify-between text-zinc-600 dark:text-zinc-400 font-medium">
+                    <span>Street Address</span>
+                    {form.address && (
+                      <span className="text-[10px] font-mono text-emerald-600 dark:text-emerald-400">
+                        shadow DOM traversed
+                      </span>
+                    )}
+                  </div>
+                  <input
+                    type="text"
+                    readOnly
+                    placeholder="Street, City, Postal"
+                    value={form.address}
+                    className={`w-full px-3 py-2 rounded-md font-mono border transition-all ${
+                      form.address 
+                        ? 'bg-emerald-500/[0.06] border-emerald-500/40 text-zinc-900 dark:text-white' 
+                        : 'bg-white dark:bg-zinc-900/60 border-zinc-200 dark:border-zinc-800 text-zinc-500'
+                    }`}
+                  />
                 </div>
               </div>
 
-              {/* Right Side: Simulated Extension Floating Card */}
-              <div className="lg:col-span-5 rounded-2xl p-4 bg-white dark:bg-slate-900 border border-brand-500/30 shadow-xl shadow-brand-500/10 space-y-3.5 relative overflow-hidden">
-                <div className="absolute top-0 right-0 w-32 h-32 bg-brand-500/10 rounded-full blur-2xl pointer-events-none" />
+              {/* Status bar */}
+              <div className="p-2.5 rounded-lg bg-zinc-100 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800/80 flex items-center justify-between text-[11px] font-mono">
+                <span className="text-zinc-600 dark:text-zinc-400 flex items-center gap-1.5">
+                  <ShieldCheck className="w-3.5 h-3.5 text-emerald-500" />
+                  <span>Network Isolation: Verified</span>
+                </span>
+                <span className="text-emerald-600 dark:text-emerald-400 font-semibold">
+                  0 bytes sent
+                </span>
+              </div>
+            </div>
 
-                {/* Extension Header */}
-                <div className="flex items-center justify-between pb-3 border-b border-slate-200 dark:border-slate-800">
-                  <div className="flex items-center gap-2">
-                    <div className="w-7 h-7 rounded-lg bg-gradient-to-tr from-brand-600 to-indigo-600 p-1 flex items-center justify-center">
-                      <Image src="/icon.svg" alt="Stashfill" width={18} height={18} className="w-4 h-4" />
-                    </div>
-                    <div>
-                      <div className="text-xs font-bold text-slate-900 dark:text-white">Stashfill Quick Popup</div>
-                      <div className="text-[10px] text-slate-500">v1.0.0 • 100% Offline</div>
-                    </div>
+            {/* Right Column: Authentic Stashfill Extension Popup HUD */}
+            <div className="lg:col-span-5 rounded-xl tech-card p-4 bg-white dark:bg-zinc-950 border border-zinc-300 dark:border-zinc-700 shadow-xl space-y-3 font-mono">
+              
+              {/* HUD Header */}
+              <div className="flex items-center justify-between pb-2 border-b border-zinc-200 dark:border-zinc-800">
+                <div className="flex items-center gap-2">
+                  <div className="w-6 h-6 rounded bg-zinc-900 dark:bg-white flex items-center justify-center p-1">
+                    <Image src="/icon.svg" alt="Stashfill" width={16} height={16} className="w-3.5 h-3.5 invert dark:invert-0" />
                   </div>
-                  <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
-                    Active Tab
-                  </span>
+                  <span className="text-xs font-bold text-zinc-950 dark:text-white">stashfill</span>
                 </div>
+                <span className="px-2 py-0.5 rounded text-[10px] bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 font-semibold">
+                  Tab Active
+                </span>
+              </div>
 
-                {/* Primary Fill Button */}
-                <button 
-                  className="w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl bg-gradient-to-r from-brand-600 to-indigo-600 text-white text-xs font-semibold shadow-md shadow-brand-500/20 hover:from-brand-500 hover:to-indigo-500 transition-all"
-                >
-                  <span className="flex items-center gap-1.5">
-                    <Zap className="w-3.5 h-3.5" />
-                    Fill All Fields
-                  </span>
-                  <kbd className="px-1.5 py-0.5 text-[10px] bg-black/20 rounded font-mono">Alt+Shift+F</kbd>
-                </button>
+              {/* Instant Fill Trigger Button */}
+              <button
+                onClick={triggerFill}
+                disabled={animating}
+                className="w-full py-2.5 px-3 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white font-semibold text-xs flex items-center justify-between transition-all active:scale-[0.98] shadow-sm"
+              >
+                <span className="flex items-center gap-1.5">
+                  <Zap className={`w-3.5 h-3.5 ${animating ? 'animate-spin' : ''}`} />
+                  <span>{animating ? 'Syncing DOM...' : 'Fill All Fields'}</span>
+                </span>
+                <kbd className="px-1.5 py-0.5 bg-black/25 rounded text-[10px]">⌥⇧F</kbd>
+              </button>
 
-                {/* Active Profiles Selector */}
-                <div className="space-y-1.5">
-                  <div className="text-[11px] font-medium text-slate-500 dark:text-slate-400 flex items-center justify-between">
-                    <span>Active Profile</span>
-                    <span className="text-[10px] text-brand-500">3 Saved</span>
+              {/* Profiles Selector */}
+              <div className="space-y-1">
+                <div className="text-[10px] text-zinc-400 uppercase tracking-wider">
+                  Active Identity
+                </div>
+                <div className="p-2 rounded-lg bg-zinc-100 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 flex items-center justify-between text-xs">
+                  <span className="font-semibold text-zinc-900 dark:text-white">Sarah Connor</span>
+                  <span className="text-[10px] text-zinc-400">14 fields</span>
+                </div>
+              </div>
+
+              {/* Quick Search */}
+              <div className="space-y-1">
+                <div className="flex items-center justify-between text-[10px] text-zinc-400 uppercase tracking-wider">
+                  <span>Quick Filter</span>
+                  <kbd className="text-[10px] px-1 bg-zinc-200 dark:bg-zinc-800 rounded">/</kbd>
+                </div>
+                <div className="space-y-1 text-xs">
+                  <div className="px-2.5 py-1.5 rounded-md bg-zinc-100 dark:bg-zinc-900/80 border border-zinc-200 dark:border-zinc-800 flex items-center justify-between text-zinc-700 dark:text-zinc-300">
+                    <span>email: sarah.connor@...</span>
+                    <kbd className="text-[10px] text-zinc-400">↵</kbd>
                   </div>
-                  <div className="p-2 rounded-xl bg-slate-50 dark:bg-slate-950/80 border border-slate-200 dark:border-slate-800 flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <span className="w-2 h-2 rounded-full bg-brand-500"></span>
-                      <span className="text-xs font-semibold text-slate-800 dark:text-slate-200">Sarah Connor (Primary)</span>
-                    </div>
-                    <span className="text-[10px] font-mono text-slate-400">14 fields</span>
+                  <div className="px-2.5 py-1.5 rounded-md bg-zinc-50 dark:bg-zinc-900/40 text-zinc-500 flex items-center justify-between">
+                    <span>phone: +1 (415) 890-...</span>
+                    <kbd className="text-[10px] text-zinc-400">↵</kbd>
                   </div>
                 </div>
+              </div>
 
-                {/* Search Quick-Paste Bar */}
-                <div className="space-y-1.5">
-                  <div className="text-[11px] font-medium text-slate-500 dark:text-slate-400 flex items-center justify-between">
-                    <span>Search &amp; Paste</span>
-                    <kbd className="text-[10px] px-1 bg-slate-200 dark:bg-slate-800 rounded font-mono">/</kbd>
-                  </div>
-                  <div className="space-y-1 text-xs">
-                    <div className="px-2.5 py-1.5 rounded-lg bg-brand-500/10 border border-brand-500/20 text-brand-600 dark:text-brand-300 flex items-center justify-between">
-                      <span className="font-mono text-[11px]">email: sarah.connor@...</span>
-                      <kbd className="text-[10px] text-slate-400">Enter</kbd>
-                    </div>
-                    <div className="px-2.5 py-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800/60 text-slate-600 dark:text-slate-400 flex items-center justify-between">
-                      <span className="font-mono text-[11px]">phone: +1 (555) 019-...</span>
-                      <kbd className="text-[10px] text-slate-400">Enter</kbd>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Encrypted Vault indicator */}
-                <div className="pt-2 border-t border-slate-200 dark:border-slate-800 flex items-center justify-between text-[11px] text-slate-500 dark:text-slate-400">
-                  <div className="flex items-center gap-1.5">
-                    <Lock className="w-3.5 h-3.5 text-amber-500" />
-                    <span>Encrypted Vault: Locked</span>
-                  </div>
-                  <span className="text-[10px] font-mono text-slate-400">AES-256</span>
-                </div>
+              {/* Vault State */}
+              <div className="pt-2 border-t border-zinc-200 dark:border-zinc-800 flex items-center justify-between text-[11px] text-zinc-500">
+                <span className="flex items-center gap-1.5">
+                  <Lock className="w-3 h-3 text-amber-500" />
+                  <span>Vault: AES-GCM 256 Sealed</span>
+                </span>
+                <span className="text-[10px] text-emerald-500 font-semibold">Local Disk Only</span>
               </div>
 
             </div>
+
           </div>
         </div>
 
-        {/* 4 Stats Grid */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-16 max-w-5xl mx-auto">
-          <div className="p-5 rounded-2xl glass-panel border border-slate-200 dark:border-slate-800 text-center">
-            <div className="text-3xl font-extrabold text-brand-600 dark:text-brand-400 mb-1">0 bytes</div>
-            <div className="text-xs font-medium text-slate-600 dark:text-slate-400">Network Telemetry Sent</div>
+        {/* 4 Technical Benchmarks in Monospace Precision */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-12 max-w-5xl mx-auto">
+          <div className="p-4 rounded-xl tech-card">
+            <div className="font-mono text-2xl font-bold text-zinc-950 dark:text-white mb-0.5">0 bytes</div>
+            <div className="font-mono text-[11px] text-zinc-500 uppercase tracking-wider">Telemetry packets</div>
           </div>
-
-          <div className="p-5 rounded-2xl glass-panel border border-slate-200 dark:border-slate-800 text-center">
-            <div className="text-3xl font-extrabold text-emerald-600 dark:text-emerald-400 mb-1">&lt; 100ms</div>
-            <div className="text-xs font-medium text-slate-600 dark:text-slate-400">Instant Popup Launch</div>
+          <div className="p-4 rounded-xl tech-card">
+            <div className="font-mono text-2xl font-bold text-zinc-950 dark:text-white mb-0.5">&lt; 45 ms</div>
+            <div className="font-mono text-[11px] text-zinc-500 uppercase tracking-wider">DOM matching engine</div>
           </div>
-
-          <div className="p-5 rounded-2xl glass-panel border border-slate-200 dark:border-slate-800 text-center">
-            <div className="text-3xl font-extrabold text-indigo-600 dark:text-indigo-400 mb-1">AES-256</div>
-            <div className="text-xs font-medium text-slate-600 dark:text-slate-400">PBKDF2 600K Encrypted Vault</div>
+          <div className="p-4 rounded-xl tech-card">
+            <div className="font-mono text-2xl font-bold text-zinc-950 dark:text-white mb-0.5">600K rounds</div>
+            <div className="font-mono text-[11px] text-zinc-500 uppercase tracking-wider">PBKDF2-SHA256 vault</div>
           </div>
-
-          <div className="p-5 rounded-2xl glass-panel border border-slate-200 dark:border-slate-800 text-center">
-            <div className="text-3xl font-extrabold text-amber-500 mb-1">EN + বাংলা</div>
-            <div className="text-xs font-medium text-slate-600 dark:text-slate-400">Bilingual Heuristic Engine</div>
+          <div className="p-4 rounded-xl tech-card">
+            <div className="font-mono text-2xl font-bold text-zinc-950 dark:text-white mb-0.5">EN + বাংলা</div>
+            <div className="font-mono text-[11px] text-zinc-500 uppercase tracking-wider">Synonym tokenization</div>
           </div>
         </div>
 

@@ -9,8 +9,8 @@
   - Privacy & Security
   - Productivity
 - **Tags**: `autofill`, `privacy`, `form-filler`, `offline`, `encryption`
-- **Support Website**: https://github.com/stashfill/stashfill
-- **Privacy Policy URL**: https://stashfill.org/privacy.html
+- **Support Website**: https://stashfill.tashanto.com
+- **Privacy Policy URL**: https://stashfill.tashanto.com/privacy.html
 
 ---
 

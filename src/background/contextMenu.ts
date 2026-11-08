@@ -149,8 +149,8 @@ export function buildContextMenuDescriptors(input: BuildContextMenuInput): Conte
     contexts: ['editable'],
   });
 
-  // If there are other profiles, show quick profile switcher items
-  const otherProfiles = profiles.filter((p) => p.id !== activeProfile?.id).slice(0, 3);
+  // If there are other profiles, show each profile as its own submenu with its name and fields
+  const otherProfiles = profiles.filter((p) => p.id !== activeProfile?.id);
   if (otherProfiles.length > 0) {
     items.push({
       id: 'stashfill-sep-profiles',
@@ -160,10 +160,56 @@ export function buildContextMenuDescriptors(input: BuildContextMenuInput): Conte
     });
 
     for (const other of otherProfiles) {
+      const subMenuId = `stashfill-profile-sub:${other.id}`;
+      // Submenu showing profile name
+      items.push({
+        id: subMenuId,
+        parentId: 'stashfill-root',
+        title: other.name,
+        contexts: ['editable'],
+      });
+
+      // Inside submenu: 1. Fill entire form with this profile
+      items.push({
+        id: `stashfill-fill-profile:${other.id}`,
+        parentId: subMenuId,
+        title: `Fill this form (${other.name})`,
+        contexts: ['editable'],
+      });
+
+      // 2. That profile's fields for 1-click paste
+      const otherSortedFields = sortFieldsByMostUsed(other.fields);
+      const otherTopFields = otherSortedFields.slice(0, MAX_FIELDS_PER_PROFILE);
+      if (otherTopFields.length > 0) {
+        items.push({
+          id: `stashfill-sep-fields-${other.id}`,
+          parentId: subMenuId,
+          type: 'separator',
+          contexts: ['editable'],
+        });
+
+        for (const field of otherTopFields) {
+          items.push({
+            id: `stashfill-field:${other.id}:${field.id}`,
+            parentId: subMenuId,
+            title: formatFieldMenuTitle(field, showPreviews),
+            contexts: ['editable'],
+          });
+        }
+      }
+
+      // 3. Switch active profile option
+      items.push({
+        id: `stashfill-sep-switch-${other.id}`,
+        parentId: subMenuId,
+        type: 'separator',
+        contexts: ['editable'],
+      });
+
       items.push({
         id: `stashfill-switch-profile:${other.id}`,
-        parentId: 'stashfill-root',
-        title: `Switch profile: ${other.name}`,
+        parentId: subMenuId,
+        title: `Switch active to ${other.name}`,
         contexts: ['editable'],
       });
     }

@@ -2,101 +2,96 @@
 
 import Link from 'next/link';
 import Image from 'next/image';
-import { Github, Shield, Heart, ExternalLink } from 'lucide-react';
+import { Github, Shield, ExternalLink } from 'lucide-react';
 
 export default function Footer() {
   return (
-    <footer className="bg-white dark:bg-slate-950 border-t border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400 text-xs sm:text-sm">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-14">
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-10">
+    <footer className="bg-white dark:bg-[#07080b] border-t border-zinc-200/80 dark:border-white/[0.08] text-zinc-500 dark:text-zinc-400 font-mono text-xs">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
           
-          {/* Col 1: Brand & Bio */}
-          <div className="md:col-span-2 space-y-4">
+          {/* Col 1 */}
+          <div className="md:col-span-2 space-y-3">
             <Link href="/" className="flex items-center gap-2.5">
-              <div className="flex items-center justify-center w-8 h-8 rounded-xl bg-gradient-to-tr from-brand-600 to-indigo-600 p-1">
-                <Image src="/icon.svg" alt="Stashfill" width={20} height={20} className="w-5 h-5" />
+              <div className="flex items-center justify-center w-6 h-6 rounded bg-zinc-900 dark:bg-white p-1">
+                <Image src="/icon.svg" alt="Stashfill" width={16} height={16} className="w-4 h-4 invert dark:invert-0" />
               </div>
-              <span className="text-xl font-extrabold text-slate-900 dark:text-white">
-                Stash<span className="text-brand-500">fill</span>
+              <span className="text-sm font-bold text-zinc-950 dark:text-white">
+                stashfill
               </span>
             </Link>
 
-            <p className="max-w-sm text-xs sm:text-sm text-slate-500 dark:text-slate-400 leading-relaxed">
-              The 100% offline, privacy-first autofill and quick-paste extension for your real data. 
-              Zero accounts, zero trackers, zero telemetry.
+            <p className="max-w-sm text-xs text-zinc-500 font-sans leading-relaxed">
+              Offline, zero-telemetry, privacy-first autofill browser extension. 
+              Distributed under the open-source MIT license.
             </p>
 
-            <div className="flex items-center gap-3 pt-2">
+            <div className="flex items-center gap-3 pt-1">
               <a
                 href="https://github.com/stashfill/stashfill"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="p-2 rounded-xl border border-slate-200 dark:border-slate-800 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 transition-colors flex items-center gap-1.5 text-xs font-semibold"
+                className="px-2.5 py-1 rounded border border-zinc-200 dark:border-zinc-800 hover:bg-zinc-100 dark:hover:bg-zinc-900 text-zinc-700 dark:text-zinc-300 transition-colors flex items-center gap-1.5 text-[11px]"
               >
-                <Github className="w-4 h-4" />
-                <span>GitHub (MIT)</span>
+                <Github className="w-3.5 h-3.5" />
+                <span>GitHub</span>
               </a>
 
-              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 text-xs font-semibold border border-emerald-500/20">
-                <Shield className="w-3.5 h-3.5" />
-                <span>Verified 0-Network</span>
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 text-[11px] font-semibold border border-emerald-500/20">
+                <Shield className="w-3 h-3" />
+                <span>0-Telemetry CI Gate</span>
               </span>
             </div>
           </div>
 
-          {/* Col 2: Navigation Links */}
-          <div className="space-y-3">
-            <h4 className="font-bold text-xs uppercase tracking-wider text-slate-900 dark:text-white">
-              Product &amp; Features
+          {/* Col 2 */}
+          <div className="space-y-2.5">
+            <h4 className="font-bold text-[11px] uppercase tracking-wider text-zinc-950 dark:text-white">
+              Specifications
             </h4>
-            <ul className="space-y-2 text-xs">
+            <ul className="space-y-1.5 text-[11px]">
               <li>
-                <Link href="#demo" className="hover:text-brand-600 dark:hover:text-brand-400 transition-colors">
-                  Interactive Simulator
+                <Link href="/comparison" className="hover:text-zinc-950 dark:hover:text-white transition-colors">
+                  Comparison Matrix
                 </Link>
               </li>
               <li>
-                <Link href="#features" className="hover:text-brand-600 dark:hover:text-brand-400 transition-colors">
-                  Bento Features
+                <Link href="/architecture" className="hover:text-zinc-950 dark:hover:text-white transition-colors">
+                  Technical Architecture
                 </Link>
               </li>
               <li>
-                <Link href="#security" className="hover:text-brand-600 dark:hover:text-brand-400 transition-colors">
-                  AES-256 Vault Security
+                <Link href="/security" className="hover:text-zinc-950 dark:hover:text-white transition-colors">
+                  Security Vault
                 </Link>
               </li>
               <li>
-                <Link href="#comparison" className="hover:text-brand-600 dark:hover:text-brand-400 transition-colors">
-                  Comparison vs Others
-                </Link>
-              </li>
-              <li>
-                <Link href="#faq" className="hover:text-brand-600 dark:hover:text-brand-400 transition-colors">
-                  Frequently Asked Questions
+                <Link href="/faq" className="hover:text-zinc-950 dark:hover:text-white transition-colors">
+                  FAQ &amp; Knowledge Base
                 </Link>
               </li>
             </ul>
           </div>
 
-          {/* Col 3: Resources & Legal */}
-          <div className="space-y-3">
-            <h4 className="font-bold text-xs uppercase tracking-wider text-slate-900 dark:text-white">
+          {/* Col 3 */}
+          <div className="space-y-2.5">
+            <h4 className="font-bold text-[11px] uppercase tracking-wider text-zinc-950 dark:text-white">
               Resources &amp; Docs
             </h4>
-            <ul className="space-y-2 text-xs">
+            <ul className="space-y-1.5 text-[11px]">
               <li>
-                <Link href="/docs" className="hover:text-brand-600 dark:hover:text-brand-400 transition-colors">
+                <Link href="/docs" className="hover:text-zinc-950 dark:hover:text-white transition-colors">
                   Documentation &amp; Cheatsheet
                 </Link>
               </li>
               <li>
-                <Link href="/install" className="hover:text-brand-600 dark:hover:text-brand-400 transition-colors">
-                  Browser Installation Guides
+                <Link href="/install" className="hover:text-zinc-950 dark:hover:text-white transition-colors">
+                  Browser Install Guides
                 </Link>
               </li>
               <li>
-                <Link href="/privacy" className="hover:text-brand-600 dark:hover:text-brand-400 transition-colors">
-                  Privacy Policy &amp; Manifesto
+                <Link href="/privacy" className="hover:text-zinc-950 dark:hover:text-white transition-colors">
+                  Privacy Policy &amp; Threat Model
                 </Link>
               </li>
               <li>
@@ -104,21 +99,10 @@ export default function Footer() {
                   href="https://github.com/stashfill/stashfill/blob/main/THREAT_MODEL.md" 
                   target="_blank" 
                   rel="noopener noreferrer" 
-                  className="hover:text-brand-600 dark:hover:text-brand-400 transition-colors flex items-center gap-1"
+                  className="hover:text-zinc-950 dark:hover:text-white transition-colors flex items-center gap-1"
                 >
                   <span>Threat Model</span>
-                  <ExternalLink className="w-3 h-3" />
-                </a>
-              </li>
-              <li>
-                <a 
-                  href="https://github.com/stashfill/stashfill/releases" 
-                  target="_blank" 
-                  rel="noopener noreferrer" 
-                  className="hover:text-brand-600 dark:hover:text-brand-400 transition-colors flex items-center gap-1"
-                >
-                  <span>Releases &amp; Changelog</span>
-                  <ExternalLink className="w-3 h-3" />
+                  <ExternalLink className="w-2.5 h-2.5" />
                 </a>
               </li>
             </ul>
@@ -126,10 +110,10 @@ export default function Footer() {
 
         </div>
 
-        <div className="mt-12 pt-6 border-t border-slate-200 dark:border-slate-800 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-slate-500">
-          <p>© {new Date().getFullYear()} Stashfill Team. Released under the MIT License.</p>
-          <p className="flex items-center gap-1">
-            Designed for privacy, speed, and freedom. Made with <Heart className="w-3.5 h-3.5 text-rose-500 fill-rose-500 inline" /> for users everywhere.
+        <div className="mt-10 pt-4 border-t border-zinc-200 dark:border-zinc-800/80 flex flex-col sm:flex-row items-center justify-between gap-3 text-[11px]">
+          <p>© {new Date().getFullYear()} Stashfill. Released under MIT.</p>
+          <p className="text-zinc-400">
+            Engineered for privacy, speed, and developer autonomy.
           </p>
         </div>
       </div>

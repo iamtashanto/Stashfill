@@ -1,224 +1,290 @@
 'use client';
 
+import { useState } from 'react';
 import { 
-  ShieldCheck, 
   Cpu, 
-  Lock, 
   Layers, 
-  FileText, 
-  Languages, 
+  FileCode2, 
   EyeOff, 
+  CheckCircle2, 
   Keyboard
 } from 'lucide-react';
 
+interface ArchitectureTopic {
+  id: string;
+  name: string;
+  badge: string;
+  description: string;
+  codeSnippet: string;
+  highlights: string[];
+}
+
+const ARCHITECTURE_TOPICS: ArchitectureTopic[] = [
+  {
+    id: 'react-sync',
+    name: 'React 18/19 & Vue v-model Reconciliation',
+    badge: 'Core Runtime Engine',
+    description:
+      'Standard autofill tools fail on modern web apps because React and Vue ignore direct DOM value assignments. Stashfill queries the native HTMLInputElement value setter from the prototype, updates React\'s internal _valueTracker descriptor, and dispatches bubbled synthetic events.',
+    codeSnippet: `// Intercept prototype descriptor & synchronize framework state
+const setter = Object.getOwnPropertyDescriptor(
+  window.HTMLInputElement.prototype, 
+  'value'
+)?.set;
+
+// Execute native setter in host element context
+setter?.call(element, targetValue);
+
+// Synchronize React internal value tracker to prevent rollback
+const tracker = (element as any)._valueTracker;
+if (tracker) {
+  tracker.setValue(previousValue);
+}
+
+// Dispatch synthetic bubbling input and change events
+element.dispatchEvent(new Event('input', { bubbles: true }));
+element.dispatchEvent(new Event('change', { bubbles: true }));`,
+    highlights: [
+      'Bypasses React synthetic event state de-synchronization',
+      'Fully compatible with Vue v-model and Angular form controls',
+      'Zero monkey-patching of page global variables',
+    ],
+  },
+  {
+    id: 'crypto-vault',
+    name: 'AES-GCM 256-Bit Hardware Encrypted Vault',
+    badge: 'W3C SubtleCrypto',
+    description:
+      'Payment cards and confidential credentials are never stored in plaintext. Keys are derived locally in browser memory via PBKDF2-SHA256 (600,000 iterations). Cards are never passively filled without explicit user consent.',
+    codeSnippet: `// Derive 256-bit AES-GCM key from master passphrase
+const keyMaterial = await crypto.subtle.importKey(
+  'raw', 
+  encoder.encode(passphrase), 
+  'PBKDF2', 
+  false, 
+  ['deriveKey']
+);
+
+const aesKey = await crypto.subtle.deriveKey(
+  {
+    name: 'PBKDF2',
+    salt: cryptoRandomSalt, // 16 bytes
+    iterations: 600_000,
+    hash: 'SHA-256',
+  },
+  keyMaterial,
+  { name: 'AES-GCM', length: 256 },
+  false,
+  ['encrypt', 'decrypt']
+);
+
+// Ephemeral 15-second clipboard scrubbing on sensitive copy
+navigator.clipboard.writeText(decryptedCardNumber);
+setTimeout(() => navigator.clipboard.writeText(''), 15_000);`,
+    highlights: [
+      'Derived using 600,000 rounds of PBKDF2-SHA256',
+      'Ephemeral one-time CVV — never persisted to disk',
+      'Automatic 15-second clipboard wiper on card copy',
+    ],
+  },
+  {
+    id: 'shadow-dom',
+    name: 'Recursive Shadow DOM & Iframe Traversal',
+    badge: 'DOM Penetration',
+    description:
+      'Enterprise software (Salesforce, Google Forms, HubSpot, Shopify) nests inputs inside open shadow roots and same-origin frames where standard document.querySelectorAll fails.',
+    codeSnippet: `// Recursive walker traversing open shadow roots & nested frames
+function collectFillableInputs(root: Document | ShadowRoot): HTMLInputElement[] {
+  const inputs: HTMLInputElement[] = [];
+  const elements = root.querySelectorAll('*');
+
+  for (const el of elements) {
+    if (el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement) {
+      inputs.push(el as any);
+    }
+    // Penetrate open Shadow DOM boundaries
+    if (el.shadowRoot) {
+      inputs.push(...collectFillableInputs(el.shadowRoot));
+    }
+    // Traverse same-origin frames safely
+    if (el instanceof HTMLIFrameElement && el.contentDocument) {
+      inputs.push(...collectFillableInputs(el.contentDocument));
+    }
+  }
+  return inputs;
+}`,
+    highlights: [
+      'Recursively descends into shadowRoot instances',
+      'Supports nested same-origin iframes cleanly',
+      'Handles contenteditable, selects, radios, and checkboxes',
+    ],
+  },
+  {
+    id: 'bangla-engine',
+    name: 'Bilingual English & Bangla (বাংলা) Matcher',
+    badge: 'Heuristic Tokenizer',
+    description:
+      'Forms across South Asia and international organizations use localized Bengali attributes. Stashfill resolves camelCase, snake_case, autocomplete tokens, and Bengali synonyms simultaneously.',
+    codeSnippet: `// Multilingual synonym token normalization table
+const SYNONYM_DICTIONARY: Record<FieldCategory, string[]> = {
+  fullName: [
+    'name', 'fullname', 'candidate_name', 'applicant',
+    'নাম', 'পুরো নাম', 'পূর্ণ নাম', 'প্রার্থীর নাম'
+  ],
+  email: [
+    'email', 'e-mail', 'mail_addr',
+    'ইমেইল', 'ই-মেইল', 'ইমেইল ঠিকানা'
+  ],
+  phone: [
+    'phone', 'tel', 'mobile', 'cell', 'contact_no',
+    'ফোন', 'মোবাইল', 'মোবাইল নম্বর', 'যোগাযোগ নম্বর'
+  ],
+  address: [
+    'address', 'street', 'billing_address', 'shipping_address',
+    'ঠিকানা', 'বর্তমান ঠিকানা', 'স্থায়ী ঠিকানা', 'বাসার ঠিকানা'
+  ]
+};`,
+    highlights: [
+      'Tested across 65+ automated fixture scenarios',
+      'Tokenizes camelCase, PascalCase, kebab-case, and snake_case',
+      'Deep autocomplete attribute prioritizer',
+    ],
+  },
+];
+
 export default function BentoFeatures() {
+  const [activeTabId, setActiveTabId] = useState<string>('react-sync');
+
+  const activeTopic = ARCHITECTURE_TOPICS.find((t) => t.id === activeTabId)!;
+
   return (
-    <section id="features" className="py-24 relative overflow-hidden bg-white dark:bg-slate-950">
+    <section id="architecture" className="py-24 relative overflow-hidden bg-zinc-50/50 dark:bg-[#090a0f] border-b border-zinc-200/80 dark:border-white/[0.08]">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         
-        {/* Section Header */}
-        <div className="text-center max-w-3xl mx-auto mb-16">
-          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 mb-3">
-            <ShieldCheck className="w-3.5 h-3.5" />
-            <span>Built Differently</span>
+        {/* Header */}
+        <div className="max-w-3xl mb-14">
+          <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md border border-zinc-200 dark:border-white/[0.1] bg-white dark:bg-zinc-900 text-xs font-mono text-zinc-600 dark:text-zinc-400 mb-4 shadow-sm">
+            <Cpu className="w-3.5 h-3.5 text-zinc-900 dark:text-white" />
+            <span>Systems Architecture</span>
           </div>
-          <h2 className="text-3xl sm:text-4xl font-extrabold text-slate-900 dark:text-white tracking-tight mb-4">
-            Engineered for Extreme Speed & Total Privacy
+          <h2 className="text-3xl sm:text-4xl font-extrabold text-zinc-950 dark:text-white tracking-tight mb-3">
+            Engineered for edge cases others ignore.
           </h2>
-          <p className="text-slate-600 dark:text-slate-400 text-base sm:text-lg">
-            Unlike cloud-based password managers or dummy text generators, Stashfill is an offline-first
-            powerhouse engineered for real-world form edge cases.
+          <p className="text-zinc-600 dark:text-zinc-400 text-base leading-relaxed">
+            Most autofill extensions are simple scripts that break on modern Single Page Applications. 
+            Stashfill is built like a precision browser engine.
           </p>
         </div>
 
-        {/* Bento Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        {/* Technical Architecture Deep-Dive Tabs */}
+        <div className="rounded-xl tech-card shadow-xl overflow-hidden mb-12">
           
-          {/* Card 1: Zero-Network CI Guarantee (Wide 2-col on lg) */}
-          <div className="lg:col-span-2 rounded-3xl p-8 glass-panel border border-slate-200 dark:border-slate-800 relative overflow-hidden group hover:border-brand-500/40 transition-all duration-300">
-            <div className="absolute top-0 right-0 w-80 h-80 bg-brand-500/10 rounded-full blur-3xl pointer-events-none group-hover:bg-brand-500/15 transition-all" />
+          {/* Tab Bar */}
+          <div className="flex overflow-x-auto border-b border-zinc-200 dark:border-zinc-800 bg-zinc-100/80 dark:bg-zinc-900/80 text-xs font-mono">
+            {ARCHITECTURE_TOPICS.map((topic) => (
+              <button
+                key={topic.id}
+                onClick={() => setActiveTabId(topic.id)}
+                className={`px-4 py-3 font-semibold whitespace-nowrap transition-all border-b-2 flex items-center gap-2 ${
+                  activeTabId === topic.id
+                    ? 'border-zinc-900 dark:border-white text-zinc-950 dark:text-white bg-white dark:bg-zinc-950'
+                    : 'border-transparent text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-200'
+                }`}
+              >
+                <span>{topic.name}</span>
+                <span className="hidden lg:inline-block px-1.5 py-0.2 text-[10px] rounded bg-zinc-200 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400">
+                  {topic.badge}
+                </span>
+              </button>
+            ))}
+          </div>
+
+          {/* Content Pane */}
+          <div className="p-6 sm:p-8 grid grid-cols-1 lg:grid-cols-12 gap-8 items-start bg-white dark:bg-zinc-950">
             
-            <div className="flex items-center gap-3 mb-5">
-              <div className="p-3 rounded-2xl bg-brand-500/10 text-brand-600 dark:text-brand-400 border border-brand-500/20">
-                <EyeOff className="w-6 h-6" />
-              </div>
+            {/* Description & Technical Points */}
+            <div className="lg:col-span-5 space-y-5">
               <div>
-                <span className="text-xs font-semibold text-brand-600 dark:text-brand-400 uppercase tracking-wider">
-                  Guaranteed Local Isolation
+                <span className="text-[11px] font-mono text-zinc-400 uppercase tracking-wider block mb-1">
+                  {activeTopic.badge}
                 </span>
-                <h3 className="text-xl sm:text-2xl font-bold text-slate-900 dark:text-white">
-                  Zero Network Requests. Zero Telemetry.
+                <h3 className="text-xl font-bold text-zinc-950 dark:text-white">
+                  {activeTopic.name}
                 </h3>
               </div>
-            </div>
 
-            <p className="text-slate-600 dark:text-slate-300 text-sm sm:text-base leading-relaxed mb-6">
-              Stashfill operates without backend servers, user accounts, or analytics tracking. 
-              Our automated CI test suite executes a strict AST and source code grep verification that 
-              immediately rejects any build containing <code className="text-xs bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 rounded font-mono text-brand-600 dark:text-brand-400">fetch()</code>, <code className="text-xs bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 rounded font-mono text-brand-600 dark:text-brand-400">XMLHttpRequest</code>, or <code className="text-xs bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 rounded font-mono text-brand-600 dark:text-brand-400">WebSocket</code>.
-            </p>
+              <p className="text-sm text-zinc-600 dark:text-zinc-400 leading-relaxed">
+                {activeTopic.description}
+              </p>
 
-            <div className="p-4 rounded-2xl bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 font-mono text-xs flex items-center justify-between">
-              <div className="flex items-center gap-2 text-emerald-600 dark:text-emerald-400 font-semibold">
-                <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-                <span>scripts/check-code-safety.mjs passed: 0 network calls</span>
+              <div className="space-y-2 pt-2 border-t border-zinc-100 dark:border-zinc-900">
+                <div className="text-xs font-mono text-zinc-500 uppercase tracking-wider">
+                  Key Implementation Guarantees:
+                </div>
+                {activeTopic.highlights.map((item, idx) => (
+                  <div key={idx} className="flex items-start gap-2 text-xs text-zinc-700 dark:text-zinc-300">
+                    <CheckCircle2 className="w-4 h-4 text-emerald-500 flex-shrink-0 mt-0.5" />
+                    <span>{item}</span>
+                  </div>
+                ))}
               </div>
-              <span className="text-[11px] text-slate-400">Exit Code: 0</span>
             </div>
+
+            {/* Live Code Representation */}
+            <div className="lg:col-span-7 rounded-lg overflow-hidden border border-zinc-200 dark:border-zinc-800 bg-[#0c0d12] text-zinc-300 font-mono text-xs">
+              <div className="flex items-center justify-between px-3.5 py-2 bg-[#12141c] border-b border-zinc-800 text-[11px] text-zinc-400">
+                <div className="flex items-center gap-1.5">
+                  <FileCode2 className="w-3.5 h-3.5 text-indigo-400" />
+                  <span>stashfill-core/{activeTopic.id}.ts</span>
+                </div>
+                <span className="text-emerald-400 font-semibold text-[10px]">TypeScript Strict</span>
+              </div>
+              <pre className="p-4 overflow-x-auto text-[11px] leading-relaxed text-zinc-300">
+                <code>{activeTopic.codeSnippet}</code>
+              </pre>
+            </div>
+
           </div>
 
-          {/* Card 2: React & Vue Value Tracker Interception */}
-          <div className="rounded-3xl p-8 glass-panel border border-slate-200 dark:border-slate-800 relative overflow-hidden group hover:border-brand-500/40 transition-all duration-300">
-            <div className="p-3 rounded-2xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 w-fit mb-5">
-              <Cpu className="w-6 h-6" />
+        </div>
+
+        {/* 3 Technical Principles Grid */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          
+          <div className="p-6 rounded-xl tech-card">
+            <div className="flex items-center gap-2 mb-3">
+              <EyeOff className="w-4 h-4 text-emerald-500" />
+              <h4 className="text-sm font-bold font-mono text-zinc-950 dark:text-white">
+                Zero-Network CI Gatekeeper
+              </h4>
             </div>
-
-            <span className="text-xs font-semibold text-emerald-600 dark:text-emerald-400 uppercase tracking-wider">
-              Framework Compatibility
-            </span>
-            <h3 className="text-xl font-bold text-slate-900 dark:text-white mt-1 mb-3">
-              React & Vue State Reconciliation
-            </h3>
-
-            <p className="text-slate-600 dark:text-slate-300 text-sm leading-relaxed mb-4">
-              Modern frontend frameworks ignore direct DOM value assignments. Stashfill overrides the native 
-              input value setter descriptor, syncs React <code className="text-xs bg-slate-100 dark:bg-slate-800 px-1 rounded font-mono">_valueTracker</code>, and dispatches bubbled synthetic events.
+            <p className="text-xs text-zinc-600 dark:text-zinc-400 leading-relaxed">
+              Every production build runs <code className="font-mono text-zinc-900 dark:text-zinc-200 bg-zinc-100 dark:bg-zinc-800 px-1 py-0.5 rounded">check-code-safety.mjs</code>. The build is killed immediately if fetch, XMLHttpRequest, or WebSocket appears in production code.
             </p>
-
-            <div className="px-3 py-2 rounded-xl bg-slate-100 dark:bg-slate-900 text-xs text-slate-600 dark:text-slate-400 border border-slate-200 dark:border-slate-800 font-mono">
-              ✓ React 18/19, Vue v-model, Angular
-            </div>
           </div>
 
-          {/* Card 3: Encrypted Vault (AES-GCM 256) */}
-          <div className="rounded-3xl p-8 glass-panel border border-slate-200 dark:border-slate-800 relative overflow-hidden group hover:border-brand-500/40 transition-all duration-300">
-            <div className="p-3 rounded-2xl bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border border-indigo-500/20 w-fit mb-5">
-              <Lock className="w-6 h-6" />
+          <div className="p-6 rounded-xl tech-card">
+            <div className="flex items-center gap-2 mb-3">
+              <Keyboard className="w-4 h-4 text-indigo-500" />
+              <h4 className="text-sm font-bold font-mono text-zinc-950 dark:text-white">
+                Sub-100ms Keyboard Flow
+              </h4>
             </div>
-
-            <span className="text-xs font-semibold text-indigo-600 dark:text-indigo-400 uppercase tracking-wider">
-              Cryptographic Hardening
-            </span>
-            <h3 className="text-xl font-bold text-slate-900 dark:text-white mt-1 mb-3">
-              AES-GCM 256-Bit Encrypted Vault
-            </h3>
-
-            <p className="text-slate-600 dark:text-slate-300 text-sm leading-relaxed mb-4">
-              Payment cards and confidential credentials are encrypted locally with PBKDF2-SHA256 (600,000 iterations). 
-              Payment fields are never passively suggested—only filled after explicit confirmation dialog with ephemeral CVV.
+            <p className="text-xs text-zinc-600 dark:text-zinc-400 leading-relaxed">
+              Opens with instant search autofocus. Filter 200+ fields in milliseconds with <kbd className="font-mono bg-zinc-200 dark:bg-zinc-800 px-1 rounded">/</kbd>, navigate with arrow keys, and press Enter to copy or fill without touching your mouse.
             </p>
-
-            <div className="px-3 py-2 rounded-xl bg-slate-100 dark:bg-slate-900 text-xs text-slate-600 dark:text-slate-400 border border-slate-200 dark:border-slate-800 font-mono">
-              🛡️ 15-Sec Clipboard Auto-Clear
-            </div>
           </div>
 
-          {/* Card 4: Multilingual Heuristic Engine (English & Bangla) */}
-          <div className="rounded-3xl p-8 glass-panel border border-slate-200 dark:border-slate-800 relative overflow-hidden group hover:border-brand-500/40 transition-all duration-300">
-            <div className="p-3 rounded-2xl bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20 w-fit mb-5">
-              <Languages className="w-6 h-6" />
+          <div className="p-6 rounded-xl tech-card">
+            <div className="flex items-center gap-2 mb-3">
+              <Layers className="w-4 h-4 text-amber-500" />
+              <h4 className="text-sm font-bold font-mono text-zinc-950 dark:text-white">
+                Encrypted Portable Snapshots
+              </h4>
             </div>
-
-            <span className="text-xs font-semibold text-amber-600 dark:text-amber-400 uppercase tracking-wider">
-              Multilingual Matching
-            </span>
-            <h3 className="text-xl font-bold text-slate-900 dark:text-white mt-1 mb-3">
-              Native English & Bangla Synonyms
-            </h3>
-
-            <p className="text-slate-600 dark:text-slate-300 text-sm leading-relaxed mb-4">
-              Tested across 65+ form fixture scenarios. Resolves tokens across autocomplete, name, id, placeholder, 
-              labels, and aria-attributes with comprehensive synonyms for both English and Bangla (বাংলা).
+            <p className="text-xs text-zinc-600 dark:text-zinc-400 leading-relaxed">
+              Export your identity vault as password-protected <code className="font-mono text-zinc-900 dark:text-zinc-200 bg-zinc-100 dark:bg-zinc-800 px-1 py-0.5 rounded">.stashfill</code> backups or plain JSON with automatic rolling local snapshots.
             </p>
-
-            <div className="px-3 py-2 rounded-xl bg-slate-100 dark:bg-slate-900 text-xs text-slate-600 dark:text-slate-400 border border-slate-200 dark:border-slate-800 font-mono">
-              &quot;নাম&quot; ↔ Full Name | &quot;ইমেইল&quot; ↔ Email
-            </div>
-          </div>
-
-          {/* Card 5: Interactive Snippets & Variable Expansion */}
-          <div className="rounded-3xl p-8 glass-panel border border-slate-200 dark:border-slate-800 relative overflow-hidden group hover:border-brand-500/40 transition-all duration-300">
-            <div className="p-3 rounded-2xl bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/20 w-fit mb-5">
-              <FileText className="w-6 h-6" />
-            </div>
-
-            <span className="text-xs font-semibold text-rose-600 dark:text-rose-400 uppercase tracking-wider">
-              Productivity Boost
-            </span>
-            <h3 className="text-xl font-bold text-slate-900 dark:text-white mt-1 mb-3">
-              Dynamic Snippets & Variables
-            </h3>
-
-            <p className="text-slate-600 dark:text-slate-300 text-sm leading-relaxed mb-4">
-              Define reusable snippets with live template variables like <code className="text-xs bg-slate-100 dark:bg-slate-800 px-1 rounded font-mono">&#123;&#123;date&#125;&#125;</code>, <code className="text-xs bg-slate-100 dark:bg-slate-800 px-1 rounded font-mono">&#123;&#123;time&#125;&#125;</code>, and <code className="text-xs bg-slate-100 dark:bg-slate-800 px-1 rounded font-mono">&#123;&#123;cursor&#125;&#125;</code>. Trigger instantly with quick shortcuts.
-            </p>
-
-            <div className="px-3 py-2 rounded-xl bg-slate-100 dark:bg-slate-900 text-xs text-slate-600 dark:text-slate-400 border border-slate-200 dark:border-slate-800 font-mono">
-              ;sig → Best regards, Sarah Connor
-            </div>
-          </div>
-
-          {/* Card 6: Keyboard-First & Speed (Wide 2-col on lg) */}
-          <div className="lg:col-span-2 rounded-3xl p-8 glass-panel border border-slate-200 dark:border-slate-800 relative overflow-hidden group hover:border-brand-500/40 transition-all duration-300">
-            <div className="flex items-center gap-3 mb-5">
-              <div className="p-3 rounded-2xl bg-sky-500/10 text-sky-600 dark:text-sky-400 border border-sky-500/20">
-                <Keyboard className="w-6 h-6" />
-              </div>
-              <div>
-                <span className="text-xs font-semibold text-sky-600 dark:text-sky-400 uppercase tracking-wider">
-                  Sub-100ms Performance
-                </span>
-                <h3 className="text-xl sm:text-2xl font-bold text-slate-900 dark:text-white">
-                  Keyboard-First Quick Search & Paste
-                </h3>
-              </div>
-            </div>
-
-            <p className="text-slate-600 dark:text-slate-300 text-sm sm:text-base leading-relaxed mb-6">
-              Never lift your hands from the keyboard. The popup opens with zero delay, automatically focuses the search input, 
-              and indexes 200+ fields in milliseconds. Navigate with arrow keys, press Enter to copy or fill, or press <kbd className="text-xs bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 rounded font-mono">Esc</kbd> to dismiss.
-            </p>
-
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-center text-xs">
-              <div className="p-3 rounded-xl bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-slate-800">
-                <div className="font-bold text-slate-900 dark:text-white font-mono">&lt; 100ms</div>
-                <div className="text-[11px] text-slate-500">Popup Render</div>
-              </div>
-              <div className="p-3 rounded-xl bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-slate-800">
-                <div className="font-bold text-slate-900 dark:text-white font-mono">&lt; 32 KB</div>
-                <div className="text-[11px] text-slate-500">Injected Script</div>
-              </div>
-              <div className="p-3 rounded-xl bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-slate-800">
-                <div className="font-bold text-slate-900 dark:text-white font-mono">Alt+Shift+F</div>
-                <div className="text-[11px] text-slate-500">Instant Fill Key</div>
-              </div>
-              <div className="p-3 rounded-xl bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-slate-800">
-                <div className="font-bold text-slate-900 dark:text-white font-mono">0 Overhead</div>
-                <div className="text-[11px] text-slate-500">On Host Pages</div>
-              </div>
-            </div>
-          </div>
-
-          {/* Card 7: Shadow DOM & Iframe Penetration */}
-          <div className="rounded-3xl p-8 glass-panel border border-slate-200 dark:border-slate-800 relative overflow-hidden group hover:border-brand-500/40 transition-all duration-300">
-            <div className="p-3 rounded-2xl bg-teal-500/10 text-teal-600 dark:text-teal-400 border border-teal-500/20 w-fit mb-5">
-              <Layers className="w-6 h-6" />
-            </div>
-
-            <span className="text-xs font-semibold text-teal-600 dark:text-teal-400 uppercase tracking-wider">
-              DOM Traversal
-            </span>
-            <h3 className="text-xl font-bold text-slate-900 dark:text-white mt-1 mb-3">
-              Shadow DOM & Nested Iframes
-            </h3>
-
-            <p className="text-slate-600 dark:text-slate-300 text-sm leading-relaxed mb-4">
-              Penetrates open Shadow DOM boundaries, nested same-origin iframes, and modern custom elements like web components used in Salesforce and Google Forms.
-            </p>
-
-            <div className="px-3 py-2 rounded-xl bg-slate-100 dark:bg-slate-900 text-xs text-slate-600 dark:text-slate-400 border border-slate-200 dark:border-slate-800 font-mono">
-              Recursive shadowRoot Walker
-            </div>
           </div>
 
         </div>

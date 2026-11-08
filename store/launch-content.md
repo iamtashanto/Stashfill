@@ -59,7 +59,7 @@ Extensions like FakeFiller are wonderful for QA testing with random data, but wh
 4. **Heuristic Matcher**: Combines autocomplete tokens, input types, camelCase/snake_case tokenization, labels, placeholders, aria-labels, and synonym dictionaries (English and Bangla at launch).
 
 Code is on GitHub under MIT: https://github.com/stashfill/stashfill
-Landing page: https://stashfill.org
+Landing page: https://stashfill.tashanto.com
 
 Would love to hear your thoughts, feedback, and edge-case form bug reports!
 
@@ -159,6 +159,6 @@ Would love to hear your thoughts, feedback, and edge-case form bug reports!
 >
 > এক্সটেনশনটি সম্পূর্ণ ফ্রি এবং MIT লাইসেন্সে ওপেন-সোর্স:  
 > 🔗 **গিটহাব রিপোজিটরি**: https://github.com/stashfill/stashfill  
-> 🌐 **ওয়েবসাইট**: https://stashfill.org
+> 🌐 **ওয়েবসাইট**: https://stashfill.tashanto.com
 >
 > আপনাদের গঠনমূলক মতামত ও পরামর্শ সাদরে প্রত্যাশিত! ধন্যবাদ।

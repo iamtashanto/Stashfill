@@ -1,30 +1,47 @@
-import type { Metadata } from 'next';
+import type { Metadata, Viewport } from 'next';
 import './globals.css';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
 
-export const metadata: Metadata = {
-  title: 'Stashfill — Offline, No-Login, Privacy-First Autofill Extension',
-  description:
-    '1-Click offline autofill for your real data. Save identity profiles, addresses, dynamic snippets, and AES-256 encrypted cards locally. Zero trackers, zero network requests, Manifest V3 ready.',
-  keywords: [
-    'autofill extension',
-    'privacy autofill',
-    'offline form filler',
-    'chrome extension',
-    'firefox addon',
-    'react form autofill',
-    'shadow dom autofill',
-    'encrypted vault',
-    'bangla autofill',
-    'open source',
+export const viewport: Viewport = {
+  themeColor: [
+    { media: '(prefers-color-scheme: light)', color: '#ffffff' },
+    { media: '(prefers-color-scheme: dark)', color: '#08090d' },
   ],
-  authors: [{ name: 'Stashfill Team' }],
+  width: 'device-width',
+  initialScale: 1,
+};
+
+export const metadata: Metadata = {
+  title: {
+    default: 'Stashfill — 1-Click Offline Autofill for Your Real Data',
+    template: '%s | Stashfill',
+  },
+  description:
+    'The 100% offline, privacy-first autofill browser extension. Save your profiles, addresses, dynamic snippets, and AES-256 encrypted cards locally. Zero accounts, zero telemetry, Manifest V3 ready.',
+  keywords: [
+    'offline autofill extension',
+    'privacy form filler',
+    'React form autofill',
+    'Shadow DOM autofill',
+    'valueTracker autofill fix',
+    'Chrome autofill extension',
+    'Firefox MV3 autofill',
+    'encrypted card vault extension',
+    'bangla autofill extension',
+    'open source autofill',
+  ],
+  authors: [{ name: 'Stashfill Team', url: 'https://stashfill.org' }],
+  creator: 'Stashfill Team',
+  publisher: 'Stashfill',
   metadataBase: new URL('https://stashfill.org'),
+  alternates: {
+    canonical: '/',
+  },
   openGraph: {
-    title: 'Stashfill — Offline, No-Login, Privacy-First Autofill Extension',
+    title: 'Stashfill — 1-Click Offline Autofill for Your Real Data',
     description:
-      'Fill web forms in 1-click with your real personal data. 100% offline, zero accounts, zero analytics.',
+      'Fill web forms in 1-click. 100% offline, zero accounts, zero analytics. Reconciles React & Vue state in under 50ms.',
     url: 'https://stashfill.org',
     siteName: 'Stashfill',
     images: [
@@ -32,7 +49,7 @@ export const metadata: Metadata = {
         url: '/icon-128.png',
         width: 128,
         height: 128,
-        alt: 'Stashfill Icon',
+        alt: 'Stashfill Offline Autofill Icon',
       },
     ],
     locale: 'en_US',
@@ -50,6 +67,17 @@ export const metadata: Metadata = {
     shortcut: '/icon-32.png',
     apple: '/icon-128.png',
   },
+  robots: {
+    index: true,
+    follow: true,
+    googleBot: {
+      index: true,
+      follow: true,
+      'max-video-preview': -1,
+      'max-image-preview': 'large',
+      'max-snippet': -1,
+    },
+  },
 };
 
 export default function RootLayout({
@@ -57,9 +85,35 @@ export default function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const applicationSchema = {
+    '@context': 'https://schema.org',
+    '@type': 'SoftwareApplication',
+    name: 'Stashfill',
+    operatingSystem: 'Chrome, Chromium, Firefox, Edge, Safari',
+    applicationCategory: 'BrowserExtension',
+    offers: {
+      '@type': 'Offer',
+      price: '0.00',
+      priceCurrency: 'USD',
+    },
+    description:
+      'Offline, no-login, privacy-first autofill and quick-paste browser extension. Saves identity profiles, addresses, dynamic snippets, and AES-256 encrypted cards locally.',
+    softwareVersion: '1.0.0',
+    license: 'https://opensource.org/licenses/MIT',
+    author: {
+      '@type': 'Organization',
+      name: 'Stashfill Team',
+      url: 'https://stashfill.org',
+    },
+  };
+
   return (
     <html lang="en" suppressHydrationWarning className="dark">
       <head>
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(applicationSchema) }}
+        />
         <script
           dangerouslySetInnerHTML={{
             __html: `
@@ -75,7 +129,7 @@ export default function RootLayout({
           }}
         />
       </head>
-      <body className="min-h-screen flex flex-col bg-white dark:bg-[#080c14] text-slate-900 dark:text-slate-100 antialiased selection:bg-brand-500 selection:text-white">
+      <body className="min-h-screen flex flex-col bg-white dark:bg-[#08090d] text-zinc-900 dark:text-zinc-100 antialiased selection:bg-indigo-600 selection:text-white">
         <Navbar />
         <main className="flex-1">{children}</main>
         <Footer />

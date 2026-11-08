@@ -380,6 +380,64 @@ describe('DOM Filler Engine, Card Rules, Snippets, and Context Menu Triggers', (
     const cardEntry = httpsMenu.find((m) => m.id === 'stashfill-card:c1');
     expect(cardEntry).toBeDefined();
     expect(cardEntry?.title).toBe('Fill card: VISA •••• 0366');
+
+    // 4. Multiple profiles -> default profile directly listed, other profiles as submenus
+    const workProf: Profile = {
+      id: 'prof_work',
+      name: 'Work',
+      fields: [
+        {
+          id: 'f_w1',
+          label: 'Work Email',
+          key: 'work_email',
+          value: 'ada@work.com',
+          type: 'email',
+          category: 'work',
+          tags: [],
+          sensitive: false,
+          createdAt: 1000,
+          updatedAt: 1000,
+          useCount: 10,
+          lastUsedAt: 1000,
+        },
+      ],
+      createdAt: 1000,
+      updatedAt: 1000,
+    };
+    const multiProfileMenu = buildContextMenuDescriptors({
+      profiles: [prof, workProf],
+      settings: DEFAULT_SETTINGS,
+      vaultInitialized: true,
+      vaultUnlocked: true,
+      cards: [],
+      isHttpsPage: true,
+      activeProfileId: prof.id,
+    });
+
+    // Default profile fields are direct children of stashfill-root
+    const defaultFields = multiProfileMenu.filter(
+      (m) => m.parentId === 'stashfill-root' && m.id.startsWith(`stashfill-field:${prof.id}:`),
+    );
+    expect(defaultFields.length).toBeGreaterThan(0);
+
+    // Work profile has its own submenu under stashfill-root
+    const workSubmenu = multiProfileMenu.find((m) => m.id === 'stashfill-profile-sub:prof_work');
+    expect(workSubmenu).toBeDefined();
+    expect(workSubmenu?.title).toBe('Work');
+    expect(workSubmenu?.parentId).toBe('stashfill-root');
+
+    // Inside Work submenu: fill form action, work email field, and switch profile action
+    const workFill = multiProfileMenu.find((m) => m.id === 'stashfill-fill-profile:prof_work');
+    expect(workFill?.parentId).toBe('stashfill-profile-sub:prof_work');
+    expect(workFill?.title).toBe('Fill this form (Work)');
+
+    const workEmailField = multiProfileMenu.find((m) => m.id === 'stashfill-field:prof_work:f_w1');
+    expect(workEmailField?.parentId).toBe('stashfill-profile-sub:prof_work');
+    expect(workEmailField?.title).toBe('Work Email');
+
+    const workSwitch = multiProfileMenu.find((m) => m.id === 'stashfill-switch-profile:prof_work');
+    expect(workSwitch?.parentId).toBe('stashfill-profile-sub:prof_work');
+    expect(workSwitch?.title).toBe('Switch active to Work');
   });
 
   it('directly tests helper functions: isElementHiddenOrHoneypot, isFillable, isElementNonEmpty, normalizeDateValue, setNativeInputValue, highlightFilledElement, hasCrossOriginPaymentIframe, copyCardNumberWithAutoClear', async () => {
