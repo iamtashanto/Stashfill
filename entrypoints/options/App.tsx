@@ -33,6 +33,7 @@ import { CardForm } from '../../src/components/CardForm';
 import { OnboardingWizard } from '../../src/components/OnboardingWizard';
 import { Toast, type ToastMessage } from '../../src/components/Toast';
 import { ConfirmModal } from '../../src/components/ConfirmModal';
+import { StashfillLogo } from '../../src/components/StashfillLogo';
 
 type Tab = 'profiles' | 'snippets' | 'vault' | 'siteRules' | 'backup' | 'settings';
 
@@ -813,12 +814,7 @@ export function App({ repository, vaultMgr, defaultOpenOnboarding = false }: Opt
       <header class="sticky top-0 z-30 border-b border-slate-200/80 bg-white/95 backdrop-blur-md dark:border-slate-800 dark:bg-slate-900/90">
         <div class="mx-auto flex h-14 md:h-16 max-w-6xl items-center justify-between px-3 sm:px-6">
           <div class="flex items-center gap-2.5 sm:gap-3">
-            <div
-              aria-hidden="true"
-              class="flex h-8 w-8 sm:h-9 sm:w-9 items-center justify-center rounded-xl bg-gradient-to-br from-brand-600 to-indigo-600 text-xs sm:text-sm font-black tracking-tight text-white shadow-xs"
-            >
-              SF
-            </div>
+            <StashfillLogo size={36} hasGlow />
             <div>
               <div class="flex items-center gap-1.5 sm:gap-2">
                 <h1 class="text-sm sm:text-base font-bold leading-none text-slate-900 dark:text-white">

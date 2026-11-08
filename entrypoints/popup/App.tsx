@@ -17,6 +17,7 @@ import { getTranslations, formatString, type Language } from '../../src/i18n';
 import { StashItemRow } from '../../src/components/StashItemRow';
 import { CardBrandIcon } from '../../src/components/CardBrandIcon';
 import { Toast, type ToastMessage } from '../../src/components/Toast';
+import { StashfillLogo } from '../../src/components/StashfillLogo';
 
 export interface PopupProps {
   repository?: StashRepository;
@@ -140,11 +141,12 @@ export function App({ repository, vaultMgr }: PopupProps = {}) {
     document.documentElement.lang = nextLang;
   };
 
-  const openOptionsPage = () => {
-    if (browser?.runtime?.openOptionsPage) {
-      browser.runtime.openOptionsPage();
-    } else if (browser?.runtime?.getURL) {
-      window.open(browser.runtime.getURL('/options.html'));
+  const openOptionsPage = async () => {
+    const url = browser?.runtime?.getURL ? browser.runtime.getURL('/options.html') : '/options.html';
+    if (browser?.tabs?.create) {
+      await browser.tabs.create({ url });
+    } else {
+      window.open(url, '_blank');
     }
   };
 
@@ -603,14 +605,7 @@ export function App({ repository, vaultMgr }: PopupProps = {}) {
       {/* Header */}
       <header class="flex shrink-0 items-center justify-between border-b border-slate-200/80 bg-white px-3.5 py-2.5 shadow-2xs dark:border-slate-800 dark:bg-slate-900/90">
         <div class="flex items-center gap-2">
-          <div
-            aria-hidden="true"
-            class="flex h-6 w-6 items-center justify-center rounded-lg bg-gradient-to-br from-brand-600 to-indigo-600 text-xs font-bold text-white shadow-xs"
-          >
-            <svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.2" d="M13 10V3L4 14h7v7l9-11h-7z" />
-            </svg>
-          </div>
+          <StashfillLogo size={24} />
           <span class="text-sm font-bold tracking-tight text-slate-900 dark:text-white">
             {t.appName}
           </span>

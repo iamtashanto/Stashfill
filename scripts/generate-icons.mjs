@@ -48,14 +48,12 @@ function createPngChunk(type, data) {
 function renderStashfillIcon(size) {
   const width = size;
   const height = size;
-  // RGBA buffer: (width * 4 + 1 filter byte) per row
   const stride = width * 4 + 1;
   const rawData = Buffer.alloc(stride * height);
 
   const setPixel = (x, y, r, g, b, a = 255) => {
     if (x < 0 || x >= width || y < 0 || y >= height) return;
     const offset = y * stride + 1 + x * 4;
-    // Simple alpha blending
     const curA = rawData[offset + 3] / 255;
     const newA = a / 255;
     const outA = newA + curA * (1 - newA);
@@ -69,104 +67,116 @@ function renderStashfillIcon(size) {
 
   const scale = size / 128;
 
-  // Background rounded rectangle (Indigo gradient: #4f46e5 to #6366f1)
-  const bgX = 8 * scale;
-  const bgY = 8 * scale;
-  const bgW = 112 * scale;
-  const bgH = 112 * scale;
+  // Background rounded squircle (Deep Indigo #4f46e5 to Royal Violet #7c3aed)
+  const bgX = 12 * scale;
+  const bgY = 12 * scale;
+  const bgW = 104 * scale;
+  const bgH = 104 * scale;
   const bgR = 28 * scale;
 
   for (let y = 0; y < height; y++) {
     for (let x = 0; x < width; x++) {
-      // Check rounded rect distance
       const dx = Math.max(bgX + bgR - x, 0, x - (bgX + bgW - bgR));
       const dy = Math.max(bgY + bgR - y, 0, y - (bgY + bgH - bgR));
       const dist = Math.sqrt(dx * dx + dy * dy);
       if (dist <= bgR) {
-        // Linear gradient between #4f46e5 (79, 70, 229) and #6366f1 (99, 102, 241)
         const t = (x + y) / (width + height);
-        const r = Math.round(79 + t * (99 - 79));
-        const g = Math.round(70 + t * (102 - 70));
-        const b = Math.round(229 + t * (241 - 229));
+        const r = Math.round(79 + t * (124 - 79));
+        const g = Math.round(70 + t * (58 - 70));
+        const b = Math.round(229 + t * (237 - 229));
         const alpha = Math.min(255, Math.max(0, Math.round((bgR - dist + 0.5) * 255)));
         setPixel(x, y, r, g, b, alpha);
       }
     }
   }
 
-  // White Shackle (arch at x:44..84, y:16..44)
-  const shackleStroke = Math.max(1, Math.round(8 * scale));
-  const cx = 64 * scale;
-  const shackleRadius = 20 * scale;
-  const shackleTopY = 32 * scale;
-
-  for (let y = Math.floor(16 * scale); y <= Math.ceil(48 * scale); y++) {
-    for (let x = Math.floor(36 * scale); x <= Math.ceil(92 * scale); x++) {
-      if (y <= shackleTopY) {
-        const d = Math.abs(Math.sqrt((x - cx) ** 2 + (y - shackleTopY) ** 2) - shackleRadius);
-        if (d <= shackleStroke / 2) {
-          setPixel(x, y, 255, 255, 255, 255);
-        }
-      } else {
-        // Vertical shackle bars
-        const leftDist = Math.abs(x - (cx - shackleRadius));
-        const rightDist = Math.abs(x - (cx + shackleRadius));
-        if (leftDist <= shackleStroke / 2 || rightDist <= shackleStroke / 2) {
-          setPixel(x, y, 255, 255, 255, 255);
+  // Draw rounded card helper
+  const drawCard = (cx, cy, cw, ch, cr, r, g, b, a) => {
+    for (let y = Math.floor(cy); y <= Math.ceil(cy + ch); y++) {
+      for (let x = Math.floor(cx); x <= Math.ceil(cx + cw); x++) {
+        const dx = Math.max(cx + cr - x, 0, x - (cx + cw - cr));
+        const dy = Math.max(cy + cr - y, 0, y - (cy + ch - cr));
+        const dist = Math.sqrt(dx * dx + dy * dy);
+        if (dist <= cr) {
+          const edgeAlpha = Math.min(1, Math.max(0, cr - dist + 0.5));
+          setPixel(x, y, r, g, b, Math.round(a * edgeAlpha));
         }
       }
     }
-  }
+  };
 
-  // Vault White Box (x:28, y:44, w:72, h:52, rx:12)
-  const boxX = 28 * scale;
-  const boxY = 44 * scale;
-  const boxW = 72 * scale;
-  const boxH = 52 * scale;
-  const boxR = 12 * scale;
+  // Back Stash Card (Layer 1)
+  drawCard(36 * scale, 38 * scale, 56 * scale, 32 * scale, 7 * scale, 255, 255, 255, 70);
 
-  for (let y = Math.floor(boxY); y <= Math.ceil(boxY + boxH); y++) {
-    for (let x = Math.floor(boxX); x <= Math.ceil(boxX + boxW); x++) {
-      const dx = Math.max(boxX + boxR - x, 0, x - (boxX + boxW - boxR));
-      const dy = Math.max(boxY + boxR - y, 0, y - (boxY + boxH - boxR));
-      const dist = Math.sqrt(dx * dx + dy * dy);
-      if (dist <= boxR) {
-        setPixel(x, y, 255, 255, 255, 245);
+  // Mid Stash Card (Layer 2)
+  drawCard(36 * scale, 44 * scale, 56 * scale, 34 * scale, 7 * scale, 255, 255, 255, 120);
+
+  // Front Vault Card (Layer 3 - Solid Clean White)
+  drawCard(36 * scale, 50 * scale, 56 * scale, 42 * scale, 8 * scale, 255, 255, 255, 250);
+
+  // Microchip Accent (Gold-Indigo Microchip)
+  drawCard(43 * scale, 58 * scale, 13 * scale, 11 * scale, 2.5 * scale, 79, 70, 229, 230);
+
+  // Fill Lightning / Arrow (Swift fill symbol)
+  // Polygon vertices: [75, 55], [64, 71], [72, 71], [67, 87], [83, 69], [75, 69], [78, 55]
+  const poly = [
+    [75, 55],
+    [64, 71],
+    [72, 71],
+    [67, 87],
+    [83, 69],
+    [75, 69],
+    [78, 55],
+  ].map(([px, py]) => [px * scale, py * scale]);
+
+  const minX = Math.floor(62 * scale);
+  const maxX = Math.ceil(85 * scale);
+  const minY = Math.floor(54 * scale);
+  const maxY = Math.ceil(89 * scale);
+
+  const pointInPoly = (px, py) => {
+    let inside = false;
+    for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
+      const xi = poly[i][0],
+        yi = poly[i][1];
+      const xj = poly[j][0],
+        yj = poly[j][1];
+      const intersect = yi > py !== yj > py && px < ((xj - xi) * (py - yi)) / (yj - yi) + xi;
+      if (intersect) inside = !inside;
+    }
+    return inside;
+  };
+
+  for (let y = minY; y <= maxY; y++) {
+    for (let x = minX; x <= maxX; x++) {
+      if (pointInPoly(x + 0.5, y + 0.5)) {
+        setPixel(x, y, 99, 102, 241, 255);
       }
     }
   }
 
-  // Keyhole circle & rect in indigo (#4f46e5)
-  const keyholeY = 66 * scale;
-  const keyholeR = Math.max(1, 6 * scale);
-  for (let y = Math.floor(keyholeY - keyholeR); y <= Math.ceil(keyholeY + keyholeR * 2.2); y++) {
-    for (let x = Math.floor(cx - keyholeR); x <= Math.ceil(cx + keyholeR); x++) {
-      const dist = Math.sqrt((x - cx) ** 2 + (y - keyholeY) ** 2);
-      const isRect =
-        y >= keyholeY && y <= keyholeY + 14 * scale && Math.abs(x - cx) <= Math.max(1, 3 * scale);
-      if (dist <= keyholeR || isRect) {
-        setPixel(x, y, 79, 70, 229, 255);
-      }
-    }
-  }
+  // Green Privacy Status Badge (Offline Mode) at top-right
+  const badgeX = 94 * scale;
+  const badgeY = 34 * scale;
+  const badgeR = Math.max(1.5, 5.5 * scale);
 
-  // Green privacy badge (#10b981) at top-right (cx: 92, cy: 36, r: 6)
-  const badgeX = 92 * scale;
-  const badgeY = 36 * scale;
-  const badgeR = Math.max(1.5, 6 * scale);
-  for (let y = Math.floor(badgeY - badgeR); y <= Math.ceil(badgeY + badgeR); y++) {
-    for (let x = Math.floor(badgeX - badgeR); x <= Math.ceil(badgeX + badgeR); x++) {
+  for (let y = Math.floor(badgeY - badgeR - 2); y <= Math.ceil(badgeY + badgeR + 2); y++) {
+    for (let x = Math.floor(badgeX - badgeR - 2); x <= Math.ceil(badgeX + badgeR + 2); x++) {
       const dist = Math.sqrt((x - badgeX) ** 2 + (y - badgeY) ** 2);
-      if (dist <= badgeR) {
-        setPixel(x, y, 16, 185, 129, 255);
+      if (dist <= badgeR + 1.2 * scale) {
+        if (dist > badgeR) {
+          // White border ring
+          setPixel(x, y, 255, 255, 255, 255);
+        } else {
+          // Emerald Green core (#10b981)
+          setPixel(x, y, 16, 185, 129, 255);
+        }
       }
     }
   }
 
   // Assemble PNG File
   const pngSignature = Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]);
-
-  // IHDR: width, height, 8 bit, RGBA (6), deflated (0), filter (0), no interlace (0)
   const ihdrData = Buffer.alloc(13);
   ihdrData.writeUInt32BE(width, 0);
   ihdrData.writeUInt32BE(height, 4);
@@ -176,12 +186,8 @@ function renderStashfillIcon(size) {
   ihdrData[11] = 0;
   ihdrData[12] = 0;
   const ihdrChunk = createPngChunk('IHDR', ihdrData);
-
-  // IDAT: deflated raw pixel scanlines
   const compressedData = deflateSync(rawData, { level: 9 });
   const idatChunk = createPngChunk('IDAT', compressedData);
-
-  // IEND
   const iendChunk = createPngChunk('IEND', Buffer.alloc(0));
 
   return Buffer.concat([pngSignature, ihdrChunk, idatChunk, iendChunk]);
@@ -194,7 +200,7 @@ for (const size of SIZES) {
   const png = renderStashfillIcon(size);
   const outPath = join(ICONS_DIR, `icon-${size}.png`);
   writeFileSync(outPath, png);
-  console.log(`  -> Generated icon-${size}.png (${png.length} bytes)`);
+  console.log(`Generated: public/icons/icon-${size}.png (${png.length} bytes)`);
 }
 
-console.log('Icons generated successfully.\n');
+console.log('Icon generation successfully completed.');

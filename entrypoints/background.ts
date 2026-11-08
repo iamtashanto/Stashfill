@@ -166,9 +166,8 @@ export default defineBackground(() => {
       menuId === 'stashfill-open-options' ||
       menuId === 'stashfill-unlock-vault'
     ) {
-      if (browser.runtime.openOptionsPage) {
-        await browser.runtime.openOptionsPage();
-      }
+      const url = browser.runtime.getURL('/options.html');
+      await browser.tabs.create({ url });
       return;
     }
 
@@ -180,9 +179,8 @@ export default defineBackground(() => {
     }
 
     if (menuId === 'stashfill-open-popup') {
-      if (browser.runtime.openOptionsPage) {
-        await browser.runtime.openOptionsPage();
-      }
+      const url = browser.runtime.getURL('/options.html');
+      await browser.tabs.create({ url });
       return;
     }
 
