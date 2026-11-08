@@ -177,6 +177,27 @@ export function App({ repository, vaultMgr, defaultOpenOnboarding = false }: Opt
     }
   };
 
+  const handleToggleTheme = async () => {
+    const nextTheme = settings.theme === 'dark' ? 'light' : 'dark';
+    const updated = await repo.updateSettings({ theme: nextTheme });
+    setSettings(updated);
+    applyTheme(nextTheme);
+  };
+
+  const handleToggleLanguage = async () => {
+    const nextLang = settings.language === 'en' ? 'bn' : 'en';
+    const updated = await repo.updateSettings({ language: nextLang });
+    setSettings(updated);
+    document.documentElement.lang = nextLang;
+  };
+
+  const totalSavedFields = useMemo(() => {
+    return profiles.reduce(
+      (sum, p) => sum + p.fields.filter((f) => f.value && f.value.trim().length > 0).length,
+      0,
+    );
+  }, [profiles]);
+
   const allCategories = useMemo(() => {
     const custom = settings.customCategories ?? [];
     const fieldCats = profileForm?.fields.map((f) => f.category).filter(Boolean) ?? [];
@@ -733,38 +754,97 @@ export function App({ repository, vaultMgr, defaultOpenOnboarding = false }: Opt
       class="flex min-h-screen flex-col bg-slate-50 font-sans text-slate-900 dark:bg-slate-950 dark:text-slate-100"
     >
       {/* Top Bar */}
-      <header class="sticky top-0 z-30 border-b border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900">
+      <header class="sticky top-0 z-30 border-b border-slate-200/80 bg-white/95 backdrop-blur-md dark:border-slate-800 dark:bg-slate-900/90">
         <div class="mx-auto flex h-16 max-w-6xl items-center justify-between px-4 sm:px-6">
           <div class="flex items-center gap-3">
             <div
               aria-hidden="true"
-              class="flex h-8 w-8 items-center justify-center rounded-lg bg-brand-600 text-sm font-bold tracking-tight text-white"
+              class="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-brand-600 to-indigo-600 text-sm font-black tracking-tight text-white shadow-xs"
             >
               SF
             </div>
             <div>
-              <h1 class="text-base font-bold leading-none text-slate-900 dark:text-white">
-                {t.appName}
-              </h1>
-              <p class="mt-0.5 text-xs text-slate-600 dark:text-slate-300">{t.tagline}</p>
+              <div class="flex items-center gap-2">
+                <h1 class="text-base font-bold leading-none text-slate-900 dark:text-white">
+                  {t.appName}
+                </h1>
+                <span class="rounded-full bg-brand-50 px-2 py-0.5 text-[10px] font-semibold text-brand-700 dark:bg-brand-950/60 dark:text-brand-300">
+                  v1.0.0
+                </span>
+              </div>
+              <p class="mt-0.5 text-xs text-slate-500 dark:text-slate-400">{t.tagline}</p>
             </div>
           </div>
 
-          <div class="flex items-center gap-3">
+          <div class="flex items-center gap-2.5">
             {!settings.onboardingCompleted && (
               <button
                 type="button"
                 onClick={() => setIsOnboardingOpen(true)}
-                class="rounded-md border border-brand-300 bg-brand-50 px-2.5 py-1 text-xs font-semibold text-brand-800 hover:bg-brand-100 dark:border-brand-700 dark:bg-brand-950 dark:text-brand-200"
+                class="cursor-pointer rounded-lg border border-brand-300 bg-brand-50 px-2.5 py-1 text-xs font-semibold text-brand-800 transition-colors hover:bg-brand-100 dark:border-brand-700 dark:bg-brand-950 dark:text-brand-200"
               >
                 {t.settings.reopenOnboarding}
               </button>
             )}
-            <span class="inline-flex items-center rounded-md bg-emerald-100 px-2.5 py-1 text-xs font-semibold text-emerald-900 dark:bg-emerald-950 dark:text-emerald-200">
-              <span
-                class="me-1.5 h-1.5 w-1.5 rounded-full bg-emerald-600"
-                aria-hidden="true"
-              ></span>
+
+            {/* Language Switcher */}
+            <button
+              type="button"
+              onClick={handleToggleLanguage}
+              title={t.settings.language}
+              aria-label={t.settings.language}
+              class="cursor-pointer rounded-lg border border-slate-200 bg-slate-50 px-2 py-1 text-xs font-semibold text-slate-700 transition-colors hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700"
+            >
+              {settings.language === 'en' ? 'বাংলা' : 'EN'}
+            </button>
+
+            {/* Theme Switcher */}
+            <button
+              type="button"
+              onClick={handleToggleTheme}
+              title={t.settings.theme}
+              aria-label={t.settings.theme}
+              class="cursor-pointer rounded-lg border border-slate-200 bg-slate-50 p-1.5 text-slate-700 transition-colors hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700"
+            >
+              {settings.theme === 'dark' ? (
+                <svg
+                  class="h-4 w-4 text-amber-400"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                  aria-hidden="true"
+                >
+                  <path
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    stroke-width="2"
+                    d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"
+                  />
+                </svg>
+              ) : (
+                <svg
+                  class="h-4 w-4"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                  aria-hidden="true"
+                >
+                  <path
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    stroke-width="2"
+                    d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"
+                  />
+                </svg>
+              )}
+            </button>
+
+            {/* Offline Assurance Badge */}
+            <span class="inline-flex items-center gap-1.5 rounded-full border border-emerald-200/80 bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-800 dark:border-emerald-800/40 dark:bg-emerald-950/40 dark:text-emerald-300">
+              <span class="relative flex h-2 w-2">
+                <span class="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75"></span>
+                <span class="relative inline-flex h-2 w-2 rounded-full bg-emerald-500"></span>
+              </span>
               {t.settings.privacyNote.split('.')[0]}
             </span>
           </div>
@@ -772,90 +852,224 @@ export function App({ repository, vaultMgr, defaultOpenOnboarding = false }: Opt
       </header>
 
       {/* Main Container */}
-      <div class="mx-auto grid w-full max-w-6xl flex-1 grid-cols-1 gap-8 px-4 py-8 sm:px-6 md:grid-cols-4">
-        {/* Navigation Sidebar */}
-        <nav aria-label={t.settings.title} class="space-y-1 md:col-span-1">
-          <button
-            type="button"
-            onClick={() => setActiveTab('profiles')}
-            aria-current={activeTab === 'profiles' ? 'page' : undefined}
-            class={`flex w-full items-center gap-2.5 rounded-lg px-3.5 py-2.5 text-start text-sm font-medium transition-colors ${
-              activeTab === 'profiles'
-                ? 'bg-brand-50 text-brand-800 dark:bg-brand-950/70 dark:text-brand-200'
-                : 'text-slate-700 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-900'
-            }`}
-          >
-            <span>{t.settings.profilesTitle}</span>
-          </button>
+      <div class="mx-auto w-full max-w-6xl flex-1 px-4 py-6 sm:px-6">
+        {/* Top Stats Overview */}
+        <div class="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
+          <div class="rounded-xl border border-slate-200/80 bg-white p-3.5 shadow-2xs dark:border-slate-800 dark:bg-slate-900">
+            <span class="text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+              {t.settings.activeProfile}
+            </span>
+            <div class="mt-1 flex items-center gap-1.5 text-sm font-bold text-slate-900 dark:text-white">
+              <span>{profileForm?.name || 'Personal'}</span>
+              <span class="text-amber-500">★</span>
+            </div>
+            <p class="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
+              {profileForm?.fields?.length || 0} fields configured
+            </p>
+          </div>
 
-          <button
-            type="button"
-            onClick={() => setActiveTab('snippets')}
-            aria-current={activeTab === 'snippets' ? 'page' : undefined}
-            class={`flex w-full items-center gap-2.5 rounded-lg px-3.5 py-2.5 text-start text-sm font-medium transition-colors ${
-              activeTab === 'snippets'
-                ? 'bg-brand-50 text-brand-800 dark:bg-brand-950/70 dark:text-brand-200'
-                : 'text-slate-700 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-900'
-            }`}
-          >
-            <span>{t.snippets.title}</span>
-          </button>
+          <div class="rounded-xl border border-slate-200/80 bg-white p-3.5 shadow-2xs dark:border-slate-800 dark:bg-slate-900">
+            <span class="text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+              {t.vault.title}
+            </span>
+            <div class="mt-1 flex items-center gap-1.5 text-sm font-bold text-slate-900 dark:text-white">
+              <span
+                class={`h-2 w-2 rounded-full ${
+                  vaultInitialized
+                    ? vaultUnlocked
+                      ? 'bg-emerald-500'
+                      : 'bg-amber-500'
+                    : 'bg-slate-400'
+                }`}
+              ></span>
+              <span>
+                {vaultInitialized
+                  ? vaultUnlocked
+                    ? t.actions.unlock
+                    : t.actions.lock
+                  : 'Unconfigured'}
+              </span>
+            </div>
+            <p class="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
+              {cards.length} cards protected
+            </p>
+          </div>
 
-          <button
-            type="button"
-            onClick={() => setActiveTab('vault')}
-            aria-current={activeTab === 'vault' ? 'page' : undefined}
-            class={`flex w-full items-center gap-2.5 rounded-lg px-3.5 py-2.5 text-start text-sm font-medium transition-colors ${
-              activeTab === 'vault'
-                ? 'bg-brand-50 text-brand-800 dark:bg-brand-950/70 dark:text-brand-200'
-                : 'text-slate-700 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-900'
-            }`}
-          >
-            <span>{t.vault.title}</span>
-          </button>
+          <div class="rounded-xl border border-slate-200/80 bg-white p-3.5 shadow-2xs dark:border-slate-800 dark:bg-slate-900">
+            <span class="text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+              {t.snippets.title}
+            </span>
+            <div class="mt-1 text-sm font-bold text-slate-900 dark:text-white">
+              {snippets.length} Triggers
+            </div>
+            <p class="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
+              Prefix: <span class="font-mono font-semibold">{settings.snippetTriggerPrefix || ';'}</span>
+            </p>
+          </div>
 
-          <button
-            type="button"
-            onClick={() => setActiveTab('siteRules')}
-            aria-current={activeTab === 'siteRules' ? 'page' : undefined}
-            class={`flex w-full items-center gap-2.5 rounded-lg px-3.5 py-2.5 text-start text-sm font-medium transition-colors ${
-              activeTab === 'siteRules'
-                ? 'bg-brand-50 text-brand-800 dark:bg-brand-950/70 dark:text-brand-200'
-                : 'text-slate-700 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-900'
-            }`}
-          >
-            <span>{t.siteRules.title}</span>
-          </button>
+          <div class="rounded-xl border border-slate-200/80 bg-white p-3.5 shadow-2xs dark:border-slate-800 dark:bg-slate-900">
+            <span class="text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+              Privacy Mode
+            </span>
+            <div class="mt-1 flex items-center gap-1 text-sm font-bold text-emerald-600 dark:text-emerald-400">
+              <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+              </svg>
+              <span>100% Offline</span>
+            </div>
+            <p class="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
+              Zero network requests
+            </p>
+          </div>
+        </div>
 
-          <button
-            type="button"
-            onClick={() => setActiveTab('backup')}
-            aria-current={activeTab === 'backup' ? 'page' : undefined}
-            class={`flex w-full items-center gap-2.5 rounded-lg px-3.5 py-2.5 text-start text-sm font-medium transition-colors ${
-              activeTab === 'backup'
-                ? 'bg-brand-50 text-brand-800 dark:bg-brand-950/70 dark:text-brand-200'
-                : 'text-slate-700 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-900'
-            }`}
-          >
-            <span>{t.settings.exportImportTitle}</span>
-          </button>
+        <div class="grid grid-cols-1 gap-6 md:grid-cols-4">
+          {/* Navigation Sidebar */}
+          <nav aria-label={t.settings.title} class="space-y-1.5 md:col-span-1">
+            <button
+              type="button"
+              onClick={() => setActiveTab('profiles')}
+              aria-current={activeTab === 'profiles' ? 'page' : undefined}
+              class={`flex w-full cursor-pointer items-center justify-between rounded-xl px-3.5 py-2.5 text-start text-sm font-medium transition-all ${
+                activeTab === 'profiles'
+                  ? 'bg-brand-600 text-white shadow-xs'
+                  : 'text-slate-700 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-900'
+              }`}
+            >
+              <div class="flex items-center gap-2.5">
+                <svg class="h-4 w-4 opacity-80" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                </svg>
+                <span>{t.settings.profilesTitle}</span>
+              </div>
+              <span
+                class={`rounded-full px-2 py-0.5 text-[10px] font-bold ${
+                  activeTab === 'profiles'
+                    ? 'bg-white/20 text-white'
+                    : 'bg-slate-200/70 text-slate-700 dark:bg-slate-800 dark:text-slate-300'
+                }`}
+              >
+                {profiles.length}
+              </span>
+            </button>
 
-          <button
-            type="button"
-            onClick={() => setActiveTab('settings')}
-            aria-current={activeTab === 'settings' ? 'page' : undefined}
-            class={`flex w-full items-center gap-2.5 rounded-lg px-3.5 py-2.5 text-start text-sm font-medium transition-colors ${
-              activeTab === 'settings'
-                ? 'bg-brand-50 text-brand-800 dark:bg-brand-950/70 dark:text-brand-200'
-                : 'text-slate-700 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-900'
-            }`}
-          >
-            <span>{t.settings.title}</span>
-          </button>
-        </nav>
+            <button
+              type="button"
+              onClick={() => setActiveTab('snippets')}
+              aria-current={activeTab === 'snippets' ? 'page' : undefined}
+              class={`flex w-full cursor-pointer items-center justify-between rounded-xl px-3.5 py-2.5 text-start text-sm font-medium transition-all ${
+                activeTab === 'snippets'
+                  ? 'bg-brand-600 text-white shadow-xs'
+                  : 'text-slate-700 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-900'
+              }`}
+            >
+              <div class="flex items-center gap-2.5">
+                <svg class="h-4 w-4 opacity-80" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
+                </svg>
+                <span>{t.snippets.title}</span>
+              </div>
+              <span
+                class={`rounded-full px-2 py-0.5 text-[10px] font-bold ${
+                  activeTab === 'snippets'
+                    ? 'bg-white/20 text-white'
+                    : 'bg-slate-200/70 text-slate-700 dark:bg-slate-800 dark:text-slate-300'
+                }`}
+              >
+                {snippets.length}
+              </span>
+            </button>
 
-        {/* Content Pane */}
-        <main class="rounded-xl border border-slate-200 bg-white p-6 dark:border-slate-800 dark:bg-slate-900 md:col-span-3">
+            <button
+              type="button"
+              onClick={() => setActiveTab('vault')}
+              aria-current={activeTab === 'vault' ? 'page' : undefined}
+              class={`flex w-full cursor-pointer items-center justify-between rounded-xl px-3.5 py-2.5 text-start text-sm font-medium transition-all ${
+                activeTab === 'vault'
+                  ? 'bg-brand-600 text-white shadow-xs'
+                  : 'text-slate-700 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-900'
+              }`}
+            >
+              <div class="flex items-center gap-2.5">
+                <svg class="h-4 w-4 opacity-80" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                </svg>
+                <span>{t.vault.title}</span>
+              </div>
+              <span
+                class={`rounded-full px-2 py-0.5 text-[10px] font-bold ${
+                  activeTab === 'vault'
+                    ? 'bg-white/20 text-white'
+                    : 'bg-slate-200/70 text-slate-700 dark:bg-slate-800 dark:text-slate-300'
+                }`}
+              >
+                {cards.length}
+              </span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setActiveTab('siteRules')}
+              aria-current={activeTab === 'siteRules' ? 'page' : undefined}
+              class={`flex w-full cursor-pointer items-center justify-between rounded-xl px-3.5 py-2.5 text-start text-sm font-medium transition-all ${
+                activeTab === 'siteRules'
+                  ? 'bg-brand-600 text-white shadow-xs'
+                  : 'text-slate-700 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-900'
+              }`}
+            >
+              <div class="flex items-center gap-2.5">
+                <svg class="h-4 w-4 opacity-80" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9" />
+                </svg>
+                <span>{t.siteRules.title}</span>
+              </div>
+              <span
+                class={`rounded-full px-2 py-0.5 text-[10px] font-bold ${
+                  activeTab === 'siteRules'
+                    ? 'bg-white/20 text-white'
+                    : 'bg-slate-200/70 text-slate-700 dark:bg-slate-800 dark:text-slate-300'
+                }`}
+              >
+                {siteRules.length}
+              </span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setActiveTab('backup')}
+              aria-current={activeTab === 'backup' ? 'page' : undefined}
+              class={`flex w-full cursor-pointer items-center gap-2.5 rounded-xl px-3.5 py-2.5 text-start text-sm font-medium transition-all ${
+                activeTab === 'backup'
+                  ? 'bg-brand-600 text-white shadow-xs'
+                  : 'text-slate-700 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-900'
+              }`}
+            >
+              <svg class="h-4 w-4 opacity-80" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+              </svg>
+              <span>{t.settings.exportImportTitle}</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setActiveTab('settings')}
+              aria-current={activeTab === 'settings' ? 'page' : undefined}
+              class={`flex w-full cursor-pointer items-center gap-2.5 rounded-xl px-3.5 py-2.5 text-start text-sm font-medium transition-all ${
+                activeTab === 'settings'
+                  ? 'bg-brand-600 text-white shadow-xs'
+                  : 'text-slate-700 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-900'
+              }`}
+            >
+              <svg class="h-4 w-4 opacity-80" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+              </svg>
+              <span>{t.settings.title}</span>
+            </button>
+          </nav>
+
+          {/* Content Pane */}
+          <main class="rounded-2xl border border-slate-200/80 bg-white p-6 shadow-2xs dark:border-slate-800 dark:bg-slate-900 md:col-span-3">
           {/* TAB 1: PROFILES & FIELDS */}
           {activeTab === 'profiles' && (
             <div class="space-y-6">
@@ -2306,6 +2520,7 @@ export function App({ repository, vaultMgr, defaultOpenOnboarding = false }: Opt
           )}
         </main>
       </div>
+    </div>
 
       {/* Onboarding Wizard */}
       <OnboardingWizard

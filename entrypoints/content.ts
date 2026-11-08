@@ -5,6 +5,7 @@ import {
   undoLastFill,
   extractFieldAttributes,
   isFillable,
+  collectFillableElements,
   copyCardNumberWithAutoClear,
   expandSnippetVariables,
   findMatchingSnippetTrigger,
@@ -311,8 +312,25 @@ export default defineContentScript({
         return active as FillableElement;
       }
 
+      // 4. Last focused element recorded by focusin listener
       if (lastFocusedElement && lastFocusedElement.isConnected) {
         return lastFocusedElement;
+      }
+
+      // 5. Fallback: single visible fillable input on page or currently active input
+      try {
+        const fillables = collectFillableElements(document.body || document.documentElement);
+        if (fillables.length === 1 && fillables[0]) {
+          return fillables[0];
+        }
+        const focused = document.querySelector(
+          'input:focus, textarea:focus',
+        ) as FillableElement | null;
+        if (focused && isFillable(focused)) {
+          return focused;
+        }
+      } catch {
+        // ignore DOM access errors in restricted contexts
       }
 
       return null;
@@ -324,8 +342,15 @@ export default defineContentScript({
       (ev) => {
         const path = ev.composedPath?.() || [];
         const firstEl = (path[0] as Element) || (ev.target as Element);
-        if (firstEl && isFillable(firstEl)) {
-          lastRightClickedElement = firstEl as FillableElement;
+        const fillable =
+          firstEl && isFillable(firstEl)
+            ? firstEl
+            : (firstEl?.closest?.(
+                'input, textarea, select, [contenteditable="true"]',
+              ) as Element | null);
+
+        if (fillable && isFillable(fillable)) {
+          lastRightClickedElement = fillable as FillableElement;
         } else {
           lastRightClickedElement = null;
         }

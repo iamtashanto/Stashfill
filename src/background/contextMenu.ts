@@ -16,6 +16,7 @@ export interface BuildContextMenuInput {
   vaultUnlocked: boolean;
   cards: PaymentCard[];
   isHttpsPage?: boolean;
+  activeProfileId?: string;
 }
 
 const MAX_FIELDS_PER_PROFILE = 12;
@@ -42,15 +43,22 @@ function formatFieldMenuTitle(field: Field, showPreviews: boolean): string {
 
 /**
  * Pure builder for Stashfill native right-click context menu items.
- * - Never replaces browser items; only adds a single top-level `Stashfill` item for editable contexts,
- *   `Save selection to Stashfill` for selection contexts, and `Open Stashfill` / `Settings` for page/action.
- * - Lists up to 12 most-used fields per profile.
+ * - Flat 1-level menu under `Stashfill` to comply with Chromium context menu limits.
+ * - Lists up to 12 most-used fields from the active profile directly under root for 1-click filling.
  * - Value previews are off by default and NEVER shown for sensitive fields.
- * - Cards are shown only when vault is unlocked and page is https, under a separate `Fill card` submenu.
- * - If vault is encrypted and locked, shows a single `Unlock Stashfill` item.
+ * - Cards are shown only when vault is unlocked and page is https, under a separate Fill card item.
+ * - If vault is encrypted and locked, shows an Unlock Stashfill item.
  */
 export function buildContextMenuDescriptors(input: BuildContextMenuInput): ContextMenuDescriptor[] {
-  const { profiles, settings, vaultInitialized, vaultUnlocked, cards, isHttpsPage = true } = input;
+  const {
+    profiles,
+    settings,
+    vaultInitialized,
+    vaultUnlocked,
+    cards,
+    isHttpsPage = true,
+    activeProfileId,
+  } = input;
 
   const items: ContextMenuDescriptor[] = [];
   const showPreviews = Boolean(settings.showMenuValuePreviews);
@@ -72,24 +80,22 @@ export function buildContextMenuDescriptors(input: BuildContextMenuInput): Conte
     });
   }
 
-  // Profile submenus (up to MAX_PROFILES_IN_MENU, then fallback to More...)
-  const visibleProfiles = profiles.slice(0, MAX_PROFILES_IN_MENU);
-  for (const profile of visibleProfiles) {
-    const profileMenuId = `stashfill-profile:${profile.id}`;
-    items.push({
-      id: profileMenuId,
-      parentId: 'stashfill-root',
-      title: profile.name,
-      contexts: ['editable'],
-    });
+  // Active profile
+  const activeProfile =
+    profiles.find((p) => p.id === activeProfileId) ||
+    profiles.find((p) => p.id === settings.defaultProfileId) ||
+    profiles[0] ||
+    null;
 
-    const sortedFields = sortFieldsByMostUsed(profile.fields);
+  if (activeProfile) {
+    const sortedFields = sortFieldsByMostUsed(activeProfile.fields);
     const topFields = sortedFields.slice(0, MAX_FIELDS_PER_PROFILE);
 
+    // Direct active profile fields under Stashfill root for 1-click paste
     for (const field of topFields) {
       items.push({
-        id: `stashfill-field:${profile.id}:${field.id}`,
-        parentId: profileMenuId,
+        id: `stashfill-field:${activeProfile.id}:${field.id}`,
+        parentId: 'stashfill-root',
         title: formatFieldMenuTitle(field, showPreviews),
         contexts: ['editable'],
       });
@@ -97,9 +103,9 @@ export function buildContextMenuDescriptors(input: BuildContextMenuInput): Conte
 
     if (sortedFields.length > MAX_FIELDS_PER_PROFILE) {
       items.push({
-        id: `stashfill-more-profile:${profile.id}`,
-        parentId: profileMenuId,
-        title: 'More...',
+        id: `stashfill-more-profile:${activeProfile.id}`,
+        parentId: 'stashfill-root',
+        title: 'More fields...',
         contexts: ['editable'],
       });
     }
@@ -115,7 +121,10 @@ export function buildContextMenuDescriptors(input: BuildContextMenuInput): Conte
   items.push({
     id: 'stashfill-fill-form',
     parentId: 'stashfill-root',
-    title: 'Fill this form with the default profile',
+    title:
+      activeProfile && profiles.length > 1
+        ? `Fill this form (${activeProfile.name})`
+        : 'Fill this form with the default profile',
     contexts: ['editable'],
   });
 
@@ -134,16 +143,37 @@ export function buildContextMenuDescriptors(input: BuildContextMenuInput): Conte
   });
 
   items.push({
-    id: 'stashfill-more',
-    parentId: 'stashfill-root',
-    title: 'More...',
-    contexts: ['editable'],
-  });
-
-  items.push({
     id: 'stashfill-undo',
     parentId: 'stashfill-root',
     title: 'Undo last fill',
+    contexts: ['editable'],
+  });
+
+  // If there are other profiles, show quick profile switcher items
+  const otherProfiles = profiles.filter((p) => p.id !== activeProfile?.id).slice(0, 3);
+  if (otherProfiles.length > 0) {
+    items.push({
+      id: 'stashfill-sep-profiles',
+      parentId: 'stashfill-root',
+      type: 'separator',
+      contexts: ['editable'],
+    });
+
+    for (const other of otherProfiles) {
+      items.push({
+        id: `stashfill-switch-profile:${other.id}`,
+        parentId: 'stashfill-root',
+        title: `Switch profile: ${other.name}`,
+        contexts: ['editable'],
+      });
+    }
+  }
+
+  // Quick picker
+  items.push({
+    id: 'stashfill-more',
+    parentId: 'stashfill-root',
+    title: 'Quick Picker overlay...',
     contexts: ['editable'],
   });
 

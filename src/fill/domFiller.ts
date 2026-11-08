@@ -676,6 +676,25 @@ export function fillFormWithProfile(
       }
     }
 
+    // 3. Single-input or focused-target fallback:
+    // When filling a page or form that has only 1 input (e.g. search bar <input name="q">, query box, or focusedOnly),
+    // and no specific canonical key reached >= 0.5 confidence, fall back to the primary profile field (fullName, firstName, or first non-empty field).
+    if (!resolvedValue && (elements.length === 1 || mode === 'focusedOnly')) {
+      if ('fields' in profile && Array.isArray(profile.fields)) {
+        const primaryField =
+          profile.fields.find((f) => f.key === 'full_name' && f.value?.trim()) ||
+          profile.fields.find((f) => f.key === 'first_name' && f.value?.trim()) ||
+          profile.fields.find((f) => !f.sensitive && f.value && f.value.trim().length > 0);
+        if (primaryField && primaryField.value) {
+          resolvedValue = primaryField.value;
+          matchedKeyForReport = (primaryField.key || 'fullName') as unknown as ProfileFieldKey;
+        }
+      } else if ('fullName' in profile && profile.fullName) {
+        resolvedValue = profile.fullName;
+        matchedKeyForReport = 'fullName';
+      }
+    }
+
     if (resolvedValue) {
       const snapshot = captureUndoEntry(el);
       const success = fillElement(el, resolvedValue, options.highlight ?? true);

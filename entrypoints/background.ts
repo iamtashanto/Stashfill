@@ -25,6 +25,7 @@ export default defineBackground(() => {
         profiles = [initial];
       }
       const settings = await repo.getSettings();
+      const activeProf = await repo.getActiveProfile();
       const vaultInitialized = await vaultManager.isInitialized();
       const vaultUnlocked = vaultManager.isUnlocked();
       const cards = vaultUnlocked ? await vaultManager.getCards() : [];
@@ -36,6 +37,7 @@ export default defineBackground(() => {
         vaultUnlocked,
         cards,
         isHttpsPage,
+        activeProfileId: activeProf?.id,
       });
 
       for (const desc of descriptors) {
@@ -99,7 +101,24 @@ export default defineBackground(() => {
       }
       return await browser.tabs.sendMessage(tabId, message);
     } catch {
-      // Fallback: if content script is not yet injected in the frame, inject via scripting.executeScript
+      // Fallback: if content script is not yet injected, try injecting it via scripting.executeScript
+      if (browser.scripting?.executeScript) {
+        try {
+          await browser.scripting.executeScript({
+            target: typeof frameId === 'number' ? { tabId, frameIds: [frameId] } : { tabId },
+            files: ['/content-scripts/content.js'],
+          });
+          // Small delay then retry sending the message
+          await new Promise((resolve) => setTimeout(resolve, 80));
+          if (typeof frameId === 'number') {
+            return await browser.tabs.sendMessage(tabId, message, { frameId });
+          }
+          return await browser.tabs.sendMessage(tabId, message);
+        } catch {
+          // If script file execution fails, fallback to direct input manipulation for single field
+        }
+      }
+
       if (
         message.type === 'FILL_ACTIVE_FIELD' &&
         message.target.kind === 'profileField' &&
@@ -142,10 +161,21 @@ export default defineBackground(() => {
   browser.contextMenus.onClicked.addListener(async (info, tab) => {
     const menuId = String(info.menuItemId);
 
-    if (menuId === 'stashfill-open-settings' || menuId === 'stashfill-unlock-vault') {
+    if (
+      menuId === 'stashfill-open-settings' ||
+      menuId === 'stashfill-open-options' ||
+      menuId === 'stashfill-unlock-vault'
+    ) {
       if (browser.runtime.openOptionsPage) {
         await browser.runtime.openOptionsPage();
       }
+      return;
+    }
+
+    if (menuId.startsWith('stashfill-switch-profile:')) {
+      const nextProfileId = menuId.replace('stashfill-switch-profile:', '');
+      await repo.setActiveProfileId(nextProfileId);
+      await rebuildContextMenus(true);
       return;
     }
 
