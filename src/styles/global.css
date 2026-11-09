@@ -87,3 +87,93 @@ body {
   outline: 2px solid var(--sf-focus-ring) !important;
   outline-offset: 2px !important;
 }
+
+/* ---------- Premium polish: motion, scrollbars, selection ---------- */
+::selection {
+  background: color-mix(in srgb, var(--sf-accent) 25%, transparent);
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--sf-border) transparent;
+}
+*::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+*::-webkit-scrollbar-thumb {
+  background: var(--sf-border);
+  border-radius: 999px;
+}
+*::-webkit-scrollbar-thumb:hover {
+  background: var(--sf-border-strong);
+}
+
+@keyframes sf-fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+@keyframes sf-pop {
+  from {
+    opacity: 0;
+    transform: scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+@keyframes sf-slide-in {
+  from {
+    opacity: 0;
+    transform: translateY(12px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+#root main,
+#root [role='tabpanel'] {
+  animation: sf-fade-up 0.22s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+[role='dialog'],
+[aria-modal='true'] {
+  animation: sf-pop 0.18s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+[role='status'],
+[role='alert'] {
+  animation: sf-slide-in 0.25s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+button,
+a,
+input,
+select,
+textarea {
+  transition:
+    background-color 0.15s ease,
+    border-color 0.15s ease,
+    color 0.15s ease,
+    box-shadow 0.15s ease,
+    transform 0.12s ease,
+    opacity 0.15s ease;
+}
+button:not(:disabled):active {
+  transform: scale(0.97);
+}
+button:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}

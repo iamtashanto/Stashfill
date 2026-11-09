@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Per-site "Always auto-fill" rule now works: fills empty, non-sensitive fields on page load (plus one SPA retry).
+- Duplicate profile action in Options (English and Bangla).
+- Field search in the profile editor.
+- Smooth motion polish: tab/dialog/toast animations, press feedback, themed scrollbars (respects reduced-motion).
+
+### Fixed
+
+- Lint errors in options entry and store-asset script.
+
 ## [1.0.0] - 2026-11-07
 
 ### Added

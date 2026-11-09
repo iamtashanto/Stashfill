@@ -146,7 +146,9 @@ export default defineBackground(() => {
                   const setter = Object.getOwnPropertyDescriptor(proto, 'value')?.set;
                   if (setter) setter.call(inputEl, valueToInsert);
                   else inputEl.value = valueToInsert;
-                  const tracker = (inputEl as unknown as { _valueTracker?: { setValue: (v: string) => void } })._valueTracker;
+                  const tracker = (
+                    inputEl as unknown as { _valueTracker?: { setValue: (v: string) => void } }
+                  )._valueTracker;
                   if (tracker) tracker.setValue(valueToInsert);
                 } else if (el.isContentEditable) {
                   el.textContent = valueToInsert;

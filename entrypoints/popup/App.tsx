@@ -142,7 +142,9 @@ export function App({ repository, vaultMgr }: PopupProps = {}) {
   };
 
   const openOptionsPage = async () => {
-    const url = browser?.runtime?.getURL ? browser.runtime.getURL('/options.html') : '/options.html';
+    const url = browser?.runtime?.getURL
+      ? browser.runtime.getURL('/options.html')
+      : '/options.html';
     if (browser?.tabs?.create) {
       await browser.tabs.create({ url });
     } else {
@@ -603,7 +605,7 @@ export function App({ repository, vaultMgr }: PopupProps = {}) {
       class="flex max-h-[580px] w-[360px] flex-col overflow-hidden bg-white font-sans text-slate-900 dark:bg-slate-900 dark:text-slate-100"
     >
       {/* Header */}
-      <header class="flex shrink-0 items-center justify-between border-b border-slate-200/80 bg-white px-3.5 py-2.5 shadow-2xs dark:border-slate-800 dark:bg-slate-900/90">
+      <header class="shadow-2xs flex shrink-0 items-center justify-between border-b border-slate-200/80 bg-white px-3.5 py-2.5 dark:border-slate-800 dark:bg-slate-900/90">
         <div class="flex items-center gap-2">
           <StashfillLogo size={24} />
           <span class="text-sm font-bold tracking-tight text-slate-900 dark:text-white">
@@ -709,11 +711,21 @@ export function App({ repository, vaultMgr }: PopupProps = {}) {
           <div
             role="region"
             aria-label={t.settings.exportImportTitle}
-            class="mx-3 mt-2 flex shrink-0 items-center justify-between gap-2 rounded-lg border border-amber-200/80 bg-amber-50/90 px-2.5 py-1.5 text-[11px] text-amber-950 shadow-2xs dark:border-amber-800/50 dark:bg-amber-950/40 dark:text-amber-200"
+            class="shadow-2xs mx-3 mt-2 flex shrink-0 items-center justify-between gap-2 rounded-lg border border-amber-200/80 bg-amber-50/90 px-2.5 py-1.5 text-[11px] text-amber-950 dark:border-amber-800/50 dark:bg-amber-950/40 dark:text-amber-200"
           >
             <div class="flex items-center gap-1.5 truncate">
-              <svg class="h-3.5 w-3.5 shrink-0 text-amber-600 dark:text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+              <svg
+                class="h-3.5 w-3.5 shrink-0 text-amber-600 dark:text-amber-400"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="2"
+                  d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
+                />
               </svg>
               <span class="truncate font-medium">{t.settings.backupReminderBanner}</span>
             </div>
@@ -721,7 +733,7 @@ export function App({ repository, vaultMgr }: PopupProps = {}) {
               <button
                 type="button"
                 onClick={handleQuickDownloadBackup}
-                class="cursor-pointer rounded-md bg-amber-600 px-2 py-0.5 text-[10px] font-semibold text-white shadow-2xs hover:bg-amber-700"
+                class="shadow-2xs cursor-pointer rounded-md bg-amber-600 px-2 py-0.5 text-[10px] font-semibold text-white hover:bg-amber-700"
               >
                 {t.settings.backupReminderDownload}
               </button>
@@ -751,7 +763,7 @@ export function App({ repository, vaultMgr }: PopupProps = {}) {
                 id="profile-select"
                 value={activeProfile?.id ?? ''}
                 onChange={(e) => handleProfileChange((e.target as HTMLSelectElement).value)}
-                class="w-full appearance-none rounded-lg border border-slate-200 bg-slate-50/70 py-1.5 pe-7 ps-2.5 text-xs font-semibold text-slate-800 shadow-2xs transition-colors hover:border-slate-300 focus:border-brand-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-brand-500/20 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                class="shadow-2xs w-full appearance-none rounded-lg border border-slate-200 bg-slate-50/70 py-1.5 pe-7 ps-2.5 text-xs font-semibold text-slate-800 transition-colors hover:border-slate-300 focus:border-brand-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-brand-500/20 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
               >
                 {profiles.map((p) => (
                   <option key={p.id} value={p.id}>
@@ -765,7 +777,12 @@ export function App({ repository, vaultMgr }: PopupProps = {}) {
                 stroke="currentColor"
                 viewBox="0 0 24 24"
               >
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+                <path
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="2"
+                  d="M19 9l-7 7-7-7"
+                />
               </svg>
             </div>
           </div>
@@ -775,7 +792,7 @@ export function App({ repository, vaultMgr }: PopupProps = {}) {
             <button
               type="button"
               onClick={handleFillEntireForm}
-              class="flex flex-1 cursor-pointer items-center justify-center gap-1.5 rounded-lg bg-gradient-to-r from-brand-600 to-indigo-600 px-3 py-2 text-xs font-bold text-white shadow-xs transition-all duration-150 hover:from-brand-500 hover:to-indigo-500 active:scale-[0.98]"
+              class="shadow-xs flex flex-1 cursor-pointer items-center justify-center gap-1.5 rounded-lg bg-gradient-to-r from-brand-600 to-indigo-600 px-3 py-2 text-xs font-bold text-white transition-all duration-150 hover:from-brand-500 hover:to-indigo-500 active:scale-[0.98]"
             >
               <svg
                 class="h-4 w-4"
@@ -801,10 +818,15 @@ export function App({ repository, vaultMgr }: PopupProps = {}) {
               aria-expanded={isQuickAdding}
               aria-label={t.actions.quickAdd}
               title={t.actions.quickAdd}
-              class="flex cursor-pointer items-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 py-2 text-xs font-semibold text-slate-700 shadow-2xs transition-colors hover:border-slate-300 hover:bg-slate-50 active:scale-[0.98] dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700"
+              class="shadow-2xs flex cursor-pointer items-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 py-2 text-xs font-semibold text-slate-700 transition-colors hover:border-slate-300 hover:bg-slate-50 active:scale-[0.98] dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700"
             >
               <svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.2" d="M12 4v16m8-8H4" />
+                <path
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="2.2"
+                  d="M12 4v16m8-8H4"
+                />
               </svg>
               <span>{t.actions.add}</span>
             </button>
@@ -925,7 +947,7 @@ export function App({ repository, vaultMgr }: PopupProps = {}) {
                 ×
               </button>
             ) : (
-              <span class="pointer-events-none absolute inset-y-0 end-0 flex items-center pe-2 text-[10px] font-mono font-semibold text-slate-400">
+              <span class="pointer-events-none absolute inset-y-0 end-0 flex items-center pe-2 font-mono text-[10px] font-semibold text-slate-400">
                 /
               </span>
             )}
@@ -936,8 +958,18 @@ export function App({ repository, vaultMgr }: PopupProps = {}) {
         <div class="flex-1 space-y-1 overflow-y-auto p-2.5">
           {visibleItems.length === 0 ? (
             <div class="flex flex-col items-center justify-center rounded-xl border border-dashed border-slate-200 py-8 text-center dark:border-slate-800">
-              <svg class="h-6 w-6 text-slate-300 dark:text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+              <svg
+                class="h-6 w-6 text-slate-300 dark:text-slate-600"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="1.5"
+                  d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"
+                />
               </svg>
               <p class="mt-2 text-xs font-medium text-slate-500 dark:text-slate-400">
                 {searchQuery ? t.emptyStates.noFieldsMatchSearch : t.emptyStates.noFieldsInProfile}
@@ -972,7 +1004,10 @@ export function App({ repository, vaultMgr }: PopupProps = {}) {
           )}
 
           {/* Secure Vault Section */}
-          <section aria-labelledby="popup-vault-heading" class="mt-3 rounded-xl border border-slate-200/80 bg-slate-50/70 p-3 dark:border-slate-800 dark:bg-slate-900/50">
+          <section
+            aria-labelledby="popup-vault-heading"
+            class="mt-3 rounded-xl border border-slate-200/80 bg-slate-50/70 p-3 dark:border-slate-800 dark:bg-slate-900/50"
+          >
             <div class="flex items-center justify-between pb-2">
               <h2
                 id="popup-vault-heading"
@@ -1009,7 +1044,7 @@ export function App({ repository, vaultMgr }: PopupProps = {}) {
             </div>
 
             {!vaultInitialized ? (
-              <div class="rounded-lg border border-slate-200/80 bg-white p-3 text-center text-xs shadow-2xs dark:border-slate-800 dark:bg-slate-800/60 dark:text-slate-300">
+              <div class="shadow-2xs rounded-lg border border-slate-200/80 bg-white p-3 text-center text-xs dark:border-slate-800 dark:bg-slate-800/60 dark:text-slate-300">
                 <p class="text-slate-600 dark:text-slate-300">{t.vault.setupPassphrase}</p>
                 <button
                   type="button"
@@ -1018,12 +1053,17 @@ export function App({ repository, vaultMgr }: PopupProps = {}) {
                 >
                   <span>{t.actions.options}</span>
                   <svg class="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
+                    <path
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                      stroke-width="2"
+                      d="M9 5l7 7-7 7"
+                    />
                   </svg>
                 </button>
               </div>
             ) : !vaultUnlocked ? (
-              <div class="space-y-2 rounded-lg border border-slate-200/80 bg-white p-2.5 shadow-2xs dark:border-slate-800 dark:bg-slate-800/60">
+              <div class="shadow-2xs space-y-2 rounded-lg border border-slate-200/80 bg-white p-2.5 dark:border-slate-800 dark:bg-slate-800/60">
                 <div class="flex items-center gap-1.5">
                   <label for="popup-vault-passphrase" class="sr-only">
                     {t.vault.enterPassphrase}
@@ -1040,7 +1080,7 @@ export function App({ repository, vaultMgr }: PopupProps = {}) {
                   <button
                     type="button"
                     onClick={handleUnlockVault}
-                    class="cursor-pointer rounded-lg bg-brand-600 px-3 py-1.5 text-xs font-semibold text-white shadow-2xs transition-colors hover:bg-brand-700 active:scale-95 dark:bg-brand-500 dark:hover:bg-brand-400"
+                    class="shadow-2xs cursor-pointer rounded-lg bg-brand-600 px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-brand-700 active:scale-95 dark:bg-brand-500 dark:hover:bg-brand-400"
                   >
                     {t.actions.unlock}
                   </button>
@@ -1100,7 +1140,7 @@ export function App({ repository, vaultMgr }: PopupProps = {}) {
                 )}
 
                 {cards.length === 0 ? (
-                  <div class="rounded-lg border border-slate-200/80 bg-white p-3 text-center text-xs text-slate-500 shadow-2xs dark:border-slate-800 dark:bg-slate-800/60 dark:text-slate-400">
+                  <div class="shadow-2xs rounded-lg border border-slate-200/80 bg-white p-3 text-center text-xs text-slate-500 dark:border-slate-800 dark:bg-slate-800/60 dark:text-slate-400">
                     {t.vault.noCardsYet}
                   </div>
                 ) : (
@@ -1109,7 +1149,7 @@ export function App({ repository, vaultMgr }: PopupProps = {}) {
                     return (
                       <div
                         key={card.id}
-                        class="flex items-center justify-between rounded-xl border border-slate-200/80 bg-white p-2.5 shadow-2xs transition-colors hover:border-slate-300 dark:border-slate-800 dark:bg-slate-800/80"
+                        class="shadow-2xs flex items-center justify-between rounded-xl border border-slate-200/80 bg-white p-2.5 transition-colors hover:border-slate-300 dark:border-slate-800 dark:bg-slate-800/80"
                       >
                         <div>
                           <div class="flex items-center gap-1.5 text-xs font-bold text-slate-900 dark:text-slate-100">
@@ -1143,7 +1183,7 @@ export function App({ repository, vaultMgr }: PopupProps = {}) {
                             onClick={() => handleCopyCardNumber15s(card.cardNumber)}
                             aria-label={`${t.vault.copyCardNumber15s}: ${card.nickname}`}
                             title={t.vault.copyCardNumber15s}
-                            class="cursor-pointer rounded-lg border border-slate-200 bg-white px-2 py-1 text-[11px] font-medium text-slate-700 shadow-2xs transition-colors hover:bg-slate-50 active:scale-95 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200"
+                            class="shadow-2xs cursor-pointer rounded-lg border border-slate-200 bg-white px-2 py-1 text-[11px] font-medium text-slate-700 transition-colors hover:bg-slate-50 active:scale-95 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200"
                           >
                             {t.actions.copy}
                           </button>
@@ -1151,7 +1191,7 @@ export function App({ repository, vaultMgr }: PopupProps = {}) {
                             type="button"
                             onClick={() => handleRequestFillCard(card)}
                             aria-label={`${t.actions.fillCard} ${card.nickname}`}
-                            class="cursor-pointer rounded-lg border border-amber-600/30 bg-amber-500/10 px-2 py-1 text-xs font-semibold text-amber-800 shadow-2xs transition-colors hover:bg-amber-500/20 active:scale-95 dark:border-amber-500/30 dark:bg-amber-500/15 dark:text-amber-200"
+                            class="shadow-2xs cursor-pointer rounded-lg border border-amber-600/30 bg-amber-500/10 px-2 py-1 text-xs font-semibold text-amber-800 transition-colors hover:bg-amber-500/20 active:scale-95 dark:border-amber-500/30 dark:bg-amber-500/15 dark:text-amber-200"
                           >
                             {t.actions.fillCard}
                           </button>

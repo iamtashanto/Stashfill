@@ -175,7 +175,32 @@ export default defineContentScript({
       }
     }
 
-    void refreshCache();
+    // Per-site "always auto-fill": runs once after load, only into empty, non-sensitive fields
+    async function runAutoFillForSite() {
+      await refreshCache();
+      if (window.self !== window.top) return;
+      const host = window.location.hostname.toLowerCase();
+      const rule = cachedSiteRules.find((r) => r.host.toLowerCase() === host);
+      if (!rule || rule.autoFillRule !== 'always') return;
+      const profile =
+        cachedProfiles.find((p) => p.id === rule.profileId) ??
+        cachedProfiles.find((p) => p.id === cachedSettings?.defaultProfileId) ??
+        cachedProfiles[0];
+      if (!profile) return;
+      const safeProfile = { ...profile, fields: profile.fields.filter((f) => !f.sensitive) };
+      const attempt = () => {
+        try {
+          fillFormWithProfile(document, safeProfile, { mode: 'emptyOnly', siteRule: rule });
+        } catch {
+          // never break the host page
+        }
+      };
+      attempt();
+      // Single retry for SPAs that render forms shortly after load
+      setTimeout(attempt, 1200);
+    }
+
+    void runAutoFillForSite();
 
     // Closed Shadow DOM UI host so page CSS cannot break Stashfill overlays
     let shadowRoot: ShadowRoot | null = null;
