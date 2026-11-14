@@ -36,7 +36,7 @@ describe('Snippet Engine and Variable Expander', () => {
 
     const match = /Code: (\d+)/.exec(result.text);
     expect(match).not.toBeNull();
-    const val = parseInt(match![1], 10);
+    const val = parseInt(match?.[1] || '0', 10);
     expect(val).toBeGreaterThanOrEqual(1000);
     expect(val).toBeLessThanOrEqual(9999);
   });

@@ -9,6 +9,7 @@ import preact from '@preact/preset-vite';
 // Optional host permissions:
 // - http://*/* and https://*/*: Requested at runtime only if the user enables the inline-chip overlay feature.
 export default defineConfig({
+  outDir: 'output',
   vite: () => ({
     plugins: [preact()],
   }),

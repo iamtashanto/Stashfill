@@ -599,26 +599,28 @@ export function App({ repository, vaultMgr }: PopupProps = {}) {
     setSettings(updated);
   };
 
+interface VisibleItem {
+  id: string;
+  rawFieldId?: string;
+  isSnippet?: boolean;
+  snippet?: Snippet;
+  label: string;
+  value: string;
+  group: string;
+  key: string;
+  sensitive: boolean;
+  useCount: number;
+  profileId?: string;
+  profileName?: string;
+}
+
   // Sorted & filtered item list: supports multi-profile search, snippets, and fast profile switching
-  const visibleItems = useMemo(() => {
+  const visibleItems = useMemo<VisibleItem[]>(() => {
     const q = searchQuery.trim().toLowerCase();
 
     // 1. If searching, perform instantaneous global search across ALL profiles and snippets
     if (q) {
-      const results: {
-        id: string;
-        rawFieldId?: string;
-        isSnippet?: boolean;
-        snippet?: Snippet;
-        label: string;
-        value: string;
-        group: string;
-        key: string;
-        sensitive: boolean;
-        useCount: number;
-        profileId?: string;
-        profileName?: string;
-      }[] = [];
+      const results: VisibleItem[] = [];
 
       // Search in all profiles
       for (const prof of profiles) {
@@ -687,20 +689,7 @@ export function App({ repository, vaultMgr }: PopupProps = {}) {
 
     // 3. All Profiles tab selected
     if (selectedFilter === 'all') {
-      const allList: {
-        id: string;
-        rawFieldId?: string;
-        isSnippet?: boolean;
-        snippet?: Snippet;
-        label: string;
-        value: string;
-        group: string;
-        key: string;
-        sensitive: boolean;
-        useCount: number;
-        profileId?: string;
-        profileName?: string;
-      }[] = [];
+      const allList: VisibleItem[] = [];
 
       for (const prof of profiles) {
         for (const f of prof.fields) {
