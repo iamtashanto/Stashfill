@@ -1,5 +1,6 @@
 import Hero from '@/components/Hero';
 import InteractiveDemo from '@/components/InteractiveDemo';
+import ProductShowcase from '@/components/ProductShowcase';
 import BentoFeatures from '@/components/BentoFeatures';
 import ComparisonTable from '@/components/ComparisonTable';
 import SecurityArchitecture from '@/components/SecurityArchitecture';
@@ -12,6 +13,7 @@ export default function HomePage() {
     <>
       <Hero />
       <InteractiveDemo />
+      <ProductShowcase />
       <BentoFeatures />
       <ComparisonTable />
       <SecurityArchitecture />

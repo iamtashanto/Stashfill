@@ -131,7 +131,7 @@ export function App({ repository, vaultMgr }: PopupProps = {}) {
       setVaultInitialized(isInit);
 
       applyTheme(curSettings.theme);
-      document.documentElement.lang = curSettings.language;
+      document.documentElement.lang = 'en';
       searchInputRef.current?.focus();
     }
     load();
@@ -165,13 +165,6 @@ export function App({ repository, vaultMgr }: PopupProps = {}) {
     const updated = await repo.updateSettings({ theme: nextTheme });
     setSettings(updated);
     applyTheme(nextTheme);
-  };
-
-  const handleToggleLanguage = async () => {
-    const nextLang = settings.language === 'en' ? 'bn' : 'en';
-    const updated = await repo.updateSettings({ language: nextLang });
-    setSettings(updated);
-    document.documentElement.lang = nextLang;
   };
 
   const openOptionsPage = async () => {
@@ -842,17 +835,6 @@ export function App({ repository, vaultMgr }: PopupProps = {}) {
         </div>
 
         <div class="flex items-center gap-1">
-          {/* Language Toggle */}
-          <button
-            type="button"
-            onClick={handleToggleLanguage}
-            title={t.settings.language}
-            aria-label={t.settings.language}
-            class="cursor-pointer rounded-md border border-slate-200/80 bg-slate-50 px-1.5 py-1 text-[11px] font-semibold text-slate-700 transition-colors hover:bg-slate-100 dark:border-slate-800 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700"
-          >
-            {settings.language === 'en' ? 'বাংলা' : 'EN'}
-          </button>
-
           {/* Theme Toggle */}
           <button
             type="button"

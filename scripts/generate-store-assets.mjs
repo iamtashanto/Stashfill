@@ -7,7 +7,7 @@
  */
 
 import { chromium } from '@playwright/test';
-import { mkdirSync } from 'node:fs';
+import { mkdirSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
 
 const ROOT_DIR = process.cwd();
@@ -406,7 +406,7 @@ function getScreenshot3Html() {
   `, 1280, 800);
 }
 
-// 4. Screenshot 4: Multilingual & Accessible (Bangla + English)
+// 4. Screenshot 4: Dynamic Text Snippets & Universal Quick-Paste
 function getScreenshot4Html() {
   return getHtmlWrapper(`
   <div style="width: 1280px; height: 800px; background: radial-gradient(circle at top right, #1E1B4B 0%, #0B0F19 70%); padding: 48px; display: flex; flex-direction: column; justify-content: space-between;">
@@ -414,89 +414,129 @@ function getScreenshot4Html() {
       <div style="display: flex; align-items: center; gap: 16px;">
         ${STASHFILL_SVG_LOGO}
         <div>
-          <h1 style="font-size: 26px; font-weight: 800;">Stashfill — বহুভাষিক ও অ্যাক্সেসিবল</h1>
-          <p style="font-size: 13px; color: #94A3B8;">Built-in English and বাংলা dictionaries with full WCAG AA compliance</p>
+          <h1 style="font-size: 26px; font-weight: 800; color: #FFFFFF;">Stashfill — Dynamic Snippets & Quick-Paste</h1>
+          <p style="font-size: 13px; color: #94A3B8;">Real-time trigger expansion with dynamic tokens & cross-profile context submenus</p>
         </div>
       </div>
       <div style="display: flex; gap: 8px;">
-        <span class="badge" style="background: rgba(99, 102, 241, 0.2); border: 1px solid rgba(99, 102, 241, 0.4); color: #C7D2FE;">
-          🌐 বাংলা ও English
-        </span>
         <span class="badge" style="background: rgba(16, 185, 129, 0.2); border: 1px solid rgba(16, 185, 129, 0.4); color: #34D399;">
-          🌙 High-Contrast Dark Mode
+          ⚡ Inline Expander
+        </span>
+        <span class="badge" style="background: rgba(99, 102, 241, 0.2); border: 1px solid rgba(99, 102, 241, 0.4); color: #C7D2FE;">
+          🔀 Cross-Profile Submenus
         </span>
       </div>
     </div>
 
     <!-- Title section -->
     <div style="text-align: center; margin-top: 10px;">
-      <h2 style="font-size: 32px; font-weight: 800; color: #FFFFFF;">
-        Native Language Support & High Accessibility
+      <h2 style="font-size: 32px; font-weight: 800; color: #FFFFFF; letter-spacing: -0.02em;">
+        Automate Repetitive Text with <span style="background: linear-gradient(135deg, #34D399, #60A5FA); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">Dynamic Variables</span>
       </h2>
       <p style="font-size: 15px; color: #94A3B8; margin-top: 6px;">
-        Switch between English and বাংলা seamlessly. Keyboard-first navigation (Esc, /, Tab, Enter).
+        Type trigger codes (;sig, ;date, ;uuid) into any field, or right-click to paste across profiles without switching.
       </p>
     </div>
 
-    <!-- Split Mockup: English & Bangla side-by-side -->
-    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 24px; height: 480px; margin-top: 20px;">
-      <!-- English Dashboard Pane -->
-      <div style="background: #13192B; border: 1px solid #1E293B; border-radius: 20px; padding: 24px; display: flex; flex-direction: column; gap: 14px;">
+    <!-- Split Mockup: Snippets Engine & Context Menu Submenus -->
+    <div style="display: grid; grid-template-columns: 1.1fr 0.9fr; gap: 24px; height: 480px; margin-top: 16px;">
+      
+      <!-- Left: Dynamic Snippets Engine -->
+      <div style="background: #13192B; border: 1px solid #1E293B; border-radius: 20px; padding: 22px; display: flex; flex-direction: column; justify-content: space-between;">
         <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #1E293B; padding-bottom: 12px;">
-          <span style="font-weight: 800; font-size: 14px; color: #F8FAFC;">English Interface</span>
-          <span style="background: #1E293B; padding: 2px 8px; border-radius: 6px; font-size: 11px; color: #94A3B8;">Language: EN</span>
-        </div>
-        <div style="background: #0B0F19; border-radius: 12px; padding: 14px; display: flex; justify-content: space-between; align-items: center;">
-          <div>
-            <div style="font-size: 11px; color: #94A3B8; font-weight: 700;">DEFAULT ACTION</div>
-            <div style="font-size: 14px; font-weight: 700; color: #FFFFFF; margin-top: 2px;">Fill Form Instantly</div>
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <span style="font-weight: 800; font-size: 14px; color: #F8FAFC;">Active Snippets Engine</span>
+            <span style="background: rgba(16, 185, 129, 0.2); color: #34D399; font-size: 10px; font-weight: 700; padding: 2px 8px; border-radius: 6px;">LIVE CACHE</span>
           </div>
-          <span style="background: #4F46E5; color: white; padding: 6px 14px; border-radius: 8px; font-size: 12px; font-weight: 700;">Fill Form</span>
+          <span style="font-family: monospace; font-size: 11px; color: #94A3B8;">4 Registered Triggers</span>
         </div>
-        <div style="background: #0B0F19; border-radius: 12px; padding: 14px; display: flex; justify-content: space-between; align-items: center;">
-          <div>
-            <div style="font-size: 11px; color: #94A3B8; font-weight: 700;">STORAGE ENCRYPTION</div>
-            <div style="font-size: 14px; font-weight: 700; color: #FFFFFF; margin-top: 2px;">Encrypted Vault</div>
+
+        <div style="display: flex; flex-direction: column; gap: 10px; margin-top: 8px;">
+          <!-- Item 1: ;sig -->
+          <div style="background: #0B0F19; border: 1px solid #1E293B; border-radius: 12px; padding: 12px; display: flex; justify-content: space-between; align-items: center;">
+            <div>
+              <div style="display: flex; align-items: center; gap: 8px;">
+                <span style="font-family: monospace; font-weight: 800; color: #34D399; font-size: 13px; background: rgba(16, 185, 129, 0.15); padding: 2px 8px; border-radius: 6px;">;sig</span>
+                <span style="font-size: 13px; font-weight: 700; color: #FFFFFF;">Email Signature</span>
+              </div>
+              <div style="font-size: 11px; color: #94A3B8; margin-top: 4px; font-family: monospace;">Best regards,\nMd Tanvir Ahamed Shanto • © {{year}}</div>
+            </div>
+            <span style="background: #1E293B; color: #A5B4FC; font-size: 11px; padding: 4px 10px; border-radius: 6px; font-family: monospace;">Expands in 0.8ms</span>
           </div>
-          <span style="background: rgba(16, 185, 129, 0.2); color: #34D399; padding: 6px 14px; border-radius: 8px; font-size: 12px; font-weight: 700;">Unlocked</span>
+
+          <!-- Item 2: ;date -->
+          <div style="background: #0B0F19; border: 1px solid #1E293B; border-radius: 12px; padding: 12px; display: flex; justify-content: space-between; align-items: center;">
+            <div>
+              <div style="display: flex; align-items: center; gap: 8px;">
+                <span style="font-family: monospace; font-weight: 800; color: #60A5FA; font-size: 13px; background: rgba(96, 165, 250, 0.15); padding: 2px 8px; border-radius: 6px;">;date</span>
+                <span style="font-size: 13px; font-weight: 700; color: #FFFFFF;">ISO Date Token</span>
+              </div>
+              <div style="font-size: 11px; color: #94A3B8; margin-top: 4px; font-family: monospace;">Evaluates: {{date}} → 2026-11-14</div>
+            </div>
+            <span style="background: #1E293B; color: #38BDF8; font-size: 11px; padding: 4px 10px; border-radius: 6px; font-family: monospace;">Dynamic Token</span>
+          </div>
+
+          <!-- Item 3: ;uuid -->
+          <div style="background: #0B0F19; border: 1px solid #1E293B; border-radius: 12px; padding: 12px; display: flex; justify-content: space-between; align-items: center;">
+            <div>
+              <div style="display: flex; align-items: center; gap: 8px;">
+                <span style="font-family: monospace; font-weight: 800; color: #C084FC; font-size: 13px; background: rgba(192, 132, 252, 0.15); padding: 2px 8px; border-radius: 6px;">;uuid</span>
+                <span style="font-size: 13px; font-weight: 700; color: #FFFFFF;">Crypto UUID v4 Generator</span>
+              </div>
+              <div style="font-size: 11px; color: #94A3B8; margin-top: 4px; font-family: monospace;">Trace-ID: {{uuid}} → 9f8e7d6c-4a12-b34e-...</div>
+            </div>
+            <span style="background: #1E293B; color: #C084FC; font-size: 11px; padding: 4px 10px; border-radius: 6px; font-family: monospace;">SubtleCrypto</span>
+          </div>
         </div>
-        <div style="background: #0B0F19; border-radius: 12px; padding: 14px; display: flex; justify-content: space-between; align-items: center;">
-          <div>
-            <div style="font-size: 11px; color: #94A3B8; font-weight: 700;">PRIVACY ASSURANCE</div>
-            <div style="font-size: 14px; font-weight: 700; color: #FFFFFF; margin-top: 2px;">Zero Network Requests</div>
-          </div>
-          <span style="background: rgba(99, 102, 241, 0.2); color: #A5B4FC; padding: 6px 14px; border-radius: 8px; font-size: 12px; font-weight: 700;">100% Offline</span>
+
+        <div style="display: flex; justify-content: space-between; align-items: center; background: rgba(30, 41, 59, 0.5); padding: 10px 14px; border-radius: 10px;">
+          <span style="font-size: 12px; color: #CBD5E1;">All Unicode & UTF-8 characters supported across inputs & clipboard</span>
+          <span style="font-size: 11px; color: #34D399; font-weight: 700;">✓ 100% Offline</span>
         </div>
       </div>
 
-      <!-- Bangla Dashboard Pane -->
-      <div style="background: #13192B; border: 1px solid #1E293B; border-radius: 20px; padding: 24px; display: flex; flex-direction: column; gap: 14px;">
+      <!-- Right: Direct Cross-Profile Context Menu -->
+      <div style="background: #13192B; border: 1px solid #1E293B; border-radius: 20px; padding: 22px; display: flex; flex-direction: column; justify-content: space-between;">
         <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #1E293B; padding-bottom: 12px;">
-          <span style="font-weight: 800; font-size: 14px; color: #F8FAFC;">বাংলা ইন্টারফেস</span>
-          <span style="background: #1E293B; padding: 2px 8px; border-radius: 6px; font-size: 11px; color: #34D399; font-weight: 700;">ভাষা: বাংলা</span>
+          <span style="font-weight: 800; font-size: 14px; color: #F8FAFC;">Context Menu Submenus</span>
+          <span style="background: #1E293B; padding: 2px 8px; border-radius: 6px; font-size: 11px; color: #A5B4FC;">Right-Click In Any Field</span>
         </div>
-        <div style="background: #0B0F19; border-radius: 12px; padding: 14px; display: flex; justify-content: space-between; align-items: center;">
-          <div>
-            <div style="font-size: 11px; color: #94A3B8; font-weight: 700;">প্রধান অ্যাকশন</div>
-            <div style="font-size: 14px; font-weight: 700; color: #FFFFFF; margin-top: 2px;">এক ক্লিকে ফর্ম পূরণ করুন</div>
+
+        <div style="background: #0B0F19; border: 1px solid #334155; border-radius: 14px; padding: 14px; box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.5); display: flex; flex-direction: column; gap: 8px;">
+          <div style="font-size: 11px; color: #64748B; font-weight: 700; text-transform: uppercase;">Browser Context Menu</div>
+          
+          <div style="background: #1E293B; border-radius: 8px; padding: 8px 12px; display: flex; justify-content: space-between; align-items: center;">
+            <span style="font-size: 13px; font-weight: 700; color: #FFFFFF;">⚡ Stashfill</span>
+            <span style="color: #94A3B8; font-size: 12px;">▶</span>
           </div>
-          <span style="background: #4F46E5; color: white; padding: 6px 14px; border-radius: 8px; font-size: 12px; font-weight: 700;">ফর্ম পূরণ করুন</span>
+
+          <!-- Nested Submenu -->
+          <div style="margin-left: 16px; background: #182234; border: 1px solid #3B82F6; border-radius: 10px; padding: 10px; display: flex; flex-direction: column; gap: 6px;">
+            <div style="font-size: 11px; color: #93C5FD; font-weight: 700;">Select Profile To Paste Without Switching:</div>
+            
+            <div style="display: flex; justify-content: space-between; align-items: center; padding: 6px 8px; background: #0B0F19; border-radius: 6px;">
+              <span style="font-size: 12px; color: #F8FAFC; font-weight: 600;">Personal → Full Name</span>
+              <span style="font-size: 11px; color: #34D399; font-weight: 700;">1-Click</span>
+            </div>
+
+            <div style="display: flex; justify-content: space-between; align-items: center; padding: 6px 8px; background: #0B0F19; border-radius: 6px;">
+              <span style="font-size: 12px; color: #F8FAFC; font-weight: 600;">Enterprise → Work Email</span>
+              <span style="font-size: 11px; color: #34D399; font-weight: 700;">1-Click</span>
+            </div>
+
+            <div style="display: flex; justify-content: space-between; align-items: center; padding: 6px 8px; background: #0B0F19; border-radius: 6px;">
+              <span style="font-size: 12px; color: #F8FAFC; font-weight: 600;">Social Links → Portfolio URL</span>
+              <span style="font-size: 11px; color: #34D399; font-weight: 700;">1-Click</span>
+            </div>
+          </div>
         </div>
-        <div style="background: #0B0F19; border-radius: 12px; padding: 14px; display: flex; justify-content: space-between; align-items: center;">
-          <div>
-            <div style="font-size: 11px; color: #94A3B8; font-weight: 700;">সুরক্ষিত সংরক্ষণাগার</div>
-            <div style="font-size: 14px; font-weight: 700; color: #FFFFFF; margin-top: 2px;">এনক্রিপ্টেড ভল্ট</div>
-          </div>
-          <span style="background: rgba(16, 185, 129, 0.2); color: #34D399; padding: 6px 14px; border-radius: 8px; font-size: 12px; font-weight: 700;">আনলকড</span>
-        </div>
-        <div style="background: #0B0F19; border-radius: 12px; padding: 14px; display: flex; justify-content: space-between; align-items: center;">
-          <div>
-            <div style="font-size: 11px; color: #94A3B8; font-weight: 700;">প্রাইভেসি প্রতিশ্রুতি</div>
-            <div style="font-size: 14px; font-weight: 700; color: #FFFFFF; margin-top: 2px;">কোনো নেটওয়ার্ক রিকোয়েস্ট নেই</div>
-          </div>
-          <span style="background: rgba(99, 102, 241, 0.2); color: #A5B4FC; padding: 6px 14px; border-radius: 8px; font-size: 12px; font-weight: 700;">১০০% অফলাইন</span>
+
+        <div style="display: flex; align-items: center; gap: 8px; background: rgba(99, 102, 241, 0.15); border: 1px solid rgba(99, 102, 241, 0.3); border-radius: 10px; padding: 10px 14px;">
+          <span style="font-size: 16px;">🛡️</span>
+          <span style="font-size: 11px; color: #C7D2FE;">15-second ephemeral clipboard scrubber automatically wipes sensitive tokens</span>
         </div>
       </div>
+
     </div>
   </div>
   `, 1280, 800);
@@ -679,7 +719,12 @@ function getPromoMarqueeHtml() {
 
 async function main() {
   console.log('Launching headless Chromium to render Web Store visual assets...');
-  const browser = await chromium.launch();
+  const launchOptions = { headless: true };
+  const chromePath = '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
+  if (existsSync(chromePath)) {
+    launchOptions.executablePath = chromePath;
+  }
+  const browser = await chromium.launch(launchOptions);
 
   const renderTask = async (name, html, width, height) => {
     const page = await browser.newPage({ viewport: { width, height } });

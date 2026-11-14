@@ -120,34 +120,36 @@ function collectFillableInputs(root: Document | ShadowRoot): HTMLInputElement[] 
     ],
   },
   {
-    id: 'bangla-engine',
-    name: 'Bilingual English & Bangla (বাংলা) Matcher',
-    badge: 'Heuristic Tokenizer',
+    id: 'snippet-engine',
+    name: 'Dynamic Snippet Variables & Universal UTF-8 Engine',
+    badge: 'Template Expander',
     description:
-      'Forms across South Asia and international organizations use localized Bengali attributes. Stashfill resolves camelCase, snake_case, autocomplete tokens, and Bengali synonyms simultaneously.',
-    codeSnippet: `// Multilingual synonym token normalization table
-const SYNONYM_DICTIONARY: Record<FieldCategory, string[]> = {
-  fullName: [
-    'name', 'fullname', 'candidate_name', 'applicant',
-    'নাম', 'পুরো নাম', 'পূর্ণ নাম', 'প্রার্থীর নাম'
-  ],
-  email: [
-    'email', 'e-mail', 'mail_addr',
-    'ইমেইল', 'ই-মেইল', 'ইমেইল ঠিকানা'
-  ],
-  phone: [
-    'phone', 'tel', 'mobile', 'cell', 'contact_no',
-    'ফোন', 'মোবাইল', 'মোবাইল নম্বর', 'যোগাযোগ নম্বর'
-  ],
-  address: [
-    'address', 'street', 'billing_address', 'shipping_address',
-    'ঠিকানা', 'বর্তমান ঠিকানা', 'স্থায়ী ঠিকানা', 'বাসার ঠিকানা'
-  ]
-};`,
+      'Expand reusable dynamic templates in any input or rich-text editor using trigger codes (;sig, ;date, ;uuid). Stashfill fully supports Unicode and international alphabets (Latin, Cyrillic, Arabic, Bangla, CJK, Emoji) across all fields and clipboard operations.',
+    codeSnippet: `// Dynamic template variable interpolation & cursor positioning
+export function expandSnippetVariables(content: string): { text: string; cursorOffset?: number } {
+  const now = new Date();
+  let expanded = content
+    .replace(/\\{\\{date\\}\\}/g, now.toISOString().split('T')[0])
+    .replace(/\\{\\{time\\}\\}/g, now.toTimeString().split(' ')[0])
+    .replace(/\\{\\{year\\}\\}/g, String(now.getFullYear()))
+    .replace(/\\{\\{uuid\\}\\}/g, crypto.randomUUID())
+    .replace(/\\{\\{random:(\\d+),(\\d+)\\}\\}/g, (_, min, max) => {
+      const low = parseInt(min, 10);
+      const high = parseInt(max, 10);
+      return String(Math.floor(Math.random() * (high - low + 1)) + low);
+    });
+
+  // Calculate dynamic cursor caret anchor
+  const cursorIndex = expanded.indexOf('{{cursor}}');
+  return {
+    text: expanded.replace('{{cursor}}', ''),
+    cursorOffset: cursorIndex !== -1 ? cursorIndex : undefined,
+  };
+}`,
     highlights: [
-      'Tested across 65+ automated fixture scenarios',
-      'Tokenizes camelCase, PascalCase, kebab-case, and snake_case',
-      'Deep autocomplete attribute prioritizer',
+      'Sub-millisecond token evaluation ({{date}}, {{time}}, {{uuid}}, {{random}})',
+      'Universal UTF-8 encoding: complete support for all languages and alphabets',
+      'Intelligent cursor caret positioning post-expansion',
     ],
   },
 ];

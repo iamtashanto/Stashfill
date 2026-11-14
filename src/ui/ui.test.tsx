@@ -158,7 +158,7 @@ describe('Stashfill UI Integration, Performance, CRUD, i18n, and Accessibility',
     expect(container.querySelectorAll('[role="listitem"]').length).toBe(2);
   });
 
-  it('switches language between English and Bangla immediately without reload in Popup and Options', async () => {
+  it('renders clean English interface in Popup and passes Axe audit', async () => {
     const { repo, vaultMgr } = await createRepoWithFields([]);
 
     await act(async () => {
@@ -167,19 +167,9 @@ describe('Stashfill UI Integration, Performance, CRUD, i18n, and Accessibility',
     await flushAsync();
 
     expect(container.textContent).toContain(en.actions.fillForm);
+    expect(document.documentElement.lang).toBe('en');
 
-    const langBtn = container.querySelector(
-      `button[aria-label="${en.settings.language}"]`,
-    ) as HTMLButtonElement;
-    expect(langBtn).not.toBeNull();
-
-    langBtn.click();
-    await flushAsync();
-
-    expect(container.textContent).toContain(bn.actions.fillForm);
-    expect(document.documentElement.lang).toBe('bn');
-
-    // Verify Axe audit in Bangla as well
+    // Verify Axe accessibility audit
     expect(runAxeAudit(container)).toEqual([]);
   });
 
