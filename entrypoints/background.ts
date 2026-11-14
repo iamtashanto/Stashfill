@@ -43,7 +43,7 @@ export default defineBackground(() => {
       for (const desc of descriptors) {
         try {
           if (desc.type === 'separator') {
-            browser.contextMenus.create({
+            await browser.contextMenus.create({
               id: desc.id,
               parentId: desc.parentId,
               type: 'separator',
@@ -52,7 +52,7 @@ export default defineBackground(() => {
               >[0]['contexts'],
             });
           } else {
-            browser.contextMenus.create({
+            await browser.contextMenus.create({
               id: desc.id,
               parentId: desc.parentId,
               title: desc.title || 'Stashfill',

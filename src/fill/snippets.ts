@@ -6,26 +6,63 @@ export interface ExpandedSnippet {
 }
 
 /**
- * Expands variables {{date}}, {{time}}, {{datetime}}, and {{cursor}} inside a snippet content string.
- * Returns the expanded text and the character offset where the cursor should be placed (if {{cursor}} was present).
+ * Generates a crypto-random or pseudo-random UUID v4.
+ */
+function generateUuid(): string {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    return crypto.randomUUID();
+  }
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+    const r = (Math.random() * 16) | 0;
+    const v = c === 'x' ? r : (r & 0x3) | 0x8;
+    return v.toString(16);
+  });
+}
+
+/**
+ * Expands variables inside a snippet content string:
+ * - {{date}} -> YYYY-MM-DD
+ * - {{time}} -> HH:MM
+ * - {{datetime}} -> YYYY-MM-DD HH:MM
+ * - {{year}} -> YYYY
+ * - {{month}} -> MM
+ * - {{day}} -> DD
+ * - {{uuid}} -> UUID v4
+ * - {{random:min,max}} -> Random integer between min and max (inclusive)
+ * - {{cursor}} -> Sets the cursor position target and is stripped from output
  */
 export function expandSnippetVariables(content: string, now = new Date()): ExpandedSnippet {
-  const dateStr = now.toISOString().slice(0, 10);
+  const yearStr = String(now.getFullYear());
+  const monthStr = String(now.getMonth() + 1).padStart(2, '0');
+  const dayStr = String(now.getDate()).padStart(2, '0');
+  const dateStr = `${yearStr}-${monthStr}-${dayStr}`;
+
   const hours = String(now.getHours()).padStart(2, '0');
   const mins = String(now.getMinutes()).padStart(2, '0');
   const timeStr = `${hours}:${mins}`;
   const dateTimeStr = `${dateStr} ${timeStr}`;
 
-  const withDates = content
+  let expanded = content
     .replace(/\{\{\s*date\s*\}\}/gi, dateStr)
     .replace(/\{\{\s*time\s*\}\}/gi, timeStr)
-    .replace(/\{\{\s*datetime\s*\}\}/gi, dateTimeStr);
+    .replace(/\{\{\s*datetime\s*\}\}/gi, dateTimeStr)
+    .replace(/\{\{\s*year\s*\}\}/gi, yearStr)
+    .replace(/\{\{\s*month\s*\}\}/gi, monthStr)
+    .replace(/\{\{\s*day\s*\}\}/gi, dayStr)
+    .replace(/\{\{\s*uuid\s*\}\}/gi, () => generateUuid())
+    .replace(/\{\{\s*random:(\d+)\s*,\s*(\d+)\s*\}\}/gi, (_match, p1, p2) => {
+      const min = parseInt(p1, 10);
+      const max = parseInt(p2, 10);
+      if (isNaN(min) || isNaN(max) || min > max) return '0';
+      const rand = Math.floor(Math.random() * (max - min + 1)) + min;
+      return String(rand);
+    });
 
-  const cursorMatch = /\{\{\s*cursor\s*\}\}/i.exec(withDates);
+  const cursorMatch = /\{\{\s*cursor\s*\}\}/i.exec(expanded);
   if (cursorMatch && typeof cursorMatch.index === 'number') {
     const text =
-      withDates.slice(0, cursorMatch.index) +
-      withDates.slice(cursorMatch.index + cursorMatch[0].length);
+      expanded.slice(0, cursorMatch.index) +
+      expanded.slice(cursorMatch.index + cursorMatch[0].length);
     return {
       text,
       cursorOffset: cursorMatch.index,
@@ -33,7 +70,7 @@ export function expandSnippetVariables(content: string, now = new Date()): Expan
   }
 
   return {
-    text: withDates,
+    text: expanded,
     cursorOffset: null,
   };
 }

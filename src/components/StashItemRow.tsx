@@ -5,6 +5,8 @@ interface StashItemRowProps {
   value: string;
   keyName?: string;
   category?: string;
+  profileBadgeText?: string;
+  badgeVariant?: 'profile' | 'snippet';
   onFill: () => void;
   onCopy: () => void;
   fillLabel?: string;
@@ -149,6 +151,8 @@ export function StashItemRow({
   label,
   value,
   keyName,
+  profileBadgeText,
+  badgeVariant = 'profile',
   onFill,
   onCopy,
   fillLabel = 'Fill',
@@ -199,18 +203,37 @@ export function StashItemRow({
           class={`flex h-7 w-7 shrink-0 items-center justify-center rounded-lg transition-colors ${
             sensitive
               ? 'bg-amber-100/80 text-amber-700 dark:bg-amber-950/60 dark:text-amber-300'
-              : 'bg-slate-100 text-slate-500 group-hover:bg-brand-50 group-hover:text-brand-600 dark:bg-slate-800 dark:text-slate-400 dark:group-hover:bg-brand-950/50 dark:group-hover:text-brand-300'
+              : badgeVariant === 'snippet'
+                ? 'bg-purple-100/80 text-purple-700 dark:bg-purple-950/60 dark:text-purple-300'
+                : 'bg-slate-100 text-slate-500 group-hover:bg-brand-50 group-hover:text-brand-600 dark:bg-slate-800 dark:text-slate-400 dark:group-hover:bg-brand-950/50 dark:group-hover:text-brand-300'
           }`}
           aria-hidden="true"
         >
-          {getFieldIcon(keyName, label, sensitive)}
+          {badgeVariant === 'snippet' ? (
+            <svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
+            </svg>
+          ) : (
+            getFieldIcon(keyName, label, sensitive)
+          )}
         </div>
 
         <div class="min-w-0 flex-1">
-          <div class="flex items-center gap-1.5">
+          <div class="flex items-center gap-1.5 flex-wrap">
             <span class="truncate text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
               {label}
             </span>
+            {profileBadgeText && (
+              <span
+                class={`inline-flex items-center rounded-md px-1.5 py-0.2 text-[9px] font-bold border ${
+                  badgeVariant === 'snippet'
+                    ? 'border-purple-200 bg-purple-50 text-purple-700 dark:border-purple-900/60 dark:bg-purple-950/60 dark:text-purple-300'
+                    : 'border-brand-200/80 bg-brand-50/70 text-brand-700 dark:border-brand-900/60 dark:bg-brand-950/60 dark:text-brand-300'
+                }`}
+              >
+                {profileBadgeText}
+              </span>
+            )}
             {useCount > 0 && usedBadgeText && (
               <span class="py-0.2 inline-flex items-center rounded-full bg-slate-100 px-1.5 text-[9px] font-semibold text-slate-600 dark:bg-slate-800 dark:text-slate-300">
                 {usedBadgeText}

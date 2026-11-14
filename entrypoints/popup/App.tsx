@@ -6,12 +6,14 @@ import { VaultManager } from '../../src/vault/vaultManager';
 import {
   type Profile,
   type Field,
+  type Snippet,
   type Settings,
   DEFAULT_SETTINGS,
 } from '../../src/core/schemas/vault';
 import { createPersonalTemplate } from '../../src/core/templates';
 import { type PaymentCard, maskCardNumber } from '../../src/types/vault';
 import { copyCardNumberWithAutoClear } from '../../src/fill/domFiller';
+import { expandSnippetVariables } from '../../src/fill/snippets';
 import { exportPlainJson } from '../../src/storage/importExport';
 import { getTranslations, formatString, type Language } from '../../src/i18n';
 import { StashItemRow } from '../../src/components/StashItemRow';
@@ -30,6 +32,8 @@ export function App({ repository, vaultMgr }: PopupProps = {}) {
 
   const [profiles, setProfiles] = useState<Profile[]>([]);
   const [activeProfile, setActiveProfile] = useState<Profile | null>(null);
+  const [snippets, setSnippets] = useState<Snippet[]>([]);
+  const [selectedFilter, setSelectedFilter] = useState<string>('active');
   const [settings, setSettings] = useState<Settings>(DEFAULT_SETTINGS);
 
   const [searchQuery, setSearchQuery] = useState('');
@@ -87,6 +91,34 @@ export function App({ repository, vaultMgr }: PopupProps = {}) {
         curSettings = await repo.getSettings();
       }
 
+      let allSnippets = await repo.getSnippets();
+      if (allSnippets.length === 0) {
+        const starter: Snippet[] = [
+          {
+            id: 'snip_sig',
+            trigger: ';sig',
+            content: 'Best regards,\nMd Tanvir Ahamed Shanto',
+            folder: 'email',
+          },
+          {
+            id: 'snip_date',
+            trigger: ';date',
+            content: '{{date}}',
+            folder: 'general',
+          },
+          {
+            id: 'snip_now',
+            trigger: ';now',
+            content: '{{datetime}}',
+            folder: 'general',
+          },
+        ];
+        for (const s of starter) {
+          await repo.upsertSnippet(s);
+        }
+        allSnippets = starter;
+      }
+
       const [active, isInit] = await Promise.all([
         repo.getActiveProfile(),
         vaultManager.isInitialized(),
@@ -94,6 +126,7 @@ export function App({ repository, vaultMgr }: PopupProps = {}) {
 
       setProfiles(allProfiles);
       setActiveProfile(active || allProfiles[0] || null);
+      setSnippets(allSnippets);
       setSettings(curSettings);
       setVaultInitialized(isInit);
 
@@ -197,29 +230,33 @@ export function App({ repository, vaultMgr }: PopupProps = {}) {
     }
   };
 
-  const markFieldUsed = async (fieldId: string) => {
-    if (!activeProfile) return;
-    const updatedProfile = await repo.recordFieldUsage(activeProfile.id, fieldId);
+  const markFieldUsed = async (fieldId: string, profileId?: string) => {
+    const targetProfId = profileId || activeProfile?.id;
+    if (!targetProfId) return;
+    const updatedProfile = await repo.recordFieldUsage(targetProfId, fieldId);
     if (updatedProfile) {
-      setActiveProfile(updatedProfile);
+      if (activeProfile && updatedProfile.id === activeProfile.id) {
+        setActiveProfile(updatedProfile);
+      }
       setProfiles((prev) => prev.map((p) => (p.id === updatedProfile.id ? updatedProfile : p)));
     }
   };
 
-  // Fill single field into active focused element
+  // Fill single field into active focused element (supports any profile)
   const handleFillField = async (
     fieldId: string,
     key: string,
     value: string,
     label?: string,
     sensitive?: boolean,
+    profileId?: string,
   ) => {
-    await markFieldUsed(fieldId);
+    await markFieldUsed(fieldId, profileId);
     try {
       const tabs = await browser.tabs.query({ active: true, currentWindow: true });
       const activeTab = tabs[0];
       if (!activeTab?.id) {
-        await handleCopy(fieldId, value, false);
+        await handleCopy(fieldId, value, false, profileId);
         return;
       }
 
@@ -250,22 +287,73 @@ export function App({ repository, vaultMgr }: PopupProps = {}) {
       if (res && res.success) {
         showToast(formatString(t.actions.filled, { count: 1 }), 'success');
       } else {
-        await handleCopy(fieldId, value, false);
+        await handleCopy(fieldId, value, false, profileId);
         showToast(t.actions.copied, 'info');
       }
     } catch {
-      await handleCopy(fieldId, value, false);
+      await handleCopy(fieldId, value, false, profileId);
       showToast(t.actions.copied, 'info');
     }
   };
 
-  // Copy to clipboard
-  const handleCopy = async (fieldId: string, value: string, recordUsage = true) => {
+  // Copy to clipboard (supports any profile)
+  const handleCopy = async (fieldId: string, value: string, recordUsage = true, profileId?: string) => {
     if (recordUsage) {
-      await markFieldUsed(fieldId);
+      await markFieldUsed(fieldId, profileId);
     }
     try {
       await navigator.clipboard.writeText(value);
+      showToast(t.actions.copied, 'success');
+    } catch {
+      showToast(t.actions.copyFailed, 'error');
+    }
+  };
+
+  // Fill text snippet directly into active element with expanded variables
+  const handleFillSnippet = async (snip: Snippet) => {
+    const expanded = expandSnippetVariables(snip.content);
+    try {
+      const tabs = await browser.tabs.query({ active: true, currentWindow: true });
+      const activeTab = tabs[0];
+      if (!activeTab?.id) {
+        await navigator.clipboard.writeText(expanded.text);
+        showToast(t.actions.copied, 'success');
+        return;
+      }
+
+      let res: { success: boolean } | null = null;
+      try {
+        res = (await browser.tabs.sendMessage(activeTab.id, {
+          type: 'FILL_ACTIVE_FIELD',
+          target: {
+            kind: 'profileField',
+            fieldPath: snip.trigger,
+            value: expanded.text,
+            label: snip.trigger,
+            sensitive: false,
+          },
+        })) as { success: boolean };
+      } catch {
+        // Fallback to clipboard
+      }
+
+      if (res && res.success) {
+        showToast(formatString(t.actions.filled, { count: 1 }), 'success');
+      } else {
+        await navigator.clipboard.writeText(expanded.text);
+        showToast(t.actions.copied, 'info');
+      }
+    } catch {
+      await navigator.clipboard.writeText(expanded.text);
+      showToast(t.actions.copied, 'info');
+    }
+  };
+
+  // Copy expanded text snippet to clipboard
+  const handleCopySnippet = async (snip: Snippet) => {
+    const expanded = expandSnippetVariables(snip.content);
+    try {
+      await navigator.clipboard.writeText(expanded.text);
       showToast(t.actions.copied, 'success');
     } catch {
       showToast(t.actions.copyFailed, 'error');
@@ -518,11 +606,140 @@ export function App({ repository, vaultMgr }: PopupProps = {}) {
     setSettings(updated);
   };
 
-  // Sorted & filtered field list: sorted by recent (lastUsedAt desc) then most used (useCount desc)
+  // Sorted & filtered item list: supports multi-profile search, snippets, and fast profile switching
   const visibleItems = useMemo(() => {
-    if (!activeProfile || !activeProfile.fields) return [];
+    const q = searchQuery.trim().toLowerCase();
 
-    const nonEmptyFields = activeProfile.fields.filter((f) => f.value && f.value.trim().length > 0);
+    // 1. If searching, perform instantaneous global search across ALL profiles and snippets
+    if (q) {
+      const results: {
+        id: string;
+        rawFieldId?: string;
+        isSnippet?: boolean;
+        snippet?: Snippet;
+        label: string;
+        value: string;
+        group: string;
+        key: string;
+        sensitive: boolean;
+        useCount: number;
+        profileId?: string;
+        profileName?: string;
+      }[] = [];
+
+      // Search in all profiles
+      for (const prof of profiles) {
+        for (const f of prof.fields) {
+          if (!f.value || !f.value.trim()) continue;
+          const matchLabel = f.label.toLowerCase().includes(q);
+          const matchVal = !f.sensitive && f.value.toLowerCase().includes(q);
+          const matchProf = prof.name.toLowerCase().includes(q);
+          const matchKey = f.key.toLowerCase().includes(q);
+          if (matchLabel || matchVal || matchProf || matchKey) {
+            results.push({
+              id: `${prof.id}:${f.id}`,
+              rawFieldId: f.id,
+              label: f.label,
+              value: f.value,
+              group: f.category || prof.name,
+              key: f.key,
+              sensitive: f.sensitive,
+              useCount: f.useCount,
+              profileId: prof.id,
+              profileName: prof.name,
+            });
+          }
+        }
+      }
+
+      // Search in snippets
+      for (const snip of snippets) {
+        const matchTrig = snip.trigger.toLowerCase().includes(q);
+        const matchContent = snip.content.toLowerCase().includes(q);
+        const matchFolder = snip.folder.toLowerCase().includes(q);
+        if (matchTrig || matchContent || matchFolder) {
+          results.push({
+            id: `snip:${snip.id}`,
+            isSnippet: true,
+            snippet: snip,
+            label: snip.trigger,
+            value: snip.content,
+            group: snip.folder,
+            key: snip.trigger,
+            sensitive: false,
+            useCount: 0,
+            profileName: t.sections.snippets,
+          });
+        }
+      }
+
+      return results;
+    }
+
+    // 2. Snippets tab selected
+    if (selectedFilter === 'snippets') {
+      return snippets.map((snip) => ({
+        id: `snip:${snip.id}`,
+        isSnippet: true,
+        snippet: snip,
+        label: snip.trigger,
+        value: snip.content,
+        group: snip.folder,
+        key: snip.trigger,
+        sensitive: false,
+        useCount: 0,
+        profileName: t.sections.snippets,
+      }));
+    }
+
+    // 3. All Profiles tab selected
+    if (selectedFilter === 'all') {
+      const allList: {
+        id: string;
+        rawFieldId?: string;
+        isSnippet?: boolean;
+        snippet?: Snippet;
+        label: string;
+        value: string;
+        group: string;
+        key: string;
+        sensitive: boolean;
+        useCount: number;
+        profileId?: string;
+        profileName?: string;
+      }[] = [];
+
+      for (const prof of profiles) {
+        for (const f of prof.fields) {
+          if (!f.value || !f.value.trim()) continue;
+          allList.push({
+            id: `${prof.id}:${f.id}`,
+            rawFieldId: f.id,
+            label: f.label,
+            value: f.value,
+            group: f.category || prof.name,
+            key: f.key,
+            sensitive: f.sensitive,
+            useCount: f.useCount,
+            profileId: prof.id,
+            profileName: prof.name,
+          });
+        }
+      }
+      return allList;
+    }
+
+    // 4. Default: Specific profile (activeProfile or clicked profile)
+    const targetProf =
+      selectedFilter === 'active'
+        ? activeProfile
+        : profiles.find((p) => p.id === selectedFilter) || activeProfile;
+
+    if (!targetProf || !targetProf.fields) return [];
+
+    const nonEmptyFields = targetProf.fields.filter(
+      (f) => f.value && f.value.trim().length > 0,
+    );
 
     const sorted = [...nonEmptyFields].sort((a, b) => {
       const lastA = a.lastUsedAt ?? 0;
@@ -531,26 +748,19 @@ export function App({ repository, vaultMgr }: PopupProps = {}) {
       return (b.useCount ?? 0) - (a.useCount ?? 0);
     });
 
-    const mapped = sorted.map((field) => ({
-      id: field.id,
+    return sorted.map((field) => ({
+      id: `${targetProf.id}:${field.id}`,
+      rawFieldId: field.id,
       label: field.label,
       value: field.value,
-      group: field.category || t.sections.personal,
+      group: field.category || targetProf.name,
       key: field.key,
       sensitive: field.sensitive,
       useCount: field.useCount,
+      profileId: targetProf.id,
+      profileName: targetProf.name,
     }));
-
-    if (!searchQuery.trim()) return mapped;
-
-    const q = searchQuery.toLowerCase();
-    return mapped.filter(
-      (item) =>
-        item.label.toLowerCase().includes(q) ||
-        (!item.sensitive && item.value.toLowerCase().includes(q)) ||
-        item.group.toLowerCase().includes(q),
-    );
-  }, [activeProfile, searchQuery, t]);
+  }, [activeProfile, profiles, snippets, selectedFilter, searchQuery, t]);
 
   // Global keyboard shortcuts
   useEffect(() => {
@@ -590,7 +800,18 @@ export function App({ repository, vaultMgr }: PopupProps = {}) {
         const item = visibleItems[selectedItemIndex];
         if (item) {
           e.preventDefault();
-          handleFillField(item.id, item.key, item.value, item.label, item.sensitive);
+          if (item.isSnippet && item.snippet) {
+            handleFillSnippet(item.snippet);
+          } else {
+            handleFillField(
+              item.rawFieldId || item.id,
+              item.key,
+              item.value,
+              item.label,
+              item.sensitive,
+              item.profileId,
+            );
+          }
         }
       }
     };
@@ -952,6 +1173,91 @@ export function App({ repository, vaultMgr }: PopupProps = {}) {
               </span>
             )}
           </div>
+
+          {/* Quick Profile & Snippets Switcher Pills */}
+          <div
+            role="tablist"
+            aria-label="Filter profile data"
+            class="flex items-center gap-1.5 overflow-x-auto py-1 scrollbar-none"
+          >
+            {activeProfile && (
+              <button
+                type="button"
+                role="tab"
+                aria-selected={selectedFilter === activeProfile.id || selectedFilter === 'active'}
+                onClick={() => setSelectedFilter(activeProfile.id)}
+                class={`shrink-0 cursor-pointer rounded-full px-2.5 py-0.5 text-[10px] font-bold transition-all ${
+                  selectedFilter === activeProfile.id || selectedFilter === 'active'
+                    ? 'bg-brand-600 text-white shadow-xs'
+                    : 'border border-slate-200/80 bg-white text-slate-600 hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700'
+                }`}
+              >
+                {activeProfile.name} ★
+              </button>
+            )}
+
+            {profiles
+              .filter((p) => p.id !== activeProfile?.id)
+              .map((p) => (
+                <button
+                  key={p.id}
+                  type="button"
+                  role="tab"
+                  aria-selected={selectedFilter === p.id}
+                  onClick={() => setSelectedFilter(p.id)}
+                  class={`shrink-0 cursor-pointer rounded-full px-2.5 py-0.5 text-[10px] font-bold transition-all ${
+                    selectedFilter === p.id
+                      ? 'bg-brand-600 text-white shadow-xs'
+                      : 'border border-slate-200/80 bg-white text-slate-600 hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700'
+                  }`}
+                >
+                  {p.name}
+                </button>
+              ))}
+
+            {profiles.length > 1 && (
+              <button
+                type="button"
+                role="tab"
+                aria-selected={selectedFilter === 'all'}
+                onClick={() => setSelectedFilter('all')}
+                class={`shrink-0 cursor-pointer rounded-full px-2.5 py-0.5 text-[10px] font-bold transition-all ${
+                  selectedFilter === 'all'
+                    ? 'bg-brand-600 text-white shadow-xs'
+                    : 'border border-slate-200/80 bg-white text-slate-600 hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700'
+                }`}
+              >
+                {t.sections.allProfiles}
+              </button>
+            )}
+
+            <button
+              type="button"
+              role="tab"
+              aria-selected={selectedFilter === 'snippets'}
+              onClick={() => setSelectedFilter('snippets')}
+              class={`inline-flex shrink-0 cursor-pointer items-center gap-1 rounded-full px-2.5 py-0.5 text-[10px] font-bold transition-all ${
+                selectedFilter === 'snippets'
+                  ? 'bg-purple-600 text-white shadow-xs'
+                  : 'border border-slate-200/80 bg-white text-slate-600 hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700'
+              }`}
+            >
+              <svg class="h-2.5 w-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="2.2"
+                  d="M13 10V3L4 14h7v7l9-11h-7z"
+                />
+              </svg>
+              <span>{t.sections.snippets}</span>
+              {snippets.length > 0 && (
+                <span class="rounded-full bg-purple-100 px-1 text-[8px] font-bold text-purple-700 dark:bg-purple-900/60 dark:text-purple-300">
+                  {snippets.length}
+                </span>
+              )}
+            </button>
+          </div>
         </div>
 
         {/* Main List Area */}
@@ -972,8 +1278,21 @@ export function App({ repository, vaultMgr }: PopupProps = {}) {
                 />
               </svg>
               <p class="mt-2 text-xs font-medium text-slate-500 dark:text-slate-400">
-                {searchQuery ? t.emptyStates.noFieldsMatchSearch : t.emptyStates.noFieldsInProfile}
+                {searchQuery
+                  ? t.emptyStates.noFieldsMatchSearch
+                  : selectedFilter === 'snippets'
+                    ? t.snippets.emptyState
+                    : t.emptyStates.noFieldsInProfile}
               </p>
+              {selectedFilter === 'snippets' && !searchQuery && (
+                <button
+                  type="button"
+                  onClick={openOptionsPage}
+                  class="mt-2 inline-flex cursor-pointer items-center gap-1.5 rounded-lg bg-purple-50 px-3 py-1.5 text-xs font-semibold text-purple-700 transition-colors hover:bg-purple-100 dark:bg-purple-950/60 dark:text-purple-300 dark:hover:bg-purple-900/60"
+                >
+                  + {t.snippets.addSnippet}
+                </button>
+              )}
             </div>
           ) : (
             <div role="list" class="space-y-0.5">
@@ -984,8 +1303,18 @@ export function App({ repository, vaultMgr }: PopupProps = {}) {
                   value={item.value}
                   sensitive={item.sensitive}
                   useCount={item.useCount}
+                  profileBadgeText={
+                    item.isSnippet
+                      ? item.label
+                      : selectedFilter === 'all' ||
+                          searchQuery ||
+                          item.profileId !== activeProfile?.id
+                        ? item.profileName
+                        : undefined
+                  }
+                  badgeVariant={item.isSnippet ? 'snippet' : 'profile'}
                   usedBadgeText={
-                    item.useCount > 0
+                    !item.isSnippet && item.useCount > 0
                       ? formatString(t.fields.mostUsedBadge, { count: item.useCount })
                       : undefined
                   }
@@ -994,10 +1323,32 @@ export function App({ repository, vaultMgr }: PopupProps = {}) {
                   revealLabel={t.actions.reveal}
                   hideLabel={t.actions.hide}
                   isSelected={idx === selectedItemIndex}
-                  onFill={() =>
-                    handleFillField(item.id, item.key, item.value, item.label, item.sensitive)
-                  }
-                  onCopy={() => handleCopy(item.id, item.value)}
+                  onFill={() => {
+                    if (item.isSnippet && item.snippet) {
+                      void handleFillSnippet(item.snippet);
+                    } else {
+                      void handleFillField(
+                        item.rawFieldId || item.id,
+                        item.key,
+                        item.value,
+                        item.label,
+                        item.sensitive,
+                        item.profileId,
+                      );
+                    }
+                  }}
+                  onCopy={() => {
+                    if (item.isSnippet && item.snippet) {
+                      void handleCopySnippet(item.snippet);
+                    } else {
+                      void handleCopy(
+                        item.rawFieldId || item.id,
+                        item.value,
+                        true,
+                        item.profileId,
+                      );
+                    }
+                  }}
                 />
               ))}
             </div>

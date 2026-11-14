@@ -352,9 +352,12 @@ export function App({ repository, vaultMgr, defaultOpenOnboarding = false }: Opt
       useCount: 0,
       lastUsedAt: null,
     };
+    if (fieldQuery) {
+      setFieldQuery('');
+    }
     setProfileForm({
       ...profileForm,
-      fields: [...profileForm.fields, newField],
+      fields: [newField, ...profileForm.fields],
     });
   };
 
@@ -1886,6 +1889,30 @@ export function App({ repository, vaultMgr, defaultOpenOnboarding = false }: Opt
                       placeholder={t.snippets.contentPlaceholder}
                       class="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-xs font-medium text-slate-900 transition-colors focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
                     />
+                    {/* Dynamic Variable helper chips */}
+                    <div class="mt-2 flex flex-wrap items-center gap-1.5">
+                      <span class="text-[10px] font-semibold text-slate-500 dark:text-slate-400">
+                        Variables:
+                      </span>
+                      {[
+                        '{{date}}',
+                        '{{time}}',
+                        '{{datetime}}',
+                        '{{year}}',
+                        '{{uuid}}',
+                        '{{random:1000,9999}}',
+                        '{{cursor}}',
+                      ].map((v) => (
+                        <button
+                          key={v}
+                          type="button"
+                          onClick={() => setSnippetContent((prev) => `${prev}${prev && !prev.endsWith(' ') ? ' ' : ''}${v}`)}
+                          class="cursor-pointer rounded-md border border-slate-200/80 bg-white px-1.5 py-0.5 font-mono text-[10px] font-medium text-slate-700 hover:border-brand-400 hover:bg-brand-50 hover:text-brand-700 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300 dark:hover:border-brand-600 dark:hover:bg-brand-950/60 dark:hover:text-brand-300"
+                        >
+                          {v}
+                        </button>
+                      ))}
+                    </div>
                   </div>
                   <div class="flex items-center justify-end gap-2.5 pt-1">
                     {editingSnippetId && (

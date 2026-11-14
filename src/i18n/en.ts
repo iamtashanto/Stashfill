@@ -57,6 +57,7 @@ export const en = {
     siteRules: 'Site Rules',
     categories: 'Categories',
     allCategories: 'All Categories',
+    allProfiles: 'All Profiles',
   },
 
   // Field labels

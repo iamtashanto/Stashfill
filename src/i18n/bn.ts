@@ -57,6 +57,7 @@ export const bn: Translations = {
     siteRules: 'সাইট রুলস',
     categories: 'ক্যাটাগরি',
     allCategories: 'সব ক্যাটাগরি',
+    allProfiles: 'সকল প্রোফাইল',
   },
 
   fields: {

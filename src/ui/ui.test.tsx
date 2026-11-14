@@ -326,4 +326,132 @@ describe('Stashfill UI Integration, Performance, CRUD, i18n, and Accessibility',
 
     expect(container.querySelector('[role="dialog"]')).toBeNull();
   });
+
+  it('prepends newly added field at the top of the fields list in Options', async () => {
+    const now = Date.now();
+    const initialFields: Field[] = [
+      {
+        id: 'f1',
+        label: 'Existing Field A',
+        key: 'field_a',
+        value: 'Value A',
+        type: 'text',
+        category: 'custom',
+        tags: [],
+        sensitive: false,
+        createdAt: now,
+        updatedAt: now,
+        useCount: 0,
+        lastUsedAt: null,
+      },
+      {
+        id: 'f2',
+        label: 'Existing Field B',
+        key: 'field_b',
+        value: 'Value B',
+        type: 'text',
+        category: 'custom',
+        tags: [],
+        sensitive: false,
+        createdAt: now,
+        updatedAt: now,
+        useCount: 0,
+        lastUsedAt: null,
+      },
+    ];
+
+    const { repo, vaultMgr } = await createRepoWithFields(initialFields);
+
+    await act(async () => {
+      render(<OptionsApp repository={repo} vaultMgr={vaultMgr} />, container);
+    });
+    await flushAsync();
+
+    // Click "+ Quick Add" in Options
+    const quickAddBtn = Array.from(container.querySelectorAll('button')).find((b) =>
+      b.textContent?.includes(en.actions.quickAdd),
+    ) as HTMLButtonElement;
+    expect(quickAddBtn).not.toBeNull();
+
+    await act(async () => {
+      quickAddBtn.click();
+    });
+    await flushAsync();
+
+    // The newly created field must be at the very top (index 0)
+    const fieldInputs = container.querySelectorAll('input[id^="field-label-"]');
+    expect(fieldInputs.length).toBe(3);
+    expect((fieldInputs[0] as HTMLInputElement).value).toBe(en.sections.custom);
+    expect((fieldInputs[1] as HTMLInputElement).value).toBe('Existing Field A');
+    expect((fieldInputs[2] as HTMLInputElement).value).toBe('Existing Field B');
+  });
+
+  it('supports cross-profile search and snippet tabs in Popup', async () => {
+    const { repo, vaultMgr } = await createRepoWithFields([]);
+
+    // Add a Work profile
+    const workProfile = {
+      id: 'prof_work',
+      name: 'Work',
+      icon: 'briefcase',
+      fields: [
+        {
+          id: 'w1',
+          key: 'work_email',
+          label: 'Work Email',
+          type: 'email' as const,
+          category: 'work',
+          value: 'tanvir@workplace.com',
+          tags: ['work'],
+          sensitive: false,
+          createdAt: 1000,
+          updatedAt: 1000,
+          useCount: 2,
+          lastUsedAt: 2000,
+        },
+      ],
+    };
+    await repo.upsertProfile(workProfile);
+
+    // Add a snippet
+    await repo.upsertSnippet({
+      id: 'snip_hello',
+      trigger: ';hello',
+      content: 'Hello, world!',
+      folder: 'general',
+    });
+
+    await act(async () => {
+      render(<PopupApp repository={repo} vaultMgr={vaultMgr} />, container);
+    });
+    await flushAsync();
+
+    // Should display filter tab pills
+    const tabs = container.querySelectorAll('[role="tab"]');
+    expect(tabs.length).toBeGreaterThanOrEqual(3); // Active, Work, Snippets
+    expect(container.textContent).toContain('Work');
+    expect(container.textContent).toContain(en.sections.snippets);
+
+    // Global search: search for "workplace" (which is in the Work profile)
+    const searchInput = container.querySelector('#popup-search-input') as HTMLInputElement;
+    expect(searchInput).not.toBeNull();
+
+    await act(async () => {
+      fireInput(searchInput, 'workplace');
+    });
+    await flushAsync();
+
+    // Work field should appear with "Work" profile badge
+    expect(container.textContent).toContain('Work Email');
+    expect(container.textContent).toContain('tanvir@workplace.com');
+
+    // Global search: search for snippet trigger ";hello"
+    await act(async () => {
+      fireInput(searchInput, ';hello');
+    });
+    await flushAsync();
+
+    expect(container.textContent).toContain(';hello');
+    expect(container.textContent).toContain('Hello, world!');
+  });
 });

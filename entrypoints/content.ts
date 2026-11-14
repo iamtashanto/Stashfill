@@ -175,6 +175,13 @@ export default defineContentScript({
       }
     }
 
+    // Auto-refresh caches on live storage changes so open tabs immediately see updated snippets/profiles
+    if (typeof browser !== 'undefined' && browser.storage?.onChanged) {
+      browser.storage.onChanged.addListener(() => {
+        void refreshCache();
+      });
+    }
+
     // Per-site "always auto-fill": runs once after load, only into empty, non-sensitive fields
     async function runAutoFillForSite() {
       await refreshCache();
@@ -411,20 +418,30 @@ export default defineContentScript({
         const siteRule = cachedSiteRules.find((r) => r.host.toLowerCase() === host);
         if (siteRule?.snippetsDisabled || siteRule?.autoFillRule === 'never') return;
 
+        const cursorPos =
+          typeof target.selectionEnd === 'number' ? target.selectionEnd : target.value.length;
+        const textBeforeCursor = target.value.slice(0, cursorPos);
+        const textAfterCursor = target.value.slice(cursorPos);
+
         const prefix = cachedSettings?.snippetTriggerPrefix || ';';
-        const match = findMatchingSnippetTrigger(target.value, cachedSnippets, prefix);
+        const match = findMatchingSnippetTrigger(textBeforeCursor, cachedSnippets, prefix);
         if (match) {
           const expanded = expandSnippetVariables(match.snippet.content);
-          const nextValue =
-            target.value.slice(0, target.value.length - match.matchedTrigger.length) +
-            expanded.text;
+          const prefixBeforeTrigger = textBeforeCursor.slice(
+            0,
+            textBeforeCursor.length - match.matchedTrigger.length,
+          );
+          const nextValue = prefixBeforeTrigger + expanded.text + textAfterCursor;
           fillElement(target, nextValue, true);
-          if (expanded.cursorOffset !== null && typeof target.setSelectionRange === 'function') {
-            const pos = target.value.length - expanded.text.length + expanded.cursorOffset;
+          if (typeof target.setSelectionRange === 'function') {
+            const targetCursorPos =
+              expanded.cursorOffset !== null
+                ? prefixBeforeTrigger.length + expanded.cursorOffset
+                : prefixBeforeTrigger.length + expanded.text.length;
             try {
-              target.setSelectionRange(pos, pos);
+              target.setSelectionRange(targetCursorPos, targetCursorPos);
             } catch {
-              // ignore on input types that don't support setSelectionRange
+              // ignore on input types that don't support setSelectionRange (e.g. email, number)
             }
           }
         }
