@@ -30,7 +30,9 @@
     "test:coverage": "node scripts/check-coverage.mjs",
     "test:watch": "vitest",
     "test:e2e": "wxt build && wxt build -b firefox --mv3 && playwright test",
-    "e2e": "wxt build && wxt build -b firefox --mv3 && playwright test"
+    "e2e": "wxt build && wxt build -b firefox --mv3 && playwright test",
+    "website:dev": "npm --prefix website run dev",
+    "website:build": "npm --prefix website run build"
   },
   "dependencies": {
     "clsx": "^2.1.1",
